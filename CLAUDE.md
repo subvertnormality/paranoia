@@ -67,3 +67,5 @@
   lane, follow-up, and consolidation-preflight validation are structured staged failures carrying
   exact role, kind, and message; preserve timeout, unavailable, provider, execution, and retry roles
   rather than flattening them.
+
+See [architecture and performance behavior](docs/how-it-works.md#architecture-and-performance-behavior) for class-only final scheduling, validated checkpoints, rebut ownership routing and diagnostic run timing. Preserve all canonical validation and cold-final coverage.

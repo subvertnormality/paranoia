@@ -199,6 +199,14 @@ Any later finding, reopen, or replacement for that class requires the decision's
 keyed challenge with new resolved evidence; unrelated snapshot and stakes changes
 do not remove it.
 
+
+Rebut routing uses explicit server-written successful session observations in
+the configured and default audit directories. A known session selects its owner
+unless an explicitly supplied engine conflicts. Unknown ownership requires
+`engine`; conflicting owners always block before spend. An incomplete audit
+scan disables automatic routing, while an explicit engine may proceed unless a
+known conflict exists. Routing does not replace durable bound-rebut authority.
+
 ## `arbitrate`
 
 Required: `repo_path`, `decision`, `options`, `stakes`.

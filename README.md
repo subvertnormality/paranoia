@@ -223,6 +223,14 @@ guesses, clamps, drops evidence, or partially settles an unresolved citation.
 Mechanized branch classes remain predicate-owned and must be closed by a normal
 `critique_branch` sweep rather than a bound rebut.
 
+
+Rebut routing uses explicit server-written successful session observations in
+the configured and default audit directories. A known session selects its owner
+unless an explicitly supplied engine conflicts. Unknown ownership requires
+`engine`; conflicting owners always block before spend. An incomplete audit
+scan disables automatic routing, while an explicit engine may proceed unless a
+known conflict exists. Routing does not replace durable bound-rebut authority.
+
 ### Arbitrate a decision
 
 `arbitrate` runs both vendors independently over one pinned repository snapshot:

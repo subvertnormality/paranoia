@@ -15,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from scripts.acceptance_sources import historical_inventory
+
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, review_census as rc, staged_protocol as sp
 from paranoia_local.engines import Review
@@ -241,7 +243,7 @@ def validate_artifact(
             raise ValueError("artifact commit identity is invalid")
         # The retained provider exchange remains bound to its historical source revision.
         # Later commits may amend only the exact, hashed source diffs below.
-    if set(artifact["source_sha256"]) != set(SOURCES):
+    if set(artifact["source_sha256"]) != historical_inventory(root, revision, SOURCES):
         raise ValueError("source inventory is not exact")
     allowed = artifact["allowed_later_source_diffs"]
     changed: set[str] = set()

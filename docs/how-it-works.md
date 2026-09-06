@@ -284,3 +284,48 @@ validation-invalid terminal retry may recover a previously sessionless gate.
 A failed staged structural review begins `# STAGED REVIEW FAILED` and states
 whether failure occurred before settlement or after unconfirmed persistence. It
 never renders a clean-review scaffold.
+
+
+## Architecture and performance behavior
+
+Phase decisions are pure functions in `review_transitions.py`; canonical class
+validation and the existing atomic lineage save still own settlement. A newly
+validated correction that closes finding debt but leaves blocking classes schedules
+one cold final, owned by that correction's engine. That final checks every active
+class and the whole artifact. Existing owned finals retain their owner; old
+ownerless class-only state remains on the conservative census route.
+
+A fully valid correction that leaves a persistently gated class blocking returns
+an **ARCHITECTURE CHECKPOINT**. No proposed class/debt operations or round/correction
+counters apply, and persistence alone does not consume a formatting retry.
+Malformed output still receives one repair attempt. The current validated session
+and reviewed snapshot/plan bounds must save atomically before bound rebut is
+available; absent sessions or ambiguous saves cannot provide authority. Existing
+failure debt remains blocking. Repair the architecture coherently or use an
+evidence-bearing bound HOLD/CONCEDE; a checkpoint never grants clearance.
+
+Public dispatch writes a linked `run` audit alongside existing tool audits for
+all five review modes. `total_elapsed_ms` measures local dispatch wall time, not
+the sum of overlapping attempts. Attempts record prompt/schema digests, engine
+settings, the actual timeout supplied, session, return code, local elapsed time
+and separate provider duration. Source fingerprints observe on-disk package bytes
+at import and finish; they are diagnostics, not proof of loaded Python code or a
+replacement for authoritative snapshot/contract bindings. Audit failure cannot
+discard a review.
+
+Both runner modes use strict UTF-8 and a common process-group lifecycle. Timeout
+cleanup is bounded by two additional seconds on POSIX and four on Windows,
+including the Windows tree-termination command. Ordinary descendants retaining
+pipes cannot extend review execution indefinitely; hostile daemon escape is
+outside the supported model. Normal role timeout budgets are unchanged.
+
+Large branch plan contracts include an ATX heading index derived from the captured
+LF line collection, outside fenced examples. The complete contract, digest,
+line coordinates and authority fence are preserved. Reviewers inspect source and
+test code through read-only capabilities; they do not execute repository tests.
+
+Reproduce the deterministic call comparison with
+`python scripts/benchmark_review_transitions.py --baseline /path/to/baseline --output /tmp/comparison.json`.
+Its fixed lifecycle fixtures prove avoided calls and preserved outcomes, not
+real-provider latency or general review precision/recall. Repeated paired live
+quality trials remain tracked in GitHub issue #49.

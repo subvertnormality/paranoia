@@ -609,8 +609,11 @@ all schema, registration, provider, policy, and test projections derive from tha
 Mechanized branch classes remain owned by the canonical predicate sweep: refuse their bound rebut
 before provider spend and require `critique_branch` to decide closure.
 The durable row is exactly `reset_round`, `reopen_count`, and `last_session_ref`. Current-attempt
-session authority replaces stale authority even when it is null; a terminal gate bootstrap may
-use only the exact validation-invalid terminal retry and only for a previously sessionless row.
+session authority replaces stale authority even when it is null. A fully validated gated
+correction becomes an architecture checkpoint without a formatting retry. Preserve substantive
+class/debt/round/counter state and prior failure debt; atomically bind only its current session
+and reviewed snapshot/plan bounds before offering rebut. Invalid output still receives the
+existing single validation retry; invalid or absent sessions provide no rebut authority.
 Clear session authority when a class becomes closed or advisory, and accept a bound rebut only for
 a currently blocking class in correction phase whose named open debt binds only that class. Refuse
 settlement while staged/format/validation failure or an unbound blocker exists. Repeated/backward caller labels refuse before provider, cache, snapshot,

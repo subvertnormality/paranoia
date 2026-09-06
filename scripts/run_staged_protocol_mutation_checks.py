@@ -237,6 +237,66 @@ CROSS_MODULE_MUTATIONS = (
 )
 
 
+
+def assertion_kill(returncode: int, report: str) -> bool:
+    """Only an executed assertion failure counts; pytest infrastructure errors do not."""
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(report)
+    except ET.ParseError:
+        return False
+    cases = list(root.iter("testcase"))
+    failures = [failure for case in cases for failure in case.findall("failure")]
+    return (
+        returncode == 1 and bool(cases) and bool(failures)
+        and not list(root.iter("error")) and not list(root.iter("skipped"))
+        and all(
+            "AssertionError" in (failure.get("message", "") + (failure.text or ""))
+            or "DID NOT RAISE" in failure.get("message", "")
+            for failure in failures
+        )
+    )
+
+
+def exercise(package_root: Path, source: Path, test: str, test_name: str):
+    """Prove both an executed source location and the selected pytest outcome."""
+    import json
+    with TemporaryDirectory(prefix="paranoia-mutation-probe-") as directory:
+        probe_root = Path(directory)
+        report = probe_root / "result.xml"
+        hit_file = probe_root / "hits.json"
+        plugin = probe_root / "paranoia_mutation_probe.py"
+        plugin.write_text(
+            "import sys, threading, json\n"
+            f"TARGET = {str(source)!r}\n"
+            "hits = set()\n"
+            "def trace(frame, event, arg):\n"
+            "    if frame.f_code.co_filename != TARGET: return None\n"
+            "    if event == 'line': hits.add(frame.f_lineno)\n"
+            "    return trace\n"
+            "def pytest_sessionstart(session):\n"
+            "    sys.settrace(trace); threading.settrace(trace)\n"
+            "def pytest_sessionfinish(session, exitstatus):\n"
+            "    sys.settrace(None); threading.settrace(None)\n"
+            f"    open({str(hit_file)!r}, 'w').write(json.dumps(sorted(hits)))\n",
+            encoding="utf-8",
+        )
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join((
+            str(probe_root), str(package_root), str(ROOT), env.get("PYTHONPATH", ""),
+        ))
+        completed = subprocess.run(
+            [sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
+             "-p", "paranoia_mutation_probe", f"--junitxml={report}",
+             f"{ROOT / test}::{test_name}"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        return (
+            completed,
+            report.read_text() if report.exists() else "",
+            set(json.loads(hit_file.read_text())) if hit_file.exists() else set(),
+        )
+
 def main() -> int:
     source_env = dict(os.environ)
     source_env["PYTHONPATH"] = os.pathsep.join((
@@ -273,19 +333,19 @@ def main() -> int:
             shutil.copytree(ROOT / "src" / "paranoia_local", package_root / "paranoia_local")
             target = package_root / "paranoia_local" / source.name
             target.write_text(original.replace(before, after), encoding="utf-8")
-            env = dict(os.environ)
-            env["PYTHONPATH"] = os.pathsep.join((
-                str(package_root), str(ROOT), env.get("PYTHONPATH", ""),
-            ))
-            completed = subprocess.run(
-                [
-                    sys.executable, "-m", "pytest", "-q", "-c", "/dev/null",
-                    f"{ROOT / test}::{test_name}",
-                ],
-                cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+            baseline, baseline_xml, baseline_hits = exercise(
+                ROOT / "src", source, test, test_name,
             )
-            if completed.returncode == 0:
-                failures.append(f"{name}: survived {test_name}")
+            line = original[:original.index(before)].count("\n") + 1
+            if baseline.returncode != 0 or not baseline_hits:
+                failures.append(f"{name}: selected baseline failed or source was not exercised")
+                continue
+            completed, report, hits = exercise(package_root, target, test, test_name)
+            changed_lines = set(range(line, line + len(after.splitlines())))
+            if not changed_lines & hits:
+                failures.append(f"{name}: intended mutation was not exercised")
+            elif not assertion_kill(completed.returncode, report):
+                failures.append(f"{name}: survived or failed outside an expected test assertion")
             else:
                 print(f"KILLED {name} by {test_name}")
     if failures:

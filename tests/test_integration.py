@@ -93,7 +93,7 @@ class TestDispatchEndToEnd:
     def test_rebut_resumes_via_dispatch(self, repo, tmp_path, fake_bins):
         out = server.dispatch(
             "rebut",
-            {"repo_path": str(repo), "session_ref": "fake-thread-1",
+            {"repo_path": str(repo), "session_ref": "fake-thread-1", "engine": "codex",
              "rebuttal": "that branch is unreachable", "round": 1},
             default_engine_name="codex", log_dir=tmp_path / "logs", now=lambda: "t1",
         )

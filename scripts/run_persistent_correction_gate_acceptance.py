@@ -18,6 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+from scripts.acceptance_sources import historical_inventory
+
 from paranoia_local import class_closure as cc
 from paranoia_local import (
     engines, handlers, orientation, prompts, review_census as rc,
@@ -587,7 +589,7 @@ def validate_artifact(
         if missing:
             raise ValueError(f"{relative} omits public contract tokens {missing!r}")
     revision = artifact["source_revision"]
-    expected_sources = set(ACCEPTANCE_SOURCES)
+    expected_sources = historical_inventory(root, revision, ACCEPTANCE_SOURCES)
     if revision == LEGACY_SOURCE_REVISION:
         expected_sources -= {
             "README.md", "docs/tool-reference.md", "docs/llm-reference.md",

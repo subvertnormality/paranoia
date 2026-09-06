@@ -130,6 +130,14 @@ The response is a direct answer with citations and a stated confidence level.
 
 Resumes the reviewer session that produced a disputed finding.
 
+Rebut routing uses explicit server-written successful session observations in
+the configured and default audit directories. A known session selects its owner
+unless an explicitly supplied engine conflicts. Unknown ownership requires
+`engine`; conflicting owners always block before spend. An incomplete audit
+scan disables automatic routing, while an explicit engine may proceed unless a
+known conflict exists. Routing does not replace durable bound-rebut authority.
+
+
 | Argument | Type | Default | Description |
 |---|---|---|---|
 | `repo_path` | string | Required | Same repository used for the review |
@@ -307,3 +315,24 @@ paranoia-local --engine {codex|claude} [--log-dir DIR]
 | `PARANOIA_STATE_ROOT` | Optional lineage-state root override |
 
 Changing `--log-dir` does not move or reset lineage state.
+
+
+### Neutral ballot example
+
+Use comparable factual options and a shared decision criterion. This is a writing template, not an API payload:
+
+```json
+{
+  "decision": "Choose the cache lifetime for configuration reads.",
+  "options": [
+    {"id": "A", "description": "Reload configuration on every request."},
+    {"id": "B", "description": "Reload configuration once per minute."}
+  ],
+  "context": "One process; configuration changes at most hourly. Assess freshness, failure recovery and request latency."
+}
+```
+
+Adapt these field names to the tool's option schema. State any measured costs
+with evidence. Avoid labels such as “safe solution” or “reckless workaround”.
+Cleaning makes the smallest faithful edits, preserves substantive asymmetry and
+leaves neutral wording unchanged; independent fidelity and advocacy checks remain.

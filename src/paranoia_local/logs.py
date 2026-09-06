@@ -28,7 +28,11 @@ def write_log(
         # A short random suffix keeps two same-tool reviews that finish within the
         # same clock second (the timestamp's resolution) from overwriting each other.
         path = log_dir / f"{timestamp}-{tool}-{uuid.uuid4().hex[:8]}.json"
+        from .telemetry import CURRENT
+        trace = CURRENT.get()
         payload = {"timestamp": timestamp, "tool": tool, **record}
+        if trace is not None:
+            payload["run_id"] = trace.run_id
         path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
         return path
     except Exception:  # noqa: BLE001 — never let audit logging break a review

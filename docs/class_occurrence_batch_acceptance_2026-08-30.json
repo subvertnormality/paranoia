@@ -1,17 +1,62 @@
 {
   "acceptance_kind": "class-occurrence-batch-public-branch-handler-v1",
   "allowed_later_source_diffs": {
-    "scripts/run_class_occurrence_batch_acceptance.py": {"scope": "Fail-closed later-diff validation plus exact projection of issues #94, #98, #106, and #108 additions while replaying the unchanged historical provider payload; issue #108 runtime migration is disabled only during historical reconstruction, then restored and asserted on the authoritative durable reload.", "sha256": "9e933a1bde77646e44110ff627ff2c2f4f7bde4e27ba1611d3ea6a9a890bdb3e"},
-    "src/paranoia_local/arbitrate_handler.py": {"scope": "Arbitration-only caller-framing taxonomy, terminal ownership, separate fallback diagnostics, and bounded attester audit output; branch class-occurrence aggregation is unchanged.", "sha256": "7b7a8a2d53f491b6c799e2cbab8a8e969c1ac6e37dd10a6ebd8dfc3f7220dc2f"},
-    "src/paranoia_local/arbitration.py": {"scope": "Adds an arbitration-only attester reply-size circuit breaker; branch class-occurrence aggregation is unchanged.", "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228"},
-    "src/paranoia_local/engines.py": {"scope": "Updates the active Codex reviewer and attester defaults to GPT-6-Astra; branch class-occurrence aggregation and the retained Codex provider exchange remain historical and unchanged.", "sha256": "38bade9651b85720f106084b3b61937592aeec6e0c07a3856ea2dfeeaaa5e316"},
-    "src/paranoia_local/class_closure.py": {"scope": "Adds durable authoritative members to future unmechanized definitions; the retained historical provider exchange is replayed under its historical schema. Issue #106 additionally stores and validates closed authoritative member inventories, including rejection of generic aliases; historical records without members remain legacy data. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 gives absent pre-inventory unmechanized rows one deterministic indivisible compatibility member on authoritative runtime load while explicit historical replay remains unmigrated.", "sha256": "84c890786e8bb1ebeea6f2a1338fbef5e1de59d6afd45a828537dc839a1606e8"},
-    "src/paranoia_local/handlers.py": {"scope": "Plan-only phase projection, debt-targeted rebut settlement, issue #94 concession challenge transport, and malformed-state preflight; branch occurrence aggregation is unchanged. Issue #106 additionally threads the active member inventory through fresh and retried integrity-lane wire decoding and exercises correction/final durable settlement; retained provider exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 removes the obsolete forced-census workaround because authoritative legacy loads now have an inventory; the retained occurrence exchange is unchanged. Issues #111/#112 add recovered-rejection rendering and correction evidence projection; the retained occurrence exchange remains historical.", "sha256": "193807cfad94e03debe8193056f06a438c1da8ec6539b8741b7f5f9d06d032aa"},
-    "src/paranoia_local/prompts.py": {"scope": "Bound-rebut, arbitration, restatement, concession-challenge guidance, issue #98's invariant sweep, and issue #106's future member-level satisfaction contract; the retained provider exchange remains historical. Issue #106 additionally introduces the exact member_coverage/member_id/evidence and members response contract for future staged roles; retained provider exchanges remain historical. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #108 tells future reviewers to assess a compatibility singleton normally; the retained provider exchange remains historical.", "sha256": "7618b8027d9b6576d99f46cd9a2d97ff496338e8bc0e7ee987e5909237a86736"},
-    "src/paranoia_local/review_census.py": {"scope": "Debt-targeted settlement, durable concession history, and future member inventory projection; the retained branch occurrence materialization is unchanged. Issue #106 additionally projects durable members, binds them into cache identity, and cuts cached census data to version 4; retained provider exchanges remain historical. Issue #111 adds bounded recovered-rejection rendering without changing occurrence materialization.", "sha256": "c387a7e2a206beb17991f9d67f70cec51e027be328cbf8a0fae51c5e828d0f87"},
-    "src/paranoia_local/server.py": {"scope": "Updates the public Codex default-model description to GPT-6-Astra; branch occurrence handling is unchanged.", "sha256": "f7e95c60a65a5b21024b9acef6378347e607121bb3f83be04c0d2b454002a51e"},
-    "src/paranoia_local/staged_protocol.py": {"scope": "Issue #94 adds concession validation and issue #106 validates future authoritative member coverage independently of the retained occurrence exchange. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issue #112 projects redundant authored anchors for future corrections; the retained occurrence exchange remains unchanged.", "sha256": "a2413d38448f482cebc6a38e78910095495a7aeb06ec5af1cd32fb998c3633c8"},
-    "tests/test_review_census.py": {"scope": "Adds isolated concession-history, malformed-state, lifecycle, invariant-sweep, and issue #106 exact-member closure regressions; the retained branch occurrence exchange is unchanged. Issue #106 additionally tests active-inventory decoding, cache invalidation, shared-anchor correction/final settlement, durable reload, and legacy-empty refusal. Issue #106 follow-up closes the legacy same-snapshot and retained text-register inventory bypasses; historical provider results remain unchanged. Issues #111/#112 add recovered-rejection and one-call evidence-projection regressions without rewriting the retained exchange.", "sha256": "0a31b5a497e5f313212de47dd74b18fc40782a30a30f8b88a1e6a10c90522eec"}
+    "src/paranoia_local/arbitrate_handler.py": {
+      "sha256": "315febef68818bec473b04b12cbd912c6983e109a42919aee6954d6eaf2ace81",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/arbitration.py": {
+      "sha256": "b8a7fb3cb1791f445481b7386f3ae13e9183c24fd56e4888ecb5a77cef6c1228",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/class_closure.py": {
+      "sha256": "84c890786e8bb1ebeea6f2a1338fbef5e1de59d6afd45a828537dc839a1606e8",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/engines.py": {
+      "sha256": "795c0ffee83ab78c91900bc6a8ce2c7ae4580b55db95ed95ebdf745eb5c02d36",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/handlers.py": {
+      "sha256": "e306060e91f94e6aff3a661fa56b3454b4f055c1405e18010b2b8191a8b15a72",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/logs.py": {
+      "sha256": "10834f5f06ccb4dc6ee21264d72bb6a29545905fed1c61ace7a29cfc85c66ed9",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/orientation.py": {
+      "sha256": "9c127101e8da7396902910ea04ec88783c6c2d2c769d5f3c6f0f01fc4cb8c377",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/prompts.py": {
+      "sha256": "e9d8292f72364a3c98cf25f602f6f5277929f8c38cdb7a46aa4a29a837cc6bf7",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/review_census.py": {
+      "sha256": "96637037ee3363fa573f13046bcca31c5fbb0f03c394f7f89f04d56f47e4215c",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/runner.py": {
+      "sha256": "0cc6e4ccdbcd863e6b88383aef62051b8f8f3ee66778e0713d6b2de791408c8e",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/server.py": {
+      "sha256": "8c323693d6bc8ac359f53fe9070d3157029c5f6dc1d42809a7f61f7bd8a65304",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "src/paranoia_local/staged_protocol.py": {
+      "sha256": "a2413d38448f482cebc6a38e78910095495a7aeb06ec5af1cd32fb998c3633c8",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "scripts/run_class_occurrence_batch_acceptance.py": {
+      "sha256": "6d7dc01c3fb7e7c2ae04668e40c2735ad3139cdd96f454823676e73d49dfaacb",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    },
+    "tests/test_review_census.py": {
+      "sha256": "5fd3c23dd2748a67a1448dfafc02dc683c1aa01192a7bc2305f52ddac59fe73a",
+      "scope": "Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+    }
   },
   "version": 1,
   "date": "2026-08-30",

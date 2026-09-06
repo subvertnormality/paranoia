@@ -771,13 +771,13 @@ def test_three_blocking_classes_keep_plan_correction_targeted(tmp_path, monkeypa
     ),
     (
         cc.BRANCH_MODE, "correction",
-            "6b9722e93512f1b6e5b20139d71f499d0239e2e7967762f9aaa46242731f889e",
+            "a6528a3c777b2a744d81b10753821e4c35a11162694edc9954e754b890210169",
         "6a8cc807cc90cd736e887c75ae0ebf017a6df86e1c752dd874a54ffafb69ddd8",
         "final",
     ),
     (
         cc.BRANCH_MODE, "final",
-            "cf0efb102fdf304c62285575aee412794e67116eee4742bf2cda3b0f464d2292",
+            "ccbd2995336329d182e7957153a795a6f34c49d8567bd93936163a836698be64",
         "335a29dc889acdf9bf9f545f61e25fa425553882b6dc1b3c83835d2b0d62cd9a",
         "clear",
     ),
@@ -2048,9 +2048,11 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         ["git", "rev-parse", f"{revision}^{{tree}}"], cwd=root,
         capture_output=True, text=True, check=True,
     ).stdout.strip() == artifact["source_tree"]
-    assert set(artifact["source_sha256"]) == set(acceptance.SOURCE_PATHS)
-    assert set(artifact["source_blob_ids"]) == set(acceptance.SOURCE_PATHS)
-    assert set(artifact["module_metrics"]) == set(acceptance.SOURCE_PATHS)
+    from scripts.acceptance_sources import historical_inventory
+    historical_paths = historical_inventory(root, revision, acceptance.SOURCE_PATHS)
+    assert set(artifact["source_sha256"]) == historical_paths
+    assert set(artifact["source_blob_ids"]) == historical_paths
+    assert set(artifact["module_metrics"]) == historical_paths
     changed = set()
     for relative, expected in artifact["source_sha256"].items():
         historical = subprocess.run(
@@ -3733,7 +3735,7 @@ def test_tracked_round_labels_must_advance_but_failed_label_can_retry(tmp_path) 
 
 
 @pytest.mark.parametrize("retry_session", ["gate-retry", None, "bad\nref"])
-def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
+def test_label_seven_plain_correction_checkpoints_without_retry(
     tmp_path, retry_session,
 ) -> None:
     state = rc.normalize_state(None, stakes="s", snapshot="p")
@@ -3789,7 +3791,7 @@ def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
         name = "fake"
 
         def run(self, *args, **kwargs):
-            return Review(text=value, session_ref="gate-first", raw=value)
+            return Review(text=value, session_ref=retry_session, raw=value)
 
         def resume(self, *args, **kwargs):
             return Review(text=value, session_ref=retry_session, raw=value)
@@ -3804,14 +3806,14 @@ def test_label_seven_plain_correction_retries_then_preserves_substantive_state(
     _, rendered, attempts = handlers._settle_staged_failure(
         closure, stakes="s", snapshot="p", error=caught.value, mode=cc.PLAN_MODE,
     )
-    assert [row["role"] for row in attempts] == [
-        "correction", "correction-validation-retry",
-    ]
+    assert [row["role"] for row in attempts] == ["correction"]
+    assert attempts[0]["outcome"] == "checkpoint"
+    assert "ARCHITECTURE-CHECKPOINT" in rendered
     assert closure.lineage.classes["class-a"].status == cc.OPEN
     assert closure.lineage.review_state["last_round"] == 6
     assert "CORRECTION-GATE: class-a" in rendered
     if retry_session != "gate-retry":
-        assert "correction_control" not in closure.lineage.review_state
+        assert closure.lineage.review_state["correction_control"]["classes"]["class-a"]["last_session_ref"] is None
         assert "rebut with session_ref=" not in rendered
     else:
         row = closure.lineage.review_state["correction_control"]["classes"]["class-a"]

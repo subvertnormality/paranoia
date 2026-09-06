@@ -13,6 +13,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Sequence
 
+from . import review_transitions as transitions
 from . import class_closure as cc, staged_protocol as sp
 
 CHECKLIST = sp.CHECKLIST
@@ -53,6 +54,19 @@ REBUT_FAILURE_FIELDS = (
 
 class CensusError(ValueError):
     pass
+
+
+class CheckpointRequired(CensusError):
+    """A fully validated decision cannot settle under the correction limit."""
+
+    def __init__(self, message: str, *, snapshot: str, plan_line_count: int | None):
+        super().__init__(message)
+        self.snapshot = snapshot
+        self.plan_line_count = plan_line_count
+        self.stage_role = "correction-checkpoint"
+        self.failure_kind = "checkpoint"
+        self.attempts: list[Attempt] = []
+        self.rejected_payloads: list[dict[str, Any]] = []
 
 
 def settle_rebut_concession(
@@ -953,22 +967,15 @@ def settle_state(state: dict[str, Any], settlement: dict[str, Any], *, phase: st
         )
         row["first_round"] = round_no; row["last_round"] = round_no
         old[row["id"]] = row
-    active = [d for d in old.values() if d.get("status") == "open" and d.get("severity") in BLOCKING]
-    if active:
-        next_phase = "correction"
-    elif phase == "census":
-        next_phase = "clear"
-    elif phase == "correction":
-        next_phase = "final"
-    elif phase == "final" and state.get("final_engine") != engine_name:
-        # Another reviewer may discover debt, but its clean response cannot discharge
-        # the cold-final obligation earned by a different reviewer.
-        next_phase = "final"
-    else:
-        next_phase = "clear"
+    decision = transitions.after_debt(
+        phase=phase, final_engine=state.get("final_engine"), engine=engine_name,
+        blocking_debt=any(
+            d.get("status") == "open" and d.get("severity") in BLOCKING
+            for d in old.values()
+        ),
+    )
     out = dict(state)
-    owner = state.get("final_engine") if phase == "final" else engine_name
-    set_phase(out, next_phase, final_engine=owner if next_phase == "final" else None)
+    set_phase(out, decision.phase, final_engine=decision.final_engine)
     out.update(snapshot_digest=snapshot, debt=list(old.values()), last_round=round_no)
     out.pop("format_debt", None)
     out.pop("validation_debt", None)

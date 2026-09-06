@@ -17,7 +17,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from . import arbitrate_handler, handlers
+from . import arbitrate_handler, handlers, telemetry, session_routing
 from .engines import get_engine
 from .logs import DEFAULT_LOG_DIR
 
@@ -28,7 +28,7 @@ _COMMON = {
     "engine": {
         "type": "string",
         "enum": ["codex", "claude"],
-        "description": "Override which local engine reviews (default: the server's configured engine).",
+        "description": "Override which local engine reviews (default: the server's configured engine; rebut uses known session ownership and requires an explicit engine when unknown).",
     },
     "model": {
         "type": "string",
@@ -487,7 +487,7 @@ _MULTI_ENGINE_HANDLERS: dict[str, Callable[..., str]] = {
 }
 
 
-def dispatch(
+def _dispatch(
     name: str,
     arguments: dict[str, Any],
     *,
@@ -508,7 +508,13 @@ def dispatch(
         handler = _HANDLERS.get(name)
         if handler is None:
             raise ValueError(f"unknown tool: {name}")
-        engine_name = arguments.get("engine") or default_engine_name
+        engine_name = (
+            session_routing.resolve(
+                arguments.get("session_ref"), arguments.get("engine"),
+                (log_dir, DEFAULT_LOG_DIR),
+            ) if name == "rebut"
+            else arguments.get("engine") or default_engine_name
+        )
         engine = get_engine(engine_name)
         kwargs = {"engine": engine, "log_dir": log_dir}
         if now is not None:
@@ -518,6 +524,20 @@ def dispatch(
         return handler(arguments, **kwargs)
     except Exception as exc:  # noqa: BLE001 — surface any failure as readable text
         return f"[paranoia-local error] {type(exc).__name__}: {exc}"
+
+
+def dispatch(
+    name: str, arguments: dict[str, Any], *, default_engine_name: str,
+    log_dir: Path = DEFAULT_LOG_DIR, now: Clock | None = None,
+    on_progress: Callable[[str], None] | None = None,
+) -> str:
+    with telemetry.recording(name, log_dir) as trace:
+        result = _dispatch(
+            name, arguments, default_engine_name=default_engine_name,
+            log_dir=log_dir, now=now, on_progress=on_progress,
+        )
+        trace.result_sha256 = telemetry.digest(result)
+        return result
 
 
 def build_server(

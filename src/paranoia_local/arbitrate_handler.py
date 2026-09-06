@@ -15,6 +15,8 @@ itself read.
 
 from __future__ import annotations
 
+from . import telemetry
+
 import hashlib
 import json
 import re
@@ -1347,7 +1349,7 @@ def _arbitrate(
         ), deciders=deciders, seed=seed)
         with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
             futures = {
-                engine.name: pool.submit(
+                engine.name: telemetry.submit(pool, 
                     researcher,
                     engine=engine,
                     model=models.get(engine.name) or engine.default_model,
@@ -2868,7 +2870,7 @@ def _fan_out(
         raise AssertionError("bounded decider correction loop did not return")
 
     with ThreadPoolExecutor(max_workers=max(1, len(deciders))) as pool:
-        futures = {engine.name: pool.submit(one, engine) for engine in deciders}
+        futures = {engine.name: telemetry.submit(pool, one, engine) for engine in deciders}
     casts: list[Cast] = []
     errors: list[str] = []
     failures: list[DeciderFailure] = []

@@ -10,6 +10,7 @@ embed of the diff, and the author-stated context/intent framed as claims.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import tempfile
 import hashlib
@@ -568,3 +569,24 @@ def build_packet(
     if reserved:
         sections.append(reserved)
     return sep.join(sections)
+
+
+def contract_heading_index(lines: tuple[str, ...]) -> str:
+    """ATX navigation from captured LF lines; coordinates are never new evidence."""
+    headings = []
+    fence: tuple[str, int] | None = None
+    for number, line in enumerate(lines, 1):
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if fence:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= fence[1] and not marker[2].strip():
+                fence = None
+            continue
+        if marker and not (marker[1][0] == "`" and "`" in marker[2]):
+            fence = (marker[1][0], len(marker[1]))
+            continue
+        heading = re.match(r"^ {0,3}(#{1,6})[ \t]+(.+?)\s*$", line)
+        if heading:
+            title = re.sub(r"[ \t]+#+[ \t]*$", "", heading[2])
+            if title.strip():
+                headings.append(f"plan:{number} {heading[1]} {title}")
+    return "\n".join(headings)

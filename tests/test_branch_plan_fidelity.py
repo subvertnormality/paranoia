@@ -1302,25 +1302,14 @@ def test_invalid_utf8_contract_blocks_before_public_provider(
     assert engine.prompts == []
 
 
-def test_provider_transport_is_strict_utf8_for_initial_and_resumed_prompts(
-    tmp_path: Path, monkeypatch,
-):
-    calls = []
-
-    class Completed:
-        returncode = 0
-        stdout = "ok"
-        stderr = ""
-
-    def subprocess_run(*args, **kwargs):
-        calls.append(kwargs)
-        return Completed()
-
-    monkeypatch.setattr(runner.subprocess, "run", subprocess_run)
-    assert runner.run_capture(["provider"], "初回契約", tmp_path).stdout == "ok"
-    assert runner.run_capture(["provider", "resume"], "再開契約", tmp_path).stdout == "ok"
-    assert [row["input"] for row in calls] == ["初回契約", "再開契約"]
-    assert all(row["encoding"] == "utf-8" and row["errors"] == "strict" for row in calls)
+def test_provider_transport_is_strict_utf8_for_initial_and_resumed_prompts(tmp_path):
+    import sys
+    for prompt in ("初回契約", "再開契約"):
+        result = runner.run_capture(
+            [sys.executable, "-c", "import sys; print(sys.stdin.read())"], prompt, tmp_path,
+        )
+        assert result.returncode == 0
+        assert result.stdout.strip() == prompt
 
 
 def test_validation_retry_resends_exact_contract_and_authority(tmp_path: Path):

@@ -22,7 +22,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from .runner import RunResult, run_capture, run_streaming
+from .runner import DEFAULT_TIMEOUT_SEC, RunResult, run_capture, run_streaming
+from . import telemetry
 
 Runner = Callable[[list[str], str, Path, int], RunResult]
 
@@ -153,8 +154,14 @@ class Engine(ABC):
         response_schema: dict[str, Any] | None = None,
     ) -> Review:
         argv = self.build_argv(cwd, model, effort, web_search)
-        return self._execute(
-            argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+        return telemetry.observe(
+            lambda: self._execute(
+                argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+            ),
+            engine=self.name, role=self.role, model=model, effort=effort,
+            web_search=web_search, requested_timeout_sec=timeout or DEFAULT_TIMEOUT_SEC,
+            operation="run", requested_session=None, injected=runner is not None,
+            prompt=prompt, schema=response_schema,
         )
 
     def resume(
@@ -171,8 +178,14 @@ class Engine(ABC):
         response_schema: dict[str, Any] | None = None,
     ) -> Review:
         argv = self.build_resume_argv(session_ref, cwd, model, effort, web_search)
-        return self._execute(
-            argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+        return telemetry.observe(
+            lambda: self._execute(
+                argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+            ),
+            engine=self.name, role=self.role, model=model, effort=effort,
+            web_search=web_search, requested_timeout_sec=timeout or DEFAULT_TIMEOUT_SEC,
+            operation="resume", requested_session=session_ref, injected=runner is not None,
+            prompt=prompt, schema=response_schema,
         )
 
     def _execute(
