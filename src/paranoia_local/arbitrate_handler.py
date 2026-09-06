@@ -26,7 +26,7 @@ import tempfile
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -2814,15 +2814,17 @@ def _fan_out(
                     raise DeciderAttemptFailure(
                         f"initial attempt failed: {type(exc).__name__}: {exc}", attempts,
                     ) from exc
+                # Capture the completed provider observation before parser or Git I/O.
+                attempts[-1] = DeciderAttempt(
+                    attempt_body, text, None,
+                    current.prompt_sha256, current.prompt_excerpt, None,
+                    lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
+                    lifecycle.get("execution"),
+                )
                 try:
                     vote = admission.parse_reply(text, presentation)
                 except ArbitrationError as exc:
-                    attempts[-1] = DeciderAttempt(
-                        attempt_body, text, str(exc),
-                        current.prompt_sha256, current.prompt_excerpt, None,
-                        lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
-                        lifecycle.get("execution"),
-                    )
+                    attempts[-1] = replace(attempts[-1], rejection=str(exc))
                     if attempt == 1:
                         raise DeciderAttemptFailure(
                             f"reply remained invalid after one correction: {exc}", attempts,
@@ -2858,12 +2860,13 @@ def _fan_out(
                         )
                         raise DeciderAttemptFailure(prompt_rejection, attempts)
                     continue
-                attempts[-1] = DeciderAttempt(
-                    attempt_body, text, None,
-                    current.prompt_sha256, current.prompt_excerpt, None,
-                    lifecycle["status"], lifecycle["admitted"], lifecycle["invoked"],
-                    lifecycle.get("execution"),
-                )
+                except Exception as exc:
+                    diagnostic = _bounded_research_text(
+                        f"decision evidence admission failed: {type(exc).__name__}: {exc}"
+                    )
+                    attempts[-1] = replace(attempts[-1], rejection=diagnostic)
+                    # Operational failure is not another provider repair opportunity.
+                    raise DeciderAttemptFailure(diagnostic, attempts) from exc
                 return Cast(
                     vote=vote, body=attempt_body, raw=text, attempts=tuple(attempts),
                 )

@@ -121,3 +121,113 @@ def test_worker_observes_real_dispatch_attempts_and_cleanup(repo, tmp_path, monk
     assert {a["role"] for a in attempts} == {"evidence-repository"}
     assert all(bench.verify_workspace(r, trees["provider_attempts"]) for r in trees["rows"])
     assert trees["source"] == source and trees["manifest_sha256"] == "frozen"
+
+
+def test_retained_live_records_bind_exact_native_audit_bytes():
+    receipt = json.loads((SCRIPTS.parent / "docs/decision_evidence_validation_2026-09-06.json").read_text())
+    for kind, name in [("manifest", "decision_evidence_live_manifest_2026-09-06.json"),
+                       ("report", "decision_evidence_live_results_2026-09-06.json")]:
+        assert bench.shared.sha((SCRIPTS.parent / "docs" / name).read_bytes()) == receipt["live"][kind + "_sha256"]
+    report = json.loads((SCRIPTS.parent / "docs/decision_evidence_live_results_2026-09-06.json").read_text())
+    for binding, row in zip(receipt["live"]["audits"], report["rows"], strict=True):
+        raw = (SCRIPTS.parent / binding["path"]).read_bytes()
+        assert bench.shared.sha(raw) == binding["sha256"] == row["audit_sha256"]
+        audit = json.loads(raw)
+        assert (audit["outcome"], audit["selected"]) == (row["outcome"], row["selected"])
+
+
+def recorded_campaign(tmp_path, monkeypatch, *, two_rounds=False):
+    root = tmp_path / "report-campaign"
+    root.mkdir()
+    trials = [{"case": {"id": case}, "version": v, "repetition": r}
+              for case in ("first", "second") for r in range(2)
+              for v in ("baseline", "candidate")]
+    manifest = {"trials": trials, "sources": {"baseline": {}, "candidate": {}},
+                "oracle": {"first": "right", "second": "right"}, "starting_calls": 0, "prior_campaign": None}
+    sequence = 0
+    for index, trial in enumerate(trials):
+        directory = root / f"trial-{index}"
+        (directory / "logs").mkdir(parents=True)
+        workspaces, observations, attempts = [], [], []
+        for round_ in range(2 if two_rounds else 1):
+            for provider in ("codex", "claude"):
+                sequence += 1
+                name = f"/observed/{index}/{round_}/{provider}"
+                workspaces.append({"root": name, "provider": provider, "snapshot": "snapshot",
+                                   "before": "exact", "after": "exact", "expected": "exact", "cleaned_up": True})
+                observations.append({"root": name, "provider": provider, "snapshot": "snapshot",
+                                     "before": "exact", "provider_attempt": round_ + 1})
+                attempts.append({"sequence": sequence, "engine": provider, "role": "evidence-repository",
+                                 "returncode": 0, "elapsed_ms": 20})
+        bench.shared.dump(directory / "workspaces.json", {
+            "rows": workspaces, "provider_attempts": observations,
+            "source": {}, "trial": index, "manifest_sha256": "frozen"})
+        bench.shared.dump(directory / "review-1.json", {
+            "elapsed_ms": 100, "result": "ARBITRATION: CONVERGED\nSELECTED: right"})
+        bench.shared.dump(directory / "logs/audit.json", {
+            "tool": "arbitrate", "outcome": "CONVERGED", "selected": "right", "snapshot": "snapshot"})
+        (directory / "attempts.jsonl").write_text("".join(json.dumps(a) + "\n" for a in attempts))
+    (root / "counter").write_text(str(sequence))
+    monkeypatch.setattr(bench, "load", lambda *a: (manifest, "frozen"))
+    monkeypatch.setattr(bench, "preflight", lambda *a: None)
+    return root
+
+
+@pytest.mark.parametrize("failure", ["source_drift", "worker_marker", "missing_workspace", "missing_result"])
+def test_report_retains_observations_when_qualification_fails(tmp_path, monkeypatch, failure):
+    root = recorded_campaign(tmp_path, monkeypatch)
+    directory = root / "trial-0"
+    if failure == "source_drift":
+        def invalid(*args):
+            raise ValueError("source revision changed")
+        monkeypatch.setattr(bench, "preflight", invalid)
+    elif failure == "worker_marker":
+        bench.shared.dump(directory / "failed.json", {"error": "worker failed after dispatch"})
+    elif failure == "missing_workspace":
+        (directory / "workspaces.json").unlink()
+    else:
+        (directory / "review-1.json").unlink()
+    result = bench.report(root)
+    row = result["rows"][0]
+    assert not result["qualified"] and not row["qualified"]
+    assert len(row["attempts"]) == 2
+    assert result["calls"] == 16 and result["ledger_complete"]
+    assert result["summary"]["baseline"]["provider_calls"] == 8
+    assert row["outcome"] == "CONVERGED"  # retained observation, explicitly unqualified
+    if failure == "missing_result":
+        assert row["elapsed_ms"] is None
+        assert result["summary"]["baseline"]["total_elapsed_ms"] is None
+        assert result["summary"]["baseline"]["known_elapsed_ms"] == 300
+    else:
+        assert row["elapsed_ms"] == 100
+        assert result["summary"]["baseline"]["total_elapsed_ms"] == 400
+
+
+def test_report_rejects_missing_second_round_workspace_in_both_directions(tmp_path, monkeypatch):
+    root = recorded_campaign(tmp_path, monkeypatch, two_rounds=True)
+    before = bench.report(root)
+    assert before["qualified"] and all(row["qualified"] for row in before["rows"])
+    path = root / "trial-1/workspaces.json"
+    trees = json.loads(path.read_text())
+    trees["rows"].pop()
+    bench.shared.dump(path, trees)
+    result = bench.report(root)
+    assert not result["qualified"]
+    assert not result["rows"][1]["workspace_ok"]
+    assert len(result["rows"][1]["attempts"]) == 4
+    assert len(result["rows"][1]["workspaces"]["provider_attempts"]) == 4
+
+
+def test_report_budget_continues_prior_calls(tmp_path, monkeypatch):
+    root = recorded_campaign(tmp_path, monkeypatch)
+    manifest, digest = bench.load(root)
+    manifest["starting_calls"] = 32
+    manifest["prior_campaign"] = {"calls": 32}
+    for path in root.glob("trial-*/attempts.jsonl"):
+        attempts = [json.loads(line) for line in path.read_text().splitlines()]
+        for row in attempts:
+            row["sequence"] += 32
+        path.write_text("".join(json.dumps(a) + "\n" for a in attempts))
+    (root / "counter").write_text("48")
+    result = bench.report(root)
+    assert result["calls"] == 16 and result["cumulative_calls"] == 48 and result["ledger_complete"]

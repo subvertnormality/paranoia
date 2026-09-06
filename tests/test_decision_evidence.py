@@ -169,3 +169,36 @@ def test_initial_prompt_states_exact_repository_relative_grammar():
     assert "literal repository-relative" in prompts.ARBITRATE_INSTRUCTIONS
     assert "never an absolute temporary-workspace path" in prompts.ARBITRATE_INSTRUCTIONS
     assert "These ten lines" in prompts.ARBITRATE_INSTRUCTIONS
+
+
+@pytest.mark.parametrize("after_format_rejection", [False, True])
+def test_unexpected_resolution_failure_retains_reply_and_peer_without_retry(
+    repo, tmp_path, monkeypatch, after_format_rejection,
+):
+    from paranoia_local import evidence
+    real_resolve = evidence.resolve_citation
+    def unavailable(repo_, citation, **kwargs):
+        if citation.path == "app.py":
+            raise RuntimeError("fixture Git read unavailable")
+        return real_resolve(repo_, citation, **kwargs)
+    monkeypatch.setattr(evidence, "resolve_citation", unavailable)
+    scripted = Agent(lambda e, r: "opt-decimal",
+                     extra={("claude", 1): {"decisive": "README.md:1"}})
+    replies = []
+    def provider(**kwargs):
+        text = scripted(**kwargs)
+        if kwargs["engine_name"] == "codex" and kwargs["cwd"] is not None:
+            if after_format_rejection and not replies:
+                text = "AUTHORITY: duplicate\n" + text
+            replies.append(text)
+        return text
+    report = run(repo, provider, tmp_path, clean=False)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    assert "decision evidence admission failed" in report
+    failed = audit(report)["failed_round"]["deciders"]
+    assert failed["claude"]["selected"] == "opt-decimal"
+    attempts = failed["codex"]["attempts"]
+    assert len(attempts) == len(replies) == (2 if after_format_rejection else 1)
+    assert [a["raw"] for a in attempts] == replies
+    assert "fixture Git read unavailable" in attempts[-1]["rejection"]
+    assert all(not Path(c["cwd"]).exists() for c in scripted.calls if c["cwd"] is not None)

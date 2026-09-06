@@ -2,7 +2,7 @@
   "acceptance_kind": "arbitration-context-steering-rejected",
   "allowed_later_source_diffs": {
     "src/paranoia_local/arbitrate_handler.py": {
-      "sha256": "020735440ac228f04b8d1ff58c507ef8af90be3e491e08426f656ab368179517",
+      "sha256": "185fc0fb0c380807753dc7a5a9ad2bcb1a4116515f4a2da768aa0f837cf246c4",
       "scope": " Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, bounded combined claim-audit correction, typed census execution extraction, explicit withdrawal of the unqualified empty-census experiment, fail-closed discovery session validation, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them. Additional later-source allowance: strict arbitration evidence admission, initial literal citation guidance and documentation/tests. Historical live outcomes remain bound to their original source; this does not establish acceptance of the new admission boundary."
     },
     "src/paranoia_local/engines.py": {

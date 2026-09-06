@@ -2,6 +2,7 @@
 """Frozen eight-dispatch comparison for decision-evidence admission."""
 import argparse
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import wraps
 import inspect
 import os
@@ -17,8 +18,19 @@ CALL_LIMIT = 128
 BASELINE = '33394cb4b465e414a315d152b079599880771de1'
 
 
-def freeze(root, baseline, candidate):
+def freeze(root, baseline, candidate, prior_report=None):
     root.mkdir(parents=True, exist_ok=False)
+    prior = None
+    starting_calls = 0
+    if prior_report is not None:
+        prior_report = Path(prior_report).resolve()
+        raw = prior_report.read_bytes()
+        previous = json.loads(raw)
+        starting_calls = previous.get("cumulative_calls", previous["calls"])
+        if (type(starting_calls) is not int or not 0 <= starting_calls <= CALL_LIMIT
+                or previous.get("ledger_complete") is not True):
+            raise ValueError("prior campaign has no complete bounded call ledger")
+        prior = {"path": str(prior_report), "sha256": shared.sha(raw), "calls": starting_calls}
     sources = {"baseline": source_record(baseline), "candidate": source_record(candidate)}
     if sources["baseline"]["revision"] != BASELINE:
         raise ValueError("wrong baseline")
@@ -49,13 +61,14 @@ def freeze(root, baseline, candidate):
                                "repetition": repetition})
     harness = {str(Path(p).resolve()): shared.sha(Path(p).read_bytes())
                for p in [__file__, shared.__file__]}
-    manifest = {"schema": 1, "sources": sources, "models": shared.MODELS,
+    manifest = {"schema": 2, "sources": sources, "models": shared.MODELS,
+                "starting_calls": starting_calls, "prior_campaign": prior,
                 "versions": versions, "trials": trials, "harness": harness,
                 "oracle": {case["id"]: oracle[case["id"]]["expected"] for case in cases},
                 "call_limit": CALL_LIMIT}
     shared.dump(root / "manifest.json", manifest)
     (root / "manifest.sha256").write_text(shared.sha((root / "manifest.json").read_bytes()))
-    (root / "counter").write_text("0")
+    (root / "counter").write_text(str(starting_calls))
 
 
 def load(root, digest=None):
@@ -64,14 +77,24 @@ def load(root, digest=None):
     if shared.sha(raw) != expected:
         raise ValueError("manifest changed")
     manifest = json.loads(raw)
-    if manifest["schema"] != 1 or manifest["call_limit"] != CALL_LIMIT or len(manifest["trials"]) != 8:
+    if manifest["schema"] != 2 or manifest["call_limit"] != CALL_LIMIT or len(manifest["trials"]) != 8:
         raise ValueError("invalid live campaign")
+    start = manifest.get("starting_calls")
+    prior = manifest.get("prior_campaign")
+    if type(start) is not int or not 0 <= start <= CALL_LIMIT:
+        raise ValueError("invalid prior call budget")
+    if (prior is None and start != 0) or (prior is not None and prior.get("calls") != start):
+        raise ValueError("prior campaign budget mismatch")
     return manifest, expected
 
 
 def preflight(root, manifest, index):
     row = manifest["trials"][index]
     shared.validate_harness(manifest["harness"])
+    if manifest.get("prior_campaign") is not None:
+        prior = manifest["prior_campaign"]
+        if shared.sha(Path(prior["path"]).read_bytes()) != prior["sha256"]:
+            raise ValueError("prior campaign record changed")
     shared.validate_source(manifest["sources"][row["version"]])
     repo = root / f"trial-{index}" / "repository"
     if shared.git(repo, "rev-parse", "HEAD") != row["snapshot"] or shared.git(repo, "status", "--porcelain"):
@@ -154,6 +177,72 @@ def verify_workspace(row, attempts):
     return (bool(related) and row["before"] == row["after"] == row["expected"]
             and all(a.get("before") == row["expected"] and a["provider"] == row["provider"]
                     and a["snapshot"] == row["snapshot"] for a in related))
+
+
+
+def verify_workspaces(rows, attempts, snapshot):
+    """Each actual attempt root has exactly one complete, matching workspace row."""
+    if not rows or not attempts:
+        return False
+    roots = [row.get("root") for row in rows]
+    return (None not in roots and len(set(roots)) == len(roots)
+            and set(roots) == {a.get("root") for a in attempts}
+            and {r.get("provider") for r in rows} == {"codex", "claude"}
+            and all(r.get("snapshot") == snapshot and verify_workspace(r, attempts) for r in rows))
+
+
+@dataclass(frozen=True)
+class TrialRecords:
+    attempts: tuple[dict, ...]
+    output: dict | None
+    workspaces: dict | None
+    audit_path: Path | None
+    audit: dict | None
+    audit_sha256: str | None
+    markers: dict
+    errors: tuple[str, ...]
+
+
+def collect_trial(directory):
+    """Collect independent stored observations before any qualification can fail."""
+    errors, attempts, digests = [], [], {}
+    def read(path):
+        try:
+            raw = path.read_bytes()
+            value = json.loads(raw)
+            digests[path] = shared.sha(raw)
+            if not isinstance(value, dict):
+                raise ValueError("expected an object")
+            return value
+        except Exception as exc:
+            errors.append(f"{path.name}: {type(exc).__name__}: {str(exc)[:300]}")
+            return None
+    try:
+        lines = (directory / "attempts.jsonl").read_text().splitlines()
+        for number, line in enumerate(lines, 1):
+            try:
+                value = json.loads(line)
+                if not isinstance(value, dict):
+                    raise ValueError("expected an attempt object")
+                attempts.append(value)
+            except Exception as exc:
+                errors.append(f"attempts.jsonl line {number}: {type(exc).__name__}")
+    except Exception as exc:
+        errors.append(f"attempts.jsonl: {type(exc).__name__}: {str(exc)[:300]}")
+    output = read(directory / "review-1.json")
+    workspaces = read(directory / "workspaces.json")
+    audits = []
+    for path in sorted((directory / "logs").glob("*.json")):
+        value = read(path)
+        if value is not None and value.get("tool") == "arbitrate":
+            audits.append((path, value))
+    if len(audits) != 1:
+        errors.append("expected exactly one arbitration audit")
+    audit_path, audit = audits[0] if len(audits) == 1 else (None, None)
+    markers = {name: read(directory / name) for name in ("incomplete.json", "failed.json")
+               if (directory / name).exists()}
+    return TrialRecords(tuple(attempts), output, workspaces, audit_path, audit,
+                        digests.get(audit_path), markers, tuple(errors))
 
 
 def worker(root, index, digest):
@@ -260,26 +349,29 @@ def run(root):
 
 def report(root):
     manifest, digest = load(root)
-    rows = []
-    all_attempts = []
+    rows, all_attempts = [], []
     for index, trial in enumerate(manifest["trials"]):
-        directory = root / f"trial-{index}"
+        records = collect_trial(root / f"trial-{index}")
+        all_attempts.extend(records.attempts)
+        output, trees, audit = records.output, records.workspaces, records.audit
+        elapsed = output.get("elapsed_ms") if output is not None else None
+        if type(elapsed) is not int or elapsed < 0:
+            elapsed = None
         row = {"index": index, "case": trial["case"]["id"], "version": trial["version"],
-               "repetition": trial["repetition"], "qualified": False, "bound": False}
+               "repetition": trial["repetition"], "qualified": False, "bound": False,
+               "attempts": list(records.attempts), "elapsed_ms": elapsed,
+               "output": output, "workspaces": trees, "worker_markers": records.markers,
+               "collection_errors": list(records.errors),
+               "outcome": audit.get("outcome") if audit else None,
+               "selected": audit.get("selected") if audit else None,
+               "audit": str(records.audit_path) if records.audit_path else None,
+               "audit_sha256": records.audit_sha256}
         try:
             preflight(root, manifest, index)
-            attempts_path = directory / "attempts.jsonl"
-            attempts = [json.loads(line) for line in attempts_path.read_text().splitlines()]
-            all_attempts.extend(attempts)
-            row["attempts"] = attempts
-            for name in ["incomplete.json", "failed.json"]:
-                if (directory / name).exists():
-                    raise ValueError((directory / name).read_text())
-            audits = [(p, json.loads(p.read_text())) for p in (directory / "logs").glob("*.json")]
-            p, audit = next((p, a) for p, a in audits if a.get("tool") == "arbitrate")
-            output = json.loads((directory / "review-1.json").read_text())
-            trees = json.loads((directory / "workspaces.json").read_text())
-            seen = trees["rows"]
+            if records.errors or records.markers:
+                raise ValueError("; ".join(records.errors) or "worker recorded failure/incompletion")
+            if output is None or trees is None or audit is None or elapsed is None:
+                raise ValueError("missing complete observation")
             if (trees["source"] != manifest["sources"][trial["version"]]
                     or trees["trial"] != index or trees["manifest_sha256"] != digest):
                 raise ValueError("observation source binding mismatch")
@@ -287,13 +379,9 @@ def report(root):
             correct = audit["outcome"] == "CONVERGED" and audit["selected"] == expected
             rendered = (f"ARBITRATION: CONVERGED" in output["result"]
                         and f"SELECTED: {expected}" in output["result"])
-            workspace_ok = (set(r.get("provider") for r in seen) == {"codex", "claude"}
-                            and len({r["root"] for r in seen}) == len(seen)
-                            and all(verify_workspace(r, trees["provider_attempts"]) for r in seen)
-                            and all(r["snapshot"] == audit["snapshot"] for r in seen))
-            decider_attempts = [a for a in attempts if a["role"] == "evidence-repository"]
+            workspace_ok = verify_workspaces(trees["rows"], trees["provider_attempts"], audit["snapshot"])
+            decider_attempts = [a for a in records.attempts if a["role"] == "evidence-repository"]
             observed = trees["provider_attempts"]
-            # Join ordinal observations to actual admitted attempt sequence per provider.
             for engine in ("codex", "claude"):
                 actual = sorted((a for a in decider_attempts if a["engine"] == engine),
                                 key=lambda a: a["sequence"])
@@ -306,14 +394,10 @@ def report(root):
                         raise ValueError("provider-attempt observation order mismatch")
                     o["attempt_sequence"] = a["sequence"]
             execution_ok = all(a.get("returncode") == 0 and not a.get("error")
-                               and not a.get("exception") for a in attempts)
+                               and not a.get("exception") for a in records.attempts)
             row.update(bound=True, qualified=correct and rendered and workspace_ok and execution_ok,
-                       outcome=audit["outcome"], selected=audit["selected"],
                        false_convergence=audit["outcome"] == "CONVERGED" and not correct,
-                       elapsed_ms=output["elapsed_ms"], workspaces=trees,
-                       workspace_ok=workspace_ok, audit=str(p),
-                       audit_sha256=shared.sha(p.read_bytes()),
-                       report_sha256=shared.sha(output["result"]))
+                       workspace_ok=workspace_ok, report_sha256=shared.sha(output["result"]))
         except Exception as exc:
             row["failure"] = f"{type(exc).__name__}: {exc}"
         rows.append(row)
@@ -322,20 +406,35 @@ def report(root):
         and all(r.get("workspace_ok") for r in group)
         and len({w["before"] for r in group for w in r["workspaces"]["rows"]}) == 1
         for case in manifest["oracle"] for repetition in range(2))
-    calls = int((root / "counter").read_text())
-    sequences = [a["sequence"] for a in all_attempts]
-    ledger_ok = sorted(sequences) == list(range(1, calls + 1)) and calls <= CALL_LIMIT
-    counts = {v: {"correct": sum(r["qualified"] for r in rows if r["version"] == v),
-                  "unresolved_or_failed": sum(not r["qualified"] for r in rows if r["version"] == v),
-                  "provider_calls": sum(len(r.get("attempts", [])) for r in rows if r["version"] == v),
-                  "total_elapsed_ms": sum(r.get("elapsed_ms", 0) for r in rows if r["version"] == v)}
-              for v in manifest["sources"]}
+    start = manifest["starting_calls"]
+    try:
+        cumulative_calls = int((root / "counter").read_text())
+        if not start <= cumulative_calls <= CALL_LIMIT:
+            raise ValueError("counter outside frozen budget")
+        calls = cumulative_calls - start
+        sequences = [a.get("sequence") for a in all_attempts]
+        ledger_ok = (all(type(s) is int for s in sequences)
+                     and sorted(sequences) == list(range(start + 1, cumulative_calls + 1)))
+    except Exception:
+        cumulative_calls, calls, ledger_ok = None, None, False
+    counts = {}
+    for version in manifest["sources"]:
+        selected = [r for r in rows if r["version"] == version]
+        complete_timing = all(r["elapsed_ms"] is not None for r in selected)
+        known_time = sum(r["elapsed_ms"] for r in selected if r["elapsed_ms"] is not None)
+        counts[version] = {"correct": sum(r["qualified"] for r in selected),
+                          "unresolved_or_failed": sum(not r["qualified"] for r in selected),
+                          "provider_calls": sum(len(r["attempts"]) for r in selected),
+                          "total_elapsed_ms": known_time if complete_timing else None,
+                          "known_elapsed_ms": known_time, "timing_complete": complete_timing}
     qualified = (paired and ledger_ok and all(r["bound"] for r in rows)
                  and not any(r.get("false_convergence") for r in rows)
                  and counts["candidate"]["correct"] == 4
                  and counts["candidate"]["unresolved_or_failed"] <= counts["baseline"]["unresolved_or_failed"])
     result = {"manifest_sha256": digest, "rows": rows, "paired_equivalence": paired,
-              "calls": calls, "ledger_complete": ledger_ok, "summary": counts, "qualified": qualified,
+              "calls": calls, "cumulative_calls": cumulative_calls,
+              "prior_campaign": manifest["prior_campaign"],
+              "ledger_complete": ledger_ok, "summary": counts, "qualified": qualified,
               "limits": "Eight live integration dispatches, not a population speed or quality study. "
                         "Elapsed dispatch times include symmetric workspace observation overhead."}
     shared.dump(root / "report.json", result)
@@ -351,9 +450,10 @@ def main():
     parser.add_argument("--candidate", type=Path)
     parser.add_argument("--index", type=int)
     parser.add_argument("--digest")
+    parser.add_argument("--prior-report", type=Path)
     args = parser.parse_args()
     if args.freeze:
-        freeze(args.freeze.resolve(), args.baseline, args.candidate)
+        freeze(args.freeze.resolve(), args.baseline, args.candidate, args.prior_report)
     elif args.run:
         run(args.run.resolve())
     elif args.report:
