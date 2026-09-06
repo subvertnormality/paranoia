@@ -3327,6 +3327,9 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
     assert "staged structural debt remains open" not in result
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    assert audit["review_origin"] == "server-empty-census"
+    assert len(audit["attempt_ledger"]) == 3
+    assert audit["session_ref"] is None
     assert audit["claim_audit_failed"] is True
     assert audit["claim_counts"] is None
     assert audit["claim_last_accepted_counts"] is None

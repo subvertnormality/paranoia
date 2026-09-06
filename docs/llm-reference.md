@@ -326,8 +326,9 @@ unless the user explicitly abandons the lineage. Audit logs are not state backup
 - Verified-plan and arbitration evidence trees are inert.
 - Local signed-in subscriptions are used; no API key or Paranoia telemetry.
 - `retain_snapshot:true` is the only ordinary mode that creates a durable Git ref.
-- `query` is cheapest; census uses three lanes plus consolidation; plan
-  verification adds evidence calls; `arbitrate` uses both subscriptions.
+- `query` uses one initial call; census uses three lanes and
+  [conditional consolidation](census-execution.md); plan verification adds evidence calls;
+  `arbitrate` uses both subscriptions.
 
 Recovery:
 

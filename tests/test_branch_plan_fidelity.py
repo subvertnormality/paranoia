@@ -94,7 +94,11 @@ class NonconformingContractEngine:
         ),
     }
 
+    def __init__(self):
+        self.prompts = []
+
     def run(self, prompt, *args, **kwargs):
+        self.prompts.append(prompt)
         if "ROLE: census lane" in prompt:
             name = next(
                 row.split()[-1] for row in prompt.splitlines()
@@ -208,14 +212,13 @@ def test_branch_contract_crosses_public_staged_handler_and_plan_anchors(
     }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "BF1")
 
     assert "CONVERGENCE: NOT-BLOCKED" in result
-    assert len(scripted.prompts) == 4
+    assert len(scripted.prompts) == 3
     for prompt in scripted.prompts[:3]:
         assert "BEGIN FROZEN IMPLEMENTATION CONTRACT" in prompt
         assert "artifact-complete" in prompt and "tests-acceptance" in prompt
         assert "persisted/public contracts" in prompt
         assert "plan:<line-or-range>" in prompt
-    assert "BEGIN FROZEN IMPLEMENTATION CONTRACT" not in scripted.prompts[3]
-    assert "Preserve validated `plan:` anchors" in scripted.prompts[3]
+    assert "consolidation=server-empty-census" in result
 
     lineage = cc.load_lineage(
         cc.default_state_root(), "branch-fidelity", stamp="BF2", mode=cc.BRANCH_MODE,
@@ -255,6 +258,9 @@ def test_public_branch_review_blocks_three_distinct_contract_failures(
 
     assert "CONVERGENCE: BLOCKED" in result
     assert "required artifact is absent" in result
+    assert len(scripted.prompts) == 4
+    assert "BEGIN FROZEN IMPLEMENTATION CONTRACT" not in scripted.prompts[3]
+    assert "Preserve validated `plan:` anchors" in scripted.prompts[3]
     assert "acceptance is not exercised" in result
     assert "implementation contradicts contract" in result
     lineage = cc.load_lineage(
@@ -481,7 +487,7 @@ def test_conflicting_public_caller_stops_before_converge_or_provider(
     thread.join(timeout=10)
     assert not thread.is_alive()
     assert len(first_results) == 1 and "CONVERGENCE: NOT-BLOCKED" in first_results[0]
-    assert converge_calls == 1 and provider_calls == 4
+    assert converge_calls == 1 and provider_calls == 3
 
 
 def test_malformed_authority_is_blocked_through_public_dispatch(
@@ -572,7 +578,8 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     lane_prompts = [p for p in scripted.prompts if "ROLE: census lane" in p]
     consolidation = [p for p in scripted.prompts if "ROLE: census lane" not in p]
     assert len(lane_prompts) == 3 and all(rendered in prompt for prompt in lane_prompts)
-    assert len(consolidation) == 1 and rendered not in consolidation[0]
+    assert not consolidation
+    assert "consolidation=server-empty-census" in result
     assert len(retry_prompts) == 1 and rendered in retry_prompts[0]
     assert "exactly 2 lines" in retry_prompts[0]
     assert "line 2, column 1 is `plan:2`" in retry_prompts[0]
@@ -594,8 +601,9 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     ledger = {row["role"]:row for row in audit["attempt_ledger"]}
     assert set(ledger) == {
         "census-behaviour", "census-behaviour-validation-retry",
-        "census-execution", "census-integrity", "consolidation",
+        "census-execution", "census-integrity",
     }
+    assert audit["review_origin"] == "server-empty-census"
     assert ledger["census-behaviour"]["outcome"] == "validation-invalid"
     assert ledger["census-behaviour-validation-retry"]["outcome"] == "completed"
     assert len(audit["rejected_payloads"]) == 1
@@ -1061,7 +1069,7 @@ def test_plan_bound_settlement_write_failure_retains_blocked_lifecycle(
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
        now=lambda: "SETTLE-FAIL")
 
-    assert len(scripted.prompts) == 4
+    assert len(scripted.prompts) == 3
     assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     assert "CONVERGENCE: BLOCKED" in result
     pending = cc.lineage_dir(cc.default_state_root()) / "settlement-failure.pending"
@@ -1172,9 +1180,9 @@ def test_conflicting_contract_text_cannot_change_protocol_authority(
         "plan_text": instruction,
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
     assert "CONVERGENCE: NOT-BLOCKED" in result
-    assert len(scripted.prompts) == 4
+    assert len(scripted.prompts) == 3
     assert all("declarative implementation-contract data only" in p for p in scripted.prompts[:3])
-    assert instruction not in scripted.prompts[3]
+    assert "consolidation=server-empty-census" in result
 
 
 def test_contract_and_composed_prompt_bounds_are_exact_and_untruncated(monkeypatch):
@@ -1229,7 +1237,7 @@ def test_public_handler_routes_every_model_prompt_through_executable_boundary(
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
     assert "CONVERGENCE: NOT-BLOCKED" in result
     assert labels.count("staged lane prompt") == 3
-    assert labels.count("consolidation prompt") == 1
+    assert labels.count("consolidation prompt") == 0
 
 
 def test_public_handler_enforces_actual_composed_prompt_boundaries(

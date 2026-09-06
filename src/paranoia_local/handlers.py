@@ -288,6 +288,22 @@ class _ValidationReview(Review):
 
 
 @dataclass(frozen=True)
+class _ServerConsolidationReview(Review):
+    """Server settlement has no provider process return code or resumable session."""
+
+    returncode: None = None
+
+
+def _server_consolidation_result(review: Review, closure: "_ClosureRound | None") -> Review:
+    if closure is None or not closure.server_consolidation:
+        return review
+    return _ServerConsolidationReview(
+        text=review.text, session_ref=None, raw="", error=review.error,
+        failure_detail=review.failure_detail,
+    )
+
+
+@dataclass(frozen=True)
 class _EvidencePhaseReview(Review):
     """A terminal evidence-provider failure with a server-owned processing phase."""
 
@@ -1245,6 +1261,31 @@ def _is_legacy_claim_only_phase(
     )
 
 
+def _census_consolidation_prompt(
+    mode: str, stakes: str, manifests: list[dict[str, Any]],
+    active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
+    prior_concessions: dict[str, Any], prior_concessions_text: str, plan_contract: bool,
+) -> str:
+    body = json.dumps({
+        "role": "census", "stakes": stakes, "manifests": manifests,
+        "active_classes": active_classes, "existing_debt": existing_debt,
+        "prior_concessions": prior_concessions,
+    }, ensure_ascii=False, separators=(",", ":"))
+    prompt = prompts.compose(
+        f"{prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)}\n"
+        f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
+        f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
+        f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes, prior_concessions=prior_concessions)}",
+        body,
+    )
+    issue = _staged_prompt_issue(
+        prompt, "consolidation prompt", maximum=rc.MAX_CONSOLIDATION_PROMPT_CHARS,
+    )
+    if issue is not None:
+        raise _staged_error(issue, role="consolidation", kind="validation")
+    return prompt
+
+
 def _validate_census_lane(
     text: str, lane: str, *, mode: str, cwd: Path, plan_lines: int | None,
     active_classes: list[dict[str, Any]], canonical: bool = False,
@@ -1666,53 +1707,48 @@ def _staged_structural_review(
                 on_progress("reusing validated census lanes after settlement rejection")
         closure.staged_manifests = manifests
         sources = census.CensusSources.capture(manifests)
-        consolidation_body = json.dumps({
-            "role": "census", "stakes": stakes, "manifests": manifests,
-            "active_classes": active_classes,
-            "existing_debt": existing_debt,
-            "prior_concessions": prior_concessions,
-        }, ensure_ascii=False, separators=(",", ":"))
         try:
-            prompt = prompts.compose(
-                f"{prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)}\n"
-                f"{sp.citation_instructions(mode, plan_contract=plan_contract)}\n"
-                f"PRIOR CONCESSIONS: {prior_concessions_text}\n"
-                f"{sp.class_decision_instructions(mode, 'census', active_classes=active_classes, prior_concessions=prior_concessions)}",
-                consolidation_body,
+            empty = census.empty_decision(
+                mode=mode, incoming=closure.empty_census_incoming,
+                lineage=lineage, state=state, manifests=manifests,
             )
-            prompt_issue = _staged_prompt_issue(
-                prompt, "consolidation prompt",
-                maximum=rc.MAX_CONSOLIDATION_PROMPT_CHARS,
-            )
-            if prompt_issue is not None:
-                raise _staged_error(
-                    prompt_issue,
-                    role="consolidation", kind="validation",
+            if empty is not None:
+                closure.server_consolidation = True
+                review = _ServerConsolidationReview(text="", session_ref=None, raw="")
+                settlement = validate_settlement(empty, **sources.arguments(), role="census")
+                call_attempts, call_rejected = [], []
+            else:
+                prompt = _census_consolidation_prompt(
+                    mode, stakes, manifests, active_classes, existing_debt,
+                    prior_concessions, prior_concessions_text, plan_contract,
                 )
-            review, settlement, call_attempts, call_rejected = _staged_call(
-                role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
-                model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
-                on_progress=on_progress,
-                web_search=web_search,
-                response_schema=sp.provider_schema(sp.decision_schema(
-                    mode, "census", active_classes=active_classes,
-                    prior_concessions=prior_concessions,
-                )),
-                next_sequence=next_sequence,
-                parser=lambda text: validate_settlement(
-                    text, **sources.arguments(),
-                    known_debt=[
-                        d["id"] for d in state.get("debt", []) if d.get("status") == "open"
-                    ],
-                    role="census",
-                ),
-                retry_context=(
-                    _plan_anchor_retry_context(plan_lines)
-                    if plan_lines is not None else None
-                ),
-            )
+                review, settlement, call_attempts, call_rejected = _staged_call(
+                    role="consolidation", engine=engine, prompt=prompt, cwd=cwd,
+                    model=model, effort=effort, timeout=STAGED_CONSOLIDATION_TIMEOUT_SEC,
+                    on_progress=on_progress,
+                    web_search=web_search,
+                    response_schema=sp.provider_schema(sp.decision_schema(
+                        mode, "census", active_classes=active_classes,
+                        prior_concessions=prior_concessions,
+                    )),
+                    next_sequence=next_sequence,
+                    parser=lambda text: validate_settlement(
+                        text, **sources.arguments(),
+                        known_debt=[
+                            d["id"] for d in state.get("debt", []) if d.get("status") == "open"
+                        ],
+                        role="census",
+                    ),
+                    retry_context=(
+                        _plan_anchor_retry_context(plan_lines)
+                        if plan_lines is not None else None
+                    ),
+                )
         except rc.CensusError as error:
-            cacheable = _cacheable_consolidation_error(error)
+            if closure.server_consolidation:
+                error.stage_role = "server-empty-census"
+                error.failure_kind = "validation"
+            cacheable = not closure.server_consolidation and _cacheable_consolidation_error(error)
             error.attempts = [  # type: ignore[attr-defined]
                 *attempts, *getattr(error, "attempts", []),
             ]
@@ -2015,6 +2051,15 @@ def _no_repo_cwd() -> Path:
 
 
 def _footer(review: Review, engine: Engine) -> str:
+    if isinstance(review, _ServerConsolidationReview):
+        prefix = (
+            "SERVER SETTLEMENT FAILED — no confirmed structural verdict.\n\n"
+            if review.error else ""
+        )
+        return (
+            prefix + review.text + "\n\n---\n_paranoia-local · "
+            f"consolidation=server-empty-census · lane engine={engine.name}_"
+        )
     if review.session_ref:
         note = (
             f"\n\n---\n_paranoia-local · engine={engine.name} · "
@@ -2140,20 +2185,26 @@ def _log(
     now: Clock,
     extra: dict[str, Any],
 ) -> None:
-    logs.write_log(
-        log_dir,
-        tool=tool,
-        record={
-            "engine": engine.name,
-            "session_ref": review.session_ref,
-            "returncode": review.returncode,
-            "error": review.error,
-            "text": review.text,
-            **(_review_failure_projection(review) if review.error else {}),
-            **extra,
-        },
-        timestamp=now(),
-    )
+    record = {
+        "engine": engine.name, "session_ref": review.session_ref,
+        "returncode": review.returncode, "error": review.error, "text": review.text,
+        **(_review_failure_projection(review) if review.error else {}),
+        **extra,
+    }
+    if isinstance(review, _ServerConsolidationReview):
+        record["review_origin"] = "server-empty-census"
+        for key in (
+            "session_ref", "returncode", "usage", "duration_ms", "provider_duration_ms",
+            "raw", "stderr",
+        ):
+            record[key] = None
+        for key in (
+            "raw_sha256", "raw_excerpt", "stderr_sha256", "stderr_excerpt",
+            "failure_detail_sha256", "failure_detail_excerpt",
+        ):
+            record.pop(key, None)
+    logs.write_log(log_dir, tool=tool, record=record, timestamp=now())
+
 
 
 def critique_branch(
@@ -2461,6 +2512,7 @@ def _converge_branch_review(
         if closure:
             closure.release()
 
+    review = _server_consolidation_result(review, closure)
     _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
           # Which suppression list and which round produced this prompt: without them an
@@ -3019,6 +3071,7 @@ def critique_plan(
         trailer += "\n" + rc.attempt_trailer(attempt_ledger).replace(
             "STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1,
         )
+    review = _server_consolidation_result(review, closure)
     _log(log_dir, "critique_plan", engine, review, now, {
         "grounded": bool(repo), "model": model,
         # None of this was recorded before, so a plan seam was not reconstructible at
@@ -4881,6 +4934,8 @@ class _ClosureRound:
         self.reopened_class_ids: tuple[str, ...] = ()
         self.prepared_lineage: cc.Lineage | None = None
         self.preflight_validation_error: rc.CensusError | None = None
+        self.empty_census_incoming: census.EmptyCensusHistory | None = None
+        self.server_consolidation = False
         self.correction_gates: list[dict[str, Any]] = []
         self._latched = latch_owned
         self._settled = False
@@ -4933,6 +4988,7 @@ class _ClosureRound:
                 # sweep, project, or render a class view from invalid durable authority.
                 self.preflight_validation_error = exc
                 return []
+        self.empty_census_incoming = census.EmptyCensusHistory.capture(self.lineage)
         self._before_sweep()
         closed_before = {
             item.class_id for item in self.lineage.active()

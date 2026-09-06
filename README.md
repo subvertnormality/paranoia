@@ -266,8 +266,8 @@ outcome or using `retain_snapshot`.
 Tracking is on by default for branch and plan reviews. A tracked review has three
 phases:
 
-1. **Census:** three cold review lanes inspect the complete artifact and one call
-   consolidates their findings.
+1. **Census:** three cold review lanes inspect the complete artifact. Findings use
+   model consolidation; an [eligible empty census](docs/census-execution.md) settles mechanically.
 2. **Correction:** later rounds target durable debt and the effects of your fixes.
 3. **Final:** after debt closes, one fresh whole-artifact regression is required.
 
@@ -520,4 +520,4 @@ guaranteed performance or closes the broader evaluation work in issue 49.
 The next bounded architecture/performance change is specified in
 [the census execution plan](docs/census-execution-plan.md): retain all substantive
 review lanes and mechanically settle only a fully validated empty census without
-historical structural obligations. This is planned work, not a delivered speed claim.
+historical structural obligations. Implementation acceptance is in progress; no live speed claim is made yet.

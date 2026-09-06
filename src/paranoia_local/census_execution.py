@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
-from . import review_census as rc, telemetry
+from . import class_closure as cc, review_census as rc, telemetry
 
 
 @dataclass(frozen=True)
@@ -134,3 +134,52 @@ class CensusSources:
             "assessment_findings": self.assessment_findings,
             "assessment_evidence": self.assessment_evidence,
         }
+
+
+@dataclass(frozen=True)
+class EmptyCensusHistory:
+    """Incoming exclusion facts, captured after load validation and before mutation."""
+    exclusions: tuple[str, ...]
+
+    @classmethod
+    def capture(cls, lineage: cc.Lineage, state: dict[str, Any] | None = None) -> EmptyCensusHistory:
+        raw = lineage.review_state if state is None else state
+        if not isinstance(raw, dict):
+            return cls(("unvalidated-state",))
+        exclusions = []
+        if lineage.classes:
+            exclusions.append("classes")
+        if lineage.debt:
+            exclusions.append("legacy-register-debt")
+        for key in (
+            "debt", "format_debt", "validation_debt", "staged_failure", "census_cache",
+        ):
+            if raw.get(key):
+                exclusions.append(key)
+        return cls(tuple(exclusions))
+
+
+def empty_decision(
+    *, mode: str, incoming: EmptyCensusHistory | None,
+    lineage: cc.Lineage, state: dict[str, Any], manifests: Sequence[dict[str, Any]],
+) -> str | None:
+    """Return the unique empty wire decision only after exact validated census coverage."""
+    from . import staged_protocol as sp
+
+    if incoming is None or incoming.exclusions or EmptyCensusHistory.capture(lineage, state).exclusions:
+        return None
+    if tuple(row.get("lane") for row in manifests) != sp.LANES[mode]:
+        return None
+    for manifest in manifests:
+        if manifest["findings"] or manifest["class_assessments"]:
+            return None
+        # Canonical data already passed the handler's anchor resolution. Recheck
+        # full executable coverage, not a verdict string or a truthy "complete".
+        try:
+            sp.validate_lane_value(manifest, lane=manifest["lane"], active_classes=())
+        except sp.ProtocolError as exc:
+            raise rc.CensusError(str(exc)) from exc
+    return (
+        '{"role":"census","governing_findings":[],"debt_outcomes":[],'
+        '"class_actions":{},"concession_challenges":{}}'
+    )
