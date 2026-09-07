@@ -4,6 +4,7 @@ import fcntl
 import os
 import tarfile
 from pathlib import Path
+from copy import deepcopy
 
 import pytest
 from paranoia_local import engines, handlers
@@ -11,7 +12,25 @@ from scripts import run_class_authoring_acceptance as acceptance
 from tests.test_review_census import lane, payload, wire
 
 
-def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
+def provider_reply(engine, text):
+    session = "scripted-" + engine
+    if engine == "codex":
+        return "\n".join(json.dumps(event) for event in [
+            {"type": "thread.started", "thread_id": session},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": text}},
+            {"type": "turn.completed"},
+        ])
+    return json.dumps({"session_id": session, "structured_output": json.loads(text)})
+
+
+def parent_schema():
+    from paranoia_local import staged_protocol as sp, class_closure as cc
+    return sp.provider_schema(sp.decision_schema(
+        cc.BRANCH_MODE, "census", active_classes=[], outcome_class_ids=(), prior_concessions={}))
+
+
+@pytest.mark.parametrize("with_retry", [True, False])
+def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch, with_retry):
     archive = acceptance.ROOT / "docs/predicate-convergence-evidence.tar.gz"
     with tarfile.open(archive) as retained:
         original = json.load(retained.extractfile("input.json"))
@@ -41,7 +60,7 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
             assert response_schema is retry_schema[self.name]
             assert "scripted-codex" in argv
             return engines.Review(
-                text=retry_reply[self.name], raw=retry_reply[self.name],
+                text=retry_reply[self.name], raw=provider_reply(self.name, retry_reply[self.name]),
                 session_ref="scripted-codex", returncode=0, error=False,
                 duration_ms=1, provider_duration_ms=1, stderr="", failure_detail="",
             )
@@ -91,11 +110,11 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
                     for row in value["coverage"]:
                         row["evidence"] = [anchor]
             text = wire(value)
-            if task["role"] == "census" and self.name == "codex":
+            if task["role"] == "census" and self.name == "codex" and with_retry:
                 retry_reply[self.name] = text
                 retry_schema[self.name] = response_schema
                 text = "{}"  # Exercise the unchanged native consolidation retry.
-        return engines.Review(text=text, raw=text, session_ref="scripted-" + self.name,
+        return engines.Review(text=text, raw=provider_reply(self.name, text), session_ref="scripted-" + self.name,
                               returncode=0, error=False, duration_ms=1,
                               provider_duration_ms=1, stderr="", failure_detail="")
     monkeypatch.setattr(engines.Engine, "_execute", execute)
@@ -135,10 +154,11 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
             acceptance.fork(root, node)
             run(node)
     qualified = acceptance.qualify_trial_graph(root, complete=True)
-    assert qualified["calls"] == 17
+    assert qualified["calls"] == (17 if with_retry else 16)
     results = acceptance.check_replay(root)
-    assert len(results) == 18
-    assert all(row["rejection"] for row in results)
+    assert len(results) == 25
+    assert all(row.get("rejection") or row.get("not_applicable") for row in results)
+    assert sum("not_applicable" in row for row in results) == (0 if with_retry else 2)
     assert all(row["dependent_calls"] == 0 for row in results
                if row["mutation"].startswith(("gate-", "task-")))
 
@@ -152,18 +172,22 @@ def test_direct_task_forwards_every_other_argument_and_restores_scope(tmp_path, 
     monkeypatch.setattr(handlers, "_staged_call", original)
     arguments = {
         "role": "consolidation", "prompt": "production prompt",
-        "parser": object(), "response_schema": object(), "retry_context": object(),
+        "parser": object(), "response_schema": parent_schema(), "retry_context": object(),
         "next_sequence": object(), "timeout": 900,
     }
     with acceptance.direct_authoring_scope(tmp_path, parent=True):
         assert handlers._staged_call(**arguments) is returned
         assert forwarded[-1]["prompt"] == acceptance.AUTHORING_TASK + "\n\nproduction prompt"
-        assert all(forwarded[-1][key] is value for key, value in arguments.items() if key != "prompt")
+        assert all(forwarded[-1][key] is value for key, value in arguments.items()
+                   if key not in {"prompt", "response_schema"})
+        assert forwarded[-1]["response_schema"] == acceptance.required_authoring_schema(arguments["response_schema"])
         lane = {**arguments, "role": "census-behaviour"}
         assert handlers._staged_call(**lane) is returned
         assert forwarded[-1] == lane
     assert handlers._staged_call is original
-    with acceptance.direct_authoring_scope(tmp_path, parent=False):
+    continuation = tmp_path / "continuation"
+    continuation.mkdir()
+    with acceptance.direct_authoring_scope(continuation, parent=False):
         assert handlers._staged_call(**arguments) is returned
         assert forwarded[-1] == arguments
     assert handlers._staged_call is original
@@ -177,6 +201,53 @@ def test_direct_task_rechecks_augmented_prompt_limit_before_invocation(tmp_path,
             handlers._staged_call(role="consolidation",
                 prompt="x" * handlers.rc.MAX_CONSOLIDATION_PROMPT_CHARS)
     assert not calls and not (tmp_path / "authoring-task.json").exists()
+
+
+@pytest.mark.parametrize("mechanized", [False, True])
+def test_required_schema_is_exact_projection_and_preserves_definitions(mechanized):
+    from paranoia_local import staged_protocol as sp
+    original = parent_schema()
+    before = deepcopy(original)
+    narrowed = acceptance.required_authoring_schema(original)
+    restored = deepcopy(narrowed)
+    target = restored["properties"]["governing_findings"]
+    target["minItems"] = original["properties"]["governing_findings"]["minItems"]
+    target["items"]["properties"]["classification"]["anyOf"] = deepcopy(
+        original["properties"]["governing_findings"]["items"]["properties"]["classification"]["anyOf"])
+    assert restored == original == before
+    definition = {"invariant": "JSON identities exclude Booleans.", "severity": "MAJOR"}
+    definition.update({"pattern": "isinstance", "pathspec": "app.py"} if mechanized else
+                      {"procedure": "Inspect both identity gates.", "members": ["identity"]})
+    finding = {"id": "identity", "severity": "MAJOR", "summary": "Booleans are admitted.",
+               "evidence": [{"anchor": "repository/app.py:1", "rationale": "The identity gate."}],
+               "remedy": "Reject Boolean identities.", "source_ids": ["integrity:identity"],
+               "classification": {"kind": "new_class", "definition": definition}}
+    value = {"role": "census", "governing_findings": [finding], "debt_outcomes": [],
+             "class_actions": {}, "concession_challenges": {}}
+    for schema in [original, narrowed]:
+        assert sp.decode(json.dumps(value), schema, max_chars=1_000_000) == value
+    for alternative in [[], [{**finding, "classification": {"kind": "one_off", "reason": "Localized defect."}}]]:
+        value["governing_findings"] = alternative
+        sp.decode(json.dumps(value), original, max_chars=1_000_000)
+        with pytest.raises(sp.ProtocolError):
+            sp.decode(json.dumps(value), narrowed, max_chars=1_000_000)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate"])
+def test_required_schema_rejects_unexpected_alternatives_before_spend(tmp_path, monkeypatch, mutation):
+    schema = parent_schema()
+    choices = schema["properties"]["governing_findings"]["items"]["properties"]["classification"]["anyOf"]
+    new = next(choice for choice in choices if choice["properties"]["kind"]["const"] == "new_class")
+    if mutation == "missing":
+        choices.remove(new)
+    else:
+        choices.append(deepcopy(new))
+    calls = []
+    monkeypatch.setattr(handlers, "_staged_call", lambda **kwargs: calls.append(kwargs))
+    with acceptance.direct_authoring_scope(tmp_path, parent=True):
+        with pytest.raises(ValueError, match="authoring schema"):
+            handlers._staged_call(role="consolidation", prompt="production prompt", response_schema=schema)
+    assert not calls
 
 
 def test_serial_admission_rejects_overlapping_node_before_work(tmp_path, monkeypatch):

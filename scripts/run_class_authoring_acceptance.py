@@ -85,7 +85,7 @@ def verify_fixture(repo, case, fixture):
 
 def manifest(root):
     value = sealed(root / "manifest.json")
-    require(value["schema"] == 3 and value["models"] == MODELS, "campaign version/model differs")
+    require(value["schema"] == 4 and value["models"] == MODELS, "campaign version/model differs")
     require(value["providers"] == PROVIDERS and value["repairs"] == REPAIRS, "schedule changed")
     require(value["gate_lines"] == gate_lines(value["files"]["defect"]), "gate coordinates differ")
     require(value["maximum"] == 32, "call ceiling changed")
@@ -298,7 +298,7 @@ def freeze(root, seed):
     for name, result in checks.items():
         seal(root / (name + "-calibration.json"), result)
     m = {
-        "schema":3, "authoring_task":AUTHORING_TASK, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
+        "schema":4, "authoring_task":AUTHORING_TASK, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
         "source":source, "models":MODELS, "stakes":original["stakes"], "files":files,
         "gate_lines":gate_lines(files["defect"]),
         "versions":{e:subprocess.check_output([e, "--version"], text=True).strip() for e in PROVIDERS.values()},
@@ -362,6 +362,76 @@ def fork(root, node):
     write_node(root, node, m, original, fixture, seed, parent)
 
 
+def required_authoring_schema(original):
+    """Narrow only the two approved locations, preserving production policy."""
+    try:
+        findings = original["properties"]["governing_findings"]
+        choices = findings["items"]["properties"]["classification"]["anyOf"]
+        require(findings["type"] == "array" and findings["minItems"] == 0,
+                "authoring schema unexpected finding bound")
+        require(isinstance(choices, list) and len(choices) == 2
+                and sorted(c["properties"]["kind"]["const"] for c in choices)
+                == ["new_class", "one_off"], "authoring schema unexpected classification alternatives")
+    except (KeyError, TypeError) as exc:
+        raise ValueError("authoring schema unexpected source shape") from exc
+    narrowed = deepcopy(original)
+    target = narrowed["properties"]["governing_findings"]
+    target["minItems"] = 1
+    target["items"]["properties"]["classification"]["anyOf"] = [
+        deepcopy(c) for c in choices if c["properties"]["kind"]["const"] == "new_class"
+    ]
+    return narrowed
+
+
+def qualify_authoring_schemas(directory, node, q):
+    from paranoia_local import engines, staged_protocol as sp
+    roles = {role.removesuffix("-validation-retry") for role in q["attempt_roles"].values()}
+    records = {p.stem: p for p in (directory / "schema-contracts").glob("*.json")}
+    require(set(records) == roles and bool(records), "authoring schema role inventory differs")
+    expected = {}
+    for role, path in records.items():
+        record = sealed(path)
+        require(set(record) == {"role", "original", "expected"} and record["role"] == role,
+                "authoring schema record shape differs")
+        desired = (required_authoring_schema(record["original"])
+                   if "-" not in node and role == "consolidation" else record["original"])
+        require(record["expected"] == desired, "authoring schema restriction differs")
+        expected[role] = shared.sha(sp.canonical_schema(desired))
+    files = {p.stem: p for p in (directory / "schemas").glob("*.json")}
+    checks = custody.read(directory / "checks.json")
+    joined = custody.join_invocations(q["attempts"], checks, q["traces"], [])
+    require(set(files) == {check["schema_sha256"] for _, check in joined} and bool(files),
+            "authoring schema invocation inventory differs")
+    for digest, path in files.items():
+        raw = path.read_text(encoding="utf-8")
+        require(shared.sha(raw) == digest and sp.canonical_schema(json.loads(raw)) == raw,
+                "authoring schema canonical bytes differ")
+    for row, check in joined:
+        role = q["attempt_roles"][row["sequence"]].removesuffix("-validation-retry")
+        require(check["schema_sha256"] == expected[role],
+                "authoring schema native role differs")
+    if "-" in node:
+        return
+    # The completed attempt is selected by the native ledger, not by process success:
+    # a rejected initial reply is ordinary retry evidence and must remain retained.
+    accepted = [(row, check) for row, check in joined
+                if check["review_role"].removesuffix("-validation-retry") == "consolidation"
+                and any(a["run_id"] == check["run_id"] and any(
+                    attempt["role"] == check["review_role"] and attempt["outcome"] == "completed"
+                    for attempt in a.get("attempt_ledger", [])) for a in q["audits"])]
+    require(len(accepted) == 1, "authoring schema requires one accepted consolidation")
+    row, check = accepted[0]
+    raw = (directory / row["process_channels"]["stdout"]["file"]).read_text(encoding="utf-8")
+    review = engines.get_engine(row["engine"]).parse_output(raw)
+    require(not review.error and review.session_ref == row["session_ref"],
+            "authoring schema accepted native response differs")
+    try:
+        sp.decode(review.text, json.loads(files[check["schema_sha256"]].read_text()),
+                  max_chars=sp.MAX_DECISION_RESPONSE_CHARS)
+    except sp.ProtocolError as exc:
+        raise ValueError("authoring schema accepted response violates restriction: " + str(exc)) from exc
+
+
 @contextmanager
 def direct_authoring_scope(directory, *, parent):
     """A disclosed acceptance task; no shipped policy or provider result changes."""
@@ -371,10 +441,24 @@ def direct_authoring_scope(directory, *, parent):
     original_execute = engines.Engine._execute
     prompt_dir = directory / "prompts"
     prompt_dir.mkdir(exist_ok=True)
+    schema_dir = directory / "schemas"
+    schema_dir.mkdir(exist_ok=True)
+    contracts = directory / "schema-contracts"
+    contracts.mkdir(exist_ok=True)
 
     def staged_call(**kwargs):
+        def forward(arguments):
+            role = arguments["role"]
+            original = kwargs["response_schema"]
+            expected = (required_authoring_schema(original)
+                        if parent and role == "consolidation" else original)
+            path = contracts / (role + ".json")
+            require(not path.exists(), "authoring schema repeated role")
+            seal(path, {"role": role, "original": original, "expected": expected})
+            return original_call(**{**arguments, "response_schema": expected})
+
         if not parent or kwargs["role"] != "consolidation":
-            return original_call(**kwargs)
+            return forward(kwargs)
         original = kwargs["prompt"]
         require(AUTHORING_TASK not in original, "authoring task already present")
         augmented = AUTHORING_TASK + "\n\n" + original
@@ -390,11 +474,15 @@ def direct_authoring_scope(directory, *, parent):
             "original_sha256": shared.sha(original), "prompt": augmented,
             "prompt_sha256": shared.sha(augmented),
         })
-        return original_call(**{**kwargs, "prompt": augmented})
+        return forward({**kwargs, "prompt": augmented})
 
     def execute(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
         # These bytes are the actual native invocation, joined to its trace hash.
         (prompt_dir / (shared.sha(prompt) + ".txt")).write_text(prompt, encoding="utf-8")
+        from paranoia_local import staged_protocol as sp
+        require(isinstance(response_schema, dict) and bool(response_schema), "authoring schema missing")
+        raw = sp.canonical_schema(response_schema)
+        (schema_dir / (shared.sha(raw) + ".json")).write_text(raw, encoding="utf-8")
         return original_execute(self, argv, prompt, cwd, runner, timeout, on_progress, response_schema)
 
     handlers._staged_call = staged_call
@@ -407,6 +495,7 @@ def direct_authoring_scope(directory, *, parent):
 
 
 def qualify_authoring_prompts(directory, node, q):
+    qualify_authoring_schemas(directory, node, q)
     files = {p.stem: p for p in (directory / "prompts").glob("*.txt")}
     require(set(files) == {r["prompt_sha256"] for r in q["attempts"]},
             "authoring task invocation prompt inventory differs")
@@ -465,6 +554,86 @@ def mutate_invocation_prompt(directory, digest, text):
             if row["prompt_sha256"] == digest:
                 row["prompt_sha256"] = replacement
         shared.dump(path, trace)
+
+
+def mutate_invocation_schema(directory, check, schema):
+    """Reseal a disposable native schema while preserving its invocation identity."""
+    from paranoia_local import staged_protocol as sp
+    raw = sp.canonical_schema(schema)
+    digest = shared.sha(raw)
+    (directory / "schemas" / (digest + ".json")).write_text(raw, encoding="utf-8")
+    checks = custody.read(directory / "checks.json")
+    for row in checks:
+        if (row["run_id"], row["review_role"]) == (check["run_id"], check["review_role"]):
+            row["schema_sha256"] = digest
+    shared.dump(directory / "checks.json", checks)
+    for path in (directory / "logs").glob("*-run-*.json"):
+        trace = custody.read(path)
+        if trace["run_id"] == check["run_id"]:
+            for row in trace["attempts"]:
+                if row["prompt_sha256"] == check["prompt_sha256"]:
+                    row["schema_sha256"] = digest
+            shared.dump(path, trace)
+    used = {row["schema_sha256"] for row in checks}
+    for path in (directory / "schemas").glob("*.json"):
+        if path.stem not in used:
+            path.unlink()
+
+
+def mutate_accepted_response(directory, q):
+    """Keep native channel joins intact while violating only the test schema."""
+    from paranoia_local import engines, staged_protocol as sp
+    accepted = [attempt for audit in q["audits"] for attempt in audit["attempt_ledger"]
+                if attempt["role"].removesuffix("-validation-retry") == "consolidation"
+                and attempt["outcome"] == "completed"]
+    require(len(accepted) == 1, "response control requires one accepted consolidation")
+    attempt = accepted[0]
+    row = next(row for row in q["attempts"]
+               if q["attempt_roles"][row["sequence"]] == attempt["role"])
+    path = directory / row["process_channels"]["stdout"]["file"]
+    raw = path.read_text(encoding="utf-8")
+    reply = engines.get_engine(row["engine"]).parse_output(raw)
+    value = json.loads(reply.text)
+    finding = value["governing_findings"][0]
+    require(len(finding["source_ids"]) > 1, "response control needs distinct lane sources")
+    extra = deepcopy(finding)
+    extra["id"] = "control-one-off"
+    extra["source_ids"] = [finding["source_ids"].pop()]
+    extra["classification"] = {"kind": "one_off", "reason": "Independent localized defect."}
+    value["governing_findings"].append(extra)
+    text = json.dumps(value)
+    original = sealed(directory / "schema-contracts/consolidation.json")["original"]
+    sp.decode(text, original, max_chars=sp.MAX_DECISION_RESPONSE_CHARS)
+    if row["engine"] == "codex":
+        events = [json.loads(line) for line in raw.splitlines()]
+        messages = [event["item"] for event in events
+                    if isinstance(event.get("item"), dict)
+                    and event["item"].get("type") == "agent_message"]
+        messages[-1]["text"] = text
+        raw = "\n".join(json.dumps(event) for event in events)
+    else:
+        envelope = json.loads(raw)
+        envelope["structured_output"] = value
+        raw = json.dumps(envelope)
+    path.write_text(raw, encoding="utf-8")
+    digest = shared.sha(path.read_bytes())
+    rows = custody.attempts(directory)
+    for target in rows:
+        if target["sequence"] == row["sequence"]:
+            target["raw_sha256"] = digest
+            target["process_channels"]["stdout"].update(sha256=digest, bytes=len(path.read_bytes()))
+    (directory / "attempts.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    checks = custody.read(directory / "checks.json")
+    for check in checks:
+        if check["raw_sha256"] == row["raw_sha256"] and check["session_ref"] == row["session_ref"]:
+            check["raw_sha256"] = digest
+    shared.dump(directory / "checks.json", checks)
+    for audit_path in (directory / "logs").glob("*-critique_branch-*.json"):
+        audit = custody.read(audit_path)
+        for target in audit.get("attempt_ledger", []):
+            if target["role"] == attempt["role"]:
+                target["raw_sha256"] = digest
+        shared.dump(audit_path, audit)
 
 
 def run_node(root, node):
@@ -576,15 +745,61 @@ def check_replay(root):
         "head", "snapshot", "channel", "cross-provider", "missing-audit", "duplicate-attempt",
         "gate-assessment-0", "gate-assessment-1", "gate-debt-0", "gate-debt-1",
         "task-missing", "task-modified", "task-in-lane",
+        "schema-missing", "schema-restriction", "schema-lane", "schema-continuation",
+        "schema-retry", "response-initial", "response-retry",
     )
     results = []
     for case in cases:
+        response_node = None
+        if case in {"schema-retry", "response-initial", "response-retry"}:
+            retry = case != "response-initial"
+            for parent in PROVIDERS:
+                q, _ = qualify_node(root, parent, manifest(root))
+                accepted_roles = {a["role"] for audit in q["audits"] for a in audit["attempt_ledger"]
+                                  if a["outcome"] == "completed"}
+                wanted = "consolidation-validation-retry" if retry else "consolidation"
+                if wanted in accepted_roles:
+                    response_node = parent
+                    break
+            if response_node is None:
+                results.append({"mutation": case, "not_applicable": "No accepted " + wanted
+                                + " attempt in this retained graph; deterministic graph tests own this control.",
+                                "dependent_calls": 0})
+                continue
         with tempfile.TemporaryDirectory(prefix="class-authoring-negative-") as tmp:
             copy = Path(tmp) / "records"
             shutil.copytree(root, copy)
             node = "p01" if case == "one-off" or case.startswith(("gate-", "task-")) else "p01-exact"
+            if case.startswith(("schema-", "response-")):
+                node = ("p01-exact" if case == "schema-continuation" else
+                        "p02" if case == "response-initial" else "p01")
+            if response_node is not None:
+                node = response_node
             directory = copy / node
-            if case.startswith("task-"):
+            parent_control = "-" not in node
+            if case.startswith("response-"):
+                q, _ = qualify_node(copy, node, manifest(copy))
+                mutate_accepted_response(directory, q)
+            elif case.startswith("schema-"):
+                q, _ = qualify_node(copy, node, manifest(copy))
+                role = ("census-behaviour" if case == "schema-lane" else
+                        "correction" if case == "schema-continuation" else
+                        "consolidation-validation-retry" if case == "schema-retry" else "consolidation")
+                checks = custody.read(directory / "checks.json")
+                check = next(row for row in checks if row["review_role"] == role)
+                record_path = directory / "schema-contracts" / (role.removesuffix("-validation-retry") + ".json")
+                record = sealed(record_path)
+                if case == "schema-missing":
+                    record_path.unlink()
+                else:
+                    schema = deepcopy(record["original"] if case == "schema-retry" else
+                                      sealed(copy / "p01/schema-contracts/consolidation.json")["expected"])
+                    if case == "schema-restriction":
+                        schema["properties"]["governing_findings"]["minItems"] = 0
+                        record["expected"] = schema
+                        seal(record_path, record)
+                    mutate_invocation_schema(directory, check, schema)
+            elif case.startswith("task-"):
                 q, _ = qualify_node(copy, "p01", manifest(copy))
                 role = "census-behaviour" if case == "task-in-lane" else "consolidation"
                 row = next(r for r in q["attempts"] if q["attempt_roles"][r["sequence"]] == role)
@@ -657,7 +872,7 @@ def check_replay(root):
             terminal = custody.read(directory / "terminal.json")
             custody.terminal(directory, terminal["outcome"], terminal["error"],
                              elapsed_ms=terminal["elapsed_ms"], dispatch_ms=terminal["dispatch_ms"])
-            if case == "one-off" or case.startswith(("gate-", "task-")):
+            if parent_control:
                 assessment = sealed(directory / "assessment.json")
                 assessment["state_sha256"] = shared.sha(state_file(directory).read_bytes())
                 assessment["terminal_sha256"] = shared.sha((directory / "terminal.json").read_bytes())
@@ -668,13 +883,16 @@ def check_replay(root):
                 results.append({"mutation":case, "rejection":str(exc)})
             else:
                 raise ValueError("negative control was accepted: " + case)
-            if case.startswith(("gate-", "task-")):
-                expected = ("authoring task" if case.startswith("task-") else
+            if case.startswith(("gate-", "task-", "schema-", "response-")):
+                expected = ("authoring schema" if case.startswith(("schema-", "response-")) else
+                            "authoring task" if case.startswith("task-") else
                             "parent assessment omits gate" if "assessment" in case else "parent debt omits gate")
                 require(expected in results[-1]["rejection"], "gate control rejected at the wrong boundary")
+                if not parent_control:
+                    continue
                 before = (copy / "calls.txt").read_bytes()
                 try:
-                    fork(copy, "p01-exact")
+                    fork(copy, node + "-exact")
                 except ValueError as exc:
                     require(expected in str(exc), "fork did not reject incomplete parent coverage")
                 else:
