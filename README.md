@@ -542,3 +542,9 @@ Native snapshot batching separates bounded object reads from inert rendering und
 The [native reader architecture](docs/native-snapshot-batching.md) separates bounded object acquisition from inert filesystem rendering. Benchmark source admission checks actual module bytes against the named committed Git tree before freeze, including nested modules, rather than treating a captured dirty-file hash as committed source.
 
 The [effectiveness and typed lifecycle card](docs/effectiveness-lifecycle-plan.md) defines bounded work on review-quality measurement and maintainability.
+
+The [effectiveness pilot](docs/review-effectiveness.md) freezes seeded and historical
+defect/control comparisons, preserves native reviewer calls, and separates
+implementer scoring from digest-bound human acceptance. The [typed lifecycle
+boundary](docs/typed-lifecycle.md) records measured simplification and exact
+baseline equivalence without claiming an end-to-end speedup.

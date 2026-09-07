@@ -672,3 +672,11 @@ For the new snapshot batching requalification, docs/snapshot-batching-requalific
 Benchmark source admission must compare the complete recursive production Python inventory and actual blob identities with the named committed tree before freeze as well as launch/import and replay. All benchmark entry points share scripts/benchmark_review_modes.py:validate_source. The requalification live workload freezes the explicit baseline and small/3,000-file pair schedule; both versions must pass every live correctness and evidence-binding slot. Preserve reviewer roles and call topology.
 
 Benchmark entry scripts must execute the shared source-only bootstrap before importing owned harness or production modules. Use standard Python cache controls with a fresh empty cache prefix and disabled writes; disabling writes alone does not reject existing stale bytecode. Freeze the bootstrap hash with the harness. Retain actual stdout, stderr, and structured failure detail separately for successful and failed returned Reviews, including explicit empty channels, exact byte lengths, and hashes. A missing or changed channel blocks live qualification without deleting its attempt or cost. Public-handler inert-snapshot acceptance must compare full bytes, special entry rendering, manifest, permissions, and history in the actual provider callback.
+
+For the #49 pilot, use scripts/benchmark_effectiveness.py:qualify_campaign as the
+single custody gate for execution, scoring and human projection. Preserve every
+scheduled slot and known cost; failed or incomplete execution cannot score clear.
+Human ratings bind an exact regenerated projection and never stand in for missing
+independent acceptance. Follow docs/review-effectiveness.md for the Q3 correction:
+preserve native clean-census settlement and never add a cold-final call solely
+for benchmarking. Keep the accepted plan bytes unchanged and convergence on CODE.
