@@ -433,6 +433,8 @@ def _staged_call(
             "\nFix every reported violation in the complete object, not only the first one. "
             "Return the complete schema-conforming JSON object."
         )
+        if role in {"consolidation", "correction", "final"}:
+            retry_prompt += "\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS
         if retry_context:
             retry_prompt += "\n\n" + retry_context
         prompt_issue = _staged_prompt_issue(

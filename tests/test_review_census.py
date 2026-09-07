@@ -802,7 +802,12 @@ def test_closure_candidate_directives_are_absent_from_excluded_followups(
     assert handlers.PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS not in prompt
     assert "review_scope" not in task
     assert task["checklist"] == (list(sp.CHECKLIST) if phase == "final" else [])
-    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest() == prompt_sha256
+    # Preserve the historical exclusion oracle, with only this card's explicit
+    # shared authoring addition removed. All other prompt bytes still bind.
+    addition = "\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS
+    assert prompt.count(addition) == 1
+    historical_prompt = prompt.replace(addition, "", 1)
+    assert hashlib.sha256(historical_prompt.encode("utf-8")).hexdigest() == prompt_sha256
     assert hashlib.sha256(
         json.dumps(schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest() == schema_sha256
@@ -2839,6 +2844,9 @@ def test_all_staged_decision_roles_share_the_bounded_validation_retry(
         def resume(self, session_ref, prompt, *args, **kwargs):
             assert session_ref == "same-session"
             assert "/payload: repair this role-specific decision" in prompt
+            assert (prompts.CLASS_AUTHORING_INSTRUCTIONS in prompt) == (
+                role in {"consolidation", "correction", "final"}
+            )
             text = invalid if exhausted else valid
             return Review(text=text, session_ref=session_ref, raw=text)
 
@@ -6820,3 +6828,165 @@ def test_exact_empty_active_set_retries_unknown_existing_target_atomically(tmp_p
     assert lineage.review_state["debt"][0]["status"] == "closed"
     fresh = next(row for row in lineage.review_state["debt"] if row["finding_id"] == "fresh")
     assert fresh["class_ids"] == []
+
+
+@pytest.mark.parametrize("guard, missing_member, expected", [
+    ("type(index) is not int", False, "clear"),
+    ("isinstance(index, bool) or not isinstance(index, int)", False, "clear"),
+    ("not isinstance(index, int)", False, "blocked"),
+    ("type(index) is not int", True, "blocked"),
+])
+def test_behavioral_integer_class_public_lifecycle(
+    repo, tmp_path, monkeypatch, guard, missing_member, expected,
+):
+    """Canonical closure accepts authored behavioral repairs, never missing evidence.
+
+    The deterministic reviewer isolates handler lifecycle semantics; real-provider
+    authoring and judgment are separately required by the live acceptance.
+    """
+    from tests.conftest import commit_all, git
+
+    anchor = "repository/app.py:2"
+    baseline = git(["rev-parse", "HEAD"], repo).strip()
+    source = "def identity(index):\n    if {guard}:\n        raise ValueError('integer required')\n    return index\n"
+    (repo / "app.py").write_text(source.format(guard="not isinstance(index, int)"))
+    (repo / "SPEC.md").write_text(
+        "JSON scalar identity must be an integer, never a Boolean. "
+        "Reject other scalars with ValueError; preserve valid integers.\n"
+    )
+    commit_all(repo, "identity defect")
+    calls = []
+    last_reply = [""]
+
+    def response(self, prompt, cwd, *args, **kwargs):
+        calls.append(prompt)
+        defective = "if not isinstance(index, int):" in (cwd / "app.py").read_text()
+        defect = {
+            "id":"identity", "severity":"MAJOR",
+            "summary":"Boolean identities pass the integer gate.",
+            "evidence":[anchor], "remedy":"Reject non-integer JSON identities.",
+        }
+        if "ROLE: census lane " in prompt:
+            lane_name = next(
+                line.split()[-1] for line in prompt.splitlines()
+                if line.startswith("ROLE: census lane ")
+            )
+            value = json.loads(lane(lane_name, findings=[defect]))
+            value = json.loads(json.dumps(value).replace("plan:1", anchor))
+            text = json.dumps(value)
+        else:
+            assert prompts.CLASS_AUTHORING_INSTRUCTIONS in prompt
+            task = _task_from_prompt(prompt)
+            role = task["role"]
+            if role == "census":
+                sources = [
+                    f["id"] for manifest in task["manifests"]
+                    for f in manifest["findings"]
+                ]
+                text = wire({
+                    "role":"census", "governing_findings":[{
+                        **defect, "source_ids":sources,
+                        "classification":{"kind":"new_class", "definition":{
+                            "invariant":"JSON scalar identities are integers, never Booleans.",
+                            "severity":"MAJOR", "procedure":(
+                                "Inspect every identity gate under the JSON scalar domain "
+                                "and require Boolean and non-integer rejection."
+                            ), "members":["integer-identity"],
+                        }},
+                    }], "debt_outcomes":[], "class_actions":{},
+                })
+            else:
+                cls = task["active_classes"][0]
+                cid = cls["class_id"]
+                outcome = (
+                    {"verdict":"violated", "evidence":[anchor],
+                     "basis":{"kind":"new_finding", "finding_id":"identity"}}
+                    if defective else
+                    {"verdict":"satisfied", "member_coverage":[] if missing_member else [{
+                        "member_id":"integer-identity", "evidence":[anchor],
+                    }]}
+                )
+                value = {
+                    "role":role,
+                    "governing_findings":[{
+                        **defect,
+                        "classification":{"kind":"existing_class", "class_id":cid},
+                    }] if defective else [],
+                    "debt_outcomes":[{
+                        "debt_id":debt["id"], "status":"closed", "evidence":[anchor],
+                    } for debt in task["existing_debt"]],
+                    "class_outcomes":{cid:outcome}, "class_actions":{cid:None},
+                }
+                if role == "final":
+                    value["coverage"] = payload(lane())["coverage"]
+                    for row in value["coverage"]:
+                        row["evidence"] = [anchor]
+                text = wire(value)
+        last_reply[0] = text
+        return Review(text=text, session_ref="identity-session", raw=text)
+
+    def retry(self, session_ref, prompt, *args, **kwargs):
+        calls.append(prompt)
+        assert missing_member
+        assert prompts.CLASS_AUTHORING_INSTRUCTIONS in prompt
+        assert "member_coverage" in prompt
+        return Review(text=last_reply[0], session_ref=session_ref, raw=last_reply[0])
+
+    monkeypatch.setattr(engines.CodexEngine, "run", response)
+    monkeypatch.setattr(engines.CodexEngine, "resume", retry)
+    arguments = {
+        "repo_path":str(repo), "base_ref":baseline, "head_ref":"HEAD",
+        "lineage":"behavioral-identity", "round":1, "stakes":"trusted local tool",
+        "web_search":False,
+    }
+    result = handlers.critique_branch(
+        arguments, engine=engines.CodexEngine(), log_dir=tmp_path / "logs",
+    )
+    assert "CONVERGENCE: BLOCKED" in result
+    original = cc.load_lineage(
+        cc.default_state_root(), "behavioral-identity", stamp="original",
+    )
+    assert len(original.classes) == 1
+    target = original.active()[0]
+    assert target.status == cc.OPEN
+    assert target.members == ("integer-identity",)
+    assert original.review_state["debt"][0]["class_ids"] == [target.class_id]
+
+    (repo / "app.py").write_text(source.format(guard=guard))
+    # The caller-owned oracle establishes the fixture behavior independently of
+    # the scripted reviewer and does not enter a model prompt.
+    namespace = {}
+    exec(compile((repo / "app.py").read_text(), "fixture", "exec"), namespace)
+    for value in (0, 1, -2):
+        assert namespace["identity"](value) == value
+    if guard != "not isinstance(index, int)":
+        for value in (True, False, None, "0", 0.5):
+            with pytest.raises(ValueError):
+                namespace["identity"](value)
+    if guard != "not isinstance(index, int)":
+        commit_all(repo, "prescribed repair")
+    result = handlers.critique_branch(
+        {**arguments, "round":2}, engine=engines.CodexEngine(),
+        log_dir=tmp_path / "logs",
+    )
+    if expected == "clear":
+        assert "STRUCTURAL-PHASE: final" in result
+        assert "CONVERGENCE: BLOCKED" in result
+        result = handlers.critique_branch(
+            {**arguments, "round":3}, engine=engines.CodexEngine(),
+            log_dir=tmp_path / "logs",
+        )
+        assert "CONVERGENCE: NOT-BLOCKED" in result
+        assert len(calls) == 6
+    else:
+        assert "CONVERGENCE: BLOCKED" in result
+        assert "CONVERGENCE: NOT-BLOCKED" not in result
+        assert len(calls) == (6 if missing_member else 5)
+    durable = cc.load_lineage(
+        cc.default_state_root(), "behavioral-identity", stamp="durable",
+    )
+    current = durable.classes[target.class_id]
+    assert (current.invariant, current.procedure, current.members) == (
+        target.invariant, target.procedure, target.members,
+    )
+    assert current.status == (cc.CLOSED if expected == "clear" else cc.OPEN)

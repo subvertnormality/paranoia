@@ -251,3 +251,25 @@ class TestCompose:
         assert "INSTRUCTIONS" in out
         assert "BODY" in out
         assert out.index("INSTRUCTIONS") < out.index("BODY")
+
+
+def test_one_class_authoring_rule_reaches_all_authoring_prompts_and_legacy_retry():
+    shared = prompts.CLASS_AUTHORING_INSTRUCTIONS
+    for mode in ("plan", "branch"):
+        for text in (
+            prompts.staged_consolidation_instructions(mode),
+            prompts.staged_followup_instructions(mode),
+        ):
+            assert text.count(shared) == 1
+    for text in (
+        prompts.CLASS_REGISTER_INSTRUCTIONS,
+        prompts.PLAN_CLASS_REGISTER_INSTRUCTIONS,
+        prompts.register_retry("invalid class ID"),
+        prompts.REGISTER_RETRY,
+    ):
+        assert text.count(shared) == 1
+    assert "governing requirement" in shared
+    assert "compliant alternative" in shared
+    assert "explicit representation requirements" in shared
+    assert "do not rewrite existing classes" in shared
+    assert "complete member inventory" in shared

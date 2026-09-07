@@ -686,3 +686,7 @@ as its new bounded contract. Preserve the original pilot and approved ratings;
 calibrate controls before a newly frozen full campaign. Historical fixture patches
 must be explicit, target defects must remain detectable, and a failed calibration
 blocks provider admission. No production review behavior changes in this card.
+
+For new behavioral class-authoring work, follow docs/class-authoring-quality-plan.md.
+Keep governing requirements separate from suggested repair syntax. This new card does
+not reopen or mutate the completed predicate probe or its historical class lineage.

@@ -327,6 +327,13 @@ the search boundary rather than limiting review to the current debt or its known
 site or property category named there must be inspected and accounted for before the class can be
 reported satisfied; any surviving occurrences are returned together. Mechanized classes continue
 to use their server-run violation predicates.
+New class invariants follow the governing requirement within its supported domain; suggested
+repair syntax is not a separate blocking obligation. Equivalent compliant repairs are valid
+unless an explicit requirement mandates a representation. Mechanized predicates must not
+match such valid alternatives: use an unmechanized procedure when a line-level predicate
+cannot honestly express the violation. This authoring guidance does not override existing
+classes or their canonical closure authority.
+
 Every unmechanized class stores a closed list of stable member IDs. A satisfied census assessment,
 correction outcome, or final outcome must provide exactly one separately evidenced row for every
 server-supplied member ID; the server checks exact set equality before deriving and deduplicating
