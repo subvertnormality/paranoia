@@ -18,6 +18,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 runpy.run_path(str(ROOT / "scripts/benchmark_bootstrap.py"))
+sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 import benchmark_review_modes as shared
 import benchmark_effectiveness as pilot
@@ -318,7 +319,6 @@ def freeze(root, seed):
 
 
 def write_node(root, node, m, original, fixture, seed, parent):
-    sys.path.insert(0, str(ROOT / "src"))
     from paranoia_local import orientation
     directory = root / node
     spec = deepcopy(original)
@@ -671,7 +671,6 @@ def _run_node(root, node):
         require(subprocess.check_output([name, "--version"], text=True).strip() == version, "CLI changed")
     for name, digest in m["calibration_sha256"].items():
         require(shared.sha((root / (name + "-calibration.json")).read_bytes()) == digest, "calibration changed")
-    sys.path.insert(0, str(ROOT / "src"))
     from paranoia_local import server, engines
     os.environ["PARANOIA_STATE_ROOT"] = str(directory / "state")
     original_admit = shared.admit

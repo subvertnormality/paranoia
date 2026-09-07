@@ -250,6 +250,28 @@ def test_required_schema_rejects_unexpected_alternatives_before_spend(tmp_path, 
     assert not calls
 
 
+def test_fresh_qualification_selects_owned_source_before_installed_package(tmp_path):
+    import subprocess
+    shadow = tmp_path / "installed"
+    package = shadow / "paranoia_local"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text('raise RuntimeError("wrong installed package imported")')
+    script = acceptance.ROOT / "scripts/run_class_authoring_acceptance.py"
+    code = (
+        "import runpy, pathlib\n"
+        f"scope = runpy.run_path({str(script)!r}, run_name='acceptance_probe')\n"
+        "try:\n"
+        f"    scope['qualify_authoring_schemas'](pathlib.Path({str(tmp_path)!r}), 'p01', {{'attempt_roles': {{}}}})\n"
+        "except ValueError as exc:\n"
+        "    assert 'role inventory' in str(exc)\n"
+        "from paranoia_local import engines\n"
+        f"assert pathlib.Path(engines.__file__).resolve() == pathlib.Path({str(acceptance.ROOT / 'src/paranoia_local/engines.py')!r})\n"
+    )
+    environment = {**os.environ, "PYTHONPATH": str(shadow)}
+    subprocess.run([acceptance.sys.executable, "-c", code], cwd=tmp_path,
+                   env=environment, check=True, capture_output=True, text=True)
+
+
 def test_serial_admission_rejects_overlapping_node_before_work(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(acceptance, "_run_node", lambda root, node: calls.append(node))

@@ -30,5 +30,29 @@ When replaying a native graph without a matching initial-success or retry-succes
 the corresponding control is explicitly not applicable there; the deterministic graph
 owns that path. No provider call is added to manufacture retry evidence.
 
-Implementation and validation are in progress. No new native class-authoring acceptance,
-speed improvement, merge eligibility, or closure of issues 49/50 is claimed by this report.
+The committed candidate bbf876c passed all 2,229 tests in 278.94 seconds. An earlier
+uncommitted run had 2,226 passes and two expected committed-envelope custody failures;
+the metadata was committed without weakening those checks.
+
+The native campaign is nonqualifying. Codex authored faithful unmechanized class f75acce4
+covering both gates in four calls, no retries, 126.097 seconds. Its invariant and procedure
+explicitly permit alternative compliant implementations. The exact-type correction closed
+that class in one call, 43.963 seconds, but native source custody rejected the continuation:
+the new pre-admission schema qualifier imported the installed main package before the
+harness selected its frozen source. The trace truthfully records main 4e145a9 and its
+different handlers/prompts hashes. This is a harness implementation defect, not evidence
+of accepted candidate behavior. No cold final, Boolean arm or Claude parent ran.
+
+The failure is retained in class-authoring-required-evidence-2026-09-07.tar.gz:
+196 files, 210,859 bytes, SHA-256
+0cfdd7e84bde7f4d89c15ca77d4a0c6710f3c95c45c0a475945e7b2d25b1c350.
+Every archived file was byte-compared with its original. All five calls and 170.060 seconds
+of dispatch time remain counted; no terminal node is rerun.
+
+The correction selects the owned src directory at harness startup, before any qualification
+can import Paranoia, and removes the two late duplicate selections. A fresh-process test
+places a competing installed package ahead of the environment and verifies qualification
+loads the owned engine module. Both complete scripted graphs and all ten focused tests pass.
+The corrected source still needs its final full-suite result. No runtime policy change,
+native campaign acceptance, speed improvement, merge eligibility, or closure of issues 49/50
+is claimed. Q4f's terminal-failure architecture checkpoint applies before another campaign.
