@@ -46,6 +46,24 @@ HARNESS_NAMES = (
 )
 
 
+class AdmissionRefused(RuntimeError):
+    """An unadmitted benchmark invocation, distinct from an engine failure."""
+
+
+def review_role(arm, operation, schema):
+    if arm == "single":
+        return "query"
+    props = schema["properties"]
+    field = props.get("lane", props.get("role", {}))
+    value = field.get("const") or field.get("enum", [None])[0]
+    role = ("census-" + value if "lane" in props else
+            "consolidation" if value == "census" else value)
+    if role not in {"census-behaviour", "census-execution", "census-integrity",
+                    "consolidation", "correction", "final"}:
+        raise ValueError("unknown native pilot role")
+    return role + ("-validation-retry" if operation == "resume" else "")
+
+
 def schedule(cases):
     rows = []
     for repetition in range(REPETITIONS):
@@ -76,6 +94,9 @@ def setup_repo(repo, files):
         (repo / name).write_text(text)
     head = commit("Implementation")
     return {"base": base, "head": head,
+            "base_tree": shared.git(repo, "rev-parse", base + "^{tree}"),
+            "head_tree": shared.git(repo, "rev-parse", head + "^{tree}"),
+            "base_files": {"SPEC.md": files["SPEC.md"], "app.py": ""},
             "history": shared.git(repo, "log", "--format=%H%x09%aI%x09%an%x09%s", "HEAD")}
 
 
@@ -88,8 +109,16 @@ def verify_fixture(repo, case, fixture):
         raise ValueError("fixture history changed")
     if shared.git(repo, "rev-list", "--count", "HEAD") != "2":
         raise ValueError("unexpected reachable fixture history")
-    if shared.git(repo, "show", fixture["base"] + ":app.py") != "":
-        raise ValueError("fixture base contains an implementation")
+    for ref in ("base", "head"):
+        if shared.git(repo, "rev-parse", fixture[ref] + "^{tree}") != fixture[ref + "_tree"]:
+            raise ValueError("fixture tree changed")
+    base_files = {"SPEC.md": case["files"]["SPEC.md"], "app.py": ""}
+    if fixture["base_files"] != base_files or shared.git(
+            repo, "ls-tree", "-r", "--name-only", fixture["base"]).splitlines() != sorted(base_files):
+        raise ValueError("fixture base contains unexpected files")
+    for name, value in base_files.items():
+        if subprocess.check_output(["git", "show", fixture["base"] + ":" + name], cwd=repo) != value.encode():
+            raise ValueError("fixture base contains unexpected bytes: " + name)
     for name, text in case["files"].items():
         if (repo / name).read_bytes() != text.encode():
             raise ValueError("fixture file changed: " + name)
@@ -181,6 +210,10 @@ def install_checks(engines, spec, repo, directory):
                 if shared.sha(packet) != spec["fixture"]["packet_sha256"]:
                     raise ValueError("fixture packet changed")
                 inspect_prompt(v["prompt"], spec, repo, operation, v.get("response_schema"))
+                if (v["self"].name != spec["case"]["provider"]
+                        or v["model"] != spec["models"][v["self"].name]
+                        or v["effort"] != "high" or v["web_search"] is not False):
+                    raise ValueError("provider settings differ before admission")
                 if spec["arm"] == "single":
                     if cwd.resolve() != repo.resolve():
                         raise ValueError("query cwd differs")
@@ -191,13 +224,30 @@ def install_checks(engines, spec, repo, directory):
                         common = cwd / common
                     if common.resolve() != (repo / ".git").resolve():
                         raise ValueError("staged worktree belongs to a different fixture")
+                from paranoia_local import telemetry
+                trace = telemetry.CURRENT.get()
+                if trace is None:
+                    raise ValueError("pilot invocation lacks native dispatch identity")
+                schema = v.get("response_schema")
                 row = {"engine": v["self"].name, "prompt_sha256": shared.sha(v["prompt"]),
                        "fixture_ok": True, "packet_sha256": shared.sha(packet),
-                       "cwd": str(cwd), "raw_sha256": None}
+                       "cwd": str(cwd), "raw_sha256": None, "session_ref": None,
+                       "run_id": trace.run_id, "operation": operation,
+                       "role": v["self"].role,
+                       "review_role": review_role(spec["arm"], operation, schema),
+                       "requested_session": v.get("session_ref"),
+                       "model": v["model"], "effort": v["effort"], "web_search": v["web_search"],
+                       "schema_sha256": shared.sha(json.dumps(schema, ensure_ascii=False,
+                           sort_keys=True, separators=(",", ":"))) if schema is not None else None,
+                       "refused": False}
                 try:
                     review = original(*args, **kwargs)
                     row["raw_sha256"] = shared.sha(review.raw or "")
+                    row["session_ref"] = review.session_ref
                     return review
+                except AdmissionRefused:
+                    row["refused"] = True
+                    raise
                 finally:
                     try:
                         verify_fixture(repo, spec["case"], spec["fixture"])
@@ -251,7 +301,12 @@ def worker(path, expected_digest):
         from paranoia_local import server, engines, class_closure as cc
         os.environ[cc.STATE_ROOT_ENV] = str(directory / "state")
         original_admit = shared.admit
-        shared.admit = lambda counter: original_admit(counter, maximum=spec["maximum"])
+        def admit(counter):
+            try:
+                return original_admit(counter, maximum=spec["maximum"])
+            except RuntimeError as exc:
+                raise AdmissionRefused(str(exc)) from exc
+        shared.admit = admit
         shared.install_observer(engines, directory, Path(spec["counter"]))
         install_checks(engines, spec, repo, directory)
         provider = spec["case"]["provider"]

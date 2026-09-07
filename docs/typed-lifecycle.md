@@ -17,6 +17,13 @@ Against baseline `cc1afef`, the materializer fell from 585 to 454 lines and from
 Run `scripts/measure_review_complexity.py --revision <commit>` to reproduce source
 inventories and hashes. These are maintenance measurements, not a speed claim.
 
+The [complete source-hashed baseline/candidate inventory](lifecycle_complexity_inventory_2026-09-07.json.gz)
+includes every module and function plus production diff sizes. It binds baseline
+cc1afef87c1386379fc2da97b72b733815013ca0 and candidate
+5c3ed0c9df0a02d541767ff1ab2c2aa610e4ffc4; subsequent benchmark-only edits do not
+change those production bytes. The deterministic gzip SHA-256 is
+365a4a6b81a4c9ede76bf56ff7c03618d5c43c8361c74ef3b6c6ee0edd0ba2ec.
+
 The frozen matrix covers 3,024 cases (622 accepted), comparing exact projections,
 canonical class application, durable state/trailers and rejected diagnostics with
 the baseline. Its receipt is `lifecycle_equivalence_baseline.json`; run

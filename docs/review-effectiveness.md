@@ -23,6 +23,7 @@ revisions, source/span hashes, specification and executable witness results.
 Reviewers receive only one fixture, its specification, controlled helpers and
 two deterministic commits. The base has no implementation; no control sibling,
 fix commit message, oracle, score or other slot output is copied into that repo.
+Public code may nevertheless be recognized from prior model training.
 
 Each case has two repetitions of single query and native tracked branch review,
 with balanced arm order. Four cases use each provider. Settings, versions,
@@ -54,6 +55,12 @@ exact frozen census diff; withheld benchmark markers reject before admission.
 After adjudication, --seal creates a receipt binding score bytes to the original
 immutable terminal hashes. Report replay rejects changed scores or terminals.
 It never rewrites an execution terminal to attach later adjudication.
+Native dispatch ID and role distinguish invocations even when failed replies have
+identical bytes and null sessions. That same join attributes stage costs. Refused
+admissions reconcile against their own retained ledger and do not become calls.
+Failed quoted findings remain available for adjudication but are unscored for
+TP/FP credit. A validated false-positive cluster counts as a case event even
+when the workflow verdict is unresolved.
 
 Slot wall time includes preflight/context preparation, actual dispatch and
 postflight, including failed dispatches; per-dispatch wall time is retained
@@ -104,3 +111,11 @@ history/prompts, ordinary edits before and after dispatch, failed providers,
 missing consolidation, custody tampering, and score/human-rating bindings.
 The full suite passed 2,112 tests before those last added harness checks.
 CODE review and complete live measurement remain delivery gates.
+
+The first CODE review identified four harness defects plus the outstanding live
+measurement gate. The correction uses native invocation identities, separately
+reconciles refused admissions, centralizes finding credit on successful execution,
+and derives case false positives from adjudicated clusters. All 34 benchmark
+tests now pass, including a complete 32-slot failure/exhaustion campaign through
+qualification, sealing, reporting and human export. Those are deterministic
+handler tests, not live effectiveness observations.

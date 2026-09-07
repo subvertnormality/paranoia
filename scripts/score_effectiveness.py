@@ -106,8 +106,11 @@ def validate_annotation(annotation, slot, oracle, arm):
         raise ValueError("native governing finding annotations incomplete")
     if annotation["verdict"] == "clear" and any(v in {"target", "false_positive"} for v in clusters.values()):
         raise ValueError("clear conflicts with blocking assertion")
-    unresolved = any(v in {"unscored", "fixture_problem"} for v in clusters.values())
-    return {"tp": int("target" in clusters), "fp": sum(v == "false_positive" for v in clusters.values()),
+    credit = slot["execution_success"]
+    unresolved = any(v in {"unscored", "fixture_problem"} for v in clusters.values()) or (
+        not credit and any(v in {"target", "false_positive"} for v in clusters.values()))
+    return {"tp": int(credit and "target" in clusters),
+            "fp": sum(v == "false_positive" for v in clusters.values()) if credit else 0,
             "unscored": unresolved, "verdict": annotation["verdict"], "clusters": clusters}
 
 
@@ -116,13 +119,10 @@ def ratio(numerator, denominator):
 
 
 def stage_usage(slot):
-    roles = {}
-    for audit in slot["audits"]:
-        for row in audit.get("attempt_ledger", []):
-            roles[(row.get("session_ref"), row.get("raw_sha256"))] = row.get("role")
+    roles = slot["attempt_roles"]
     result = {}
     for row in slot["attempts"]:
-        role = roles.get((row.get("session_ref"), row.get("raw_sha256")), row.get("role") or "unmapped")
+        role = roles.get(row["sequence"], "unmapped")
         group = result.setdefault(role, {"calls": 0, "provider_call_ms": 0, "usage": []})
         group["calls"] += 1
         group["provider_call_ms"] += row["elapsed_ms"]
@@ -161,7 +161,7 @@ def report(root):
         tp, fp = sum(r["tp"] for r in group), sum(r["fp"] for r in group)
         defects = sum(r["defective"] for r in group)
         false_clears = sum(r["defective"] and r["verdict"] == "clear" for r in group)
-        false_positives = sum(not r["defective"] and r["verdict"] == "defect" for r in group)
+        false_positives = sum(not r["defective"] and r["fp"] > 0 for r in group)
         summary[arm] = {
             "scheduled": len(group), "defective": defects, "target_detections": tp,
             "finding_precision": ratio(tp, tp + fp), "target_recall": ratio(tp, defects),

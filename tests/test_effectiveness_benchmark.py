@@ -337,6 +337,7 @@ def test_contaminated_base_rejects_even_with_consistent_head_history(tmp_path):
                                   cwd=repo, env=env, text=True).strip()
     bench.shared.git(repo, "reset", "--hard", head)
     fixture.update(base=bad_base, head=head,
+                   base_tree=tree, head_tree=tree,
                    history=bench.shared.git(repo, "log", "--format=%H%x09%aI%x09%an%x09%s", "HEAD"))
     with pytest.raises(ValueError, match="base contains"):
         bench.verify_fixture(repo, case, fixture)
@@ -369,3 +370,105 @@ def test_scoring_receipt_binds_original_terminals_and_later_annotations(pilot_sl
     q = bench.qualify_campaign(root)
     assert not q["qualified"] and q["calls"] == 1
     assert any("scoring custody" in e for e in q["errors"])
+
+
+
+def test_complete_campaign_retains_identical_failures_refusals_and_unscored_findings(
+        tmp_path, pilot_slot, monkeypatch):
+    original_output = bench.subprocess.check_output
+    def version_only(argv, *args, **kwargs):
+        if len(argv) == 2 and argv[0] in bench.shared.MODELS and argv[1] == "--version":
+            return argv[0] + " test-version"
+        return original_output(argv, *args, **kwargs)
+    monkeypatch.setattr(bench.subprocess, "check_output", version_only)
+    root = tmp_path / "campaign"
+    bench.freeze(root, ROOT, call_limit=4)
+    m = bench.load_manifest(root)
+    def failed(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
+        text = ("Touching intervals incorrectly overlap. Empty intervals must overlap."
+                if response_schema is None else "Provider unavailable")
+        return engines.Review(text=text, session_ref=None, raw="", error=True,
+                              returncode=127, stderr="same unavailable executable")
+    base_run, base_resume, base_admit = engines.Engine.run, engines.Engine.resume, bench.shared.admit
+    for row in m["order"]:
+        directory = root / row["id"]
+        with monkeypatch.context() as context:
+            context.setattr(engines.Engine, "run", base_run)
+            context.setattr(engines.Engine, "resume", base_resume)
+            context.setattr(engines.Engine, "_execute", failed)
+            context.setattr(bench.shared, "admit", base_admit)
+            context.setenv("PARANOIA_STATE_ROOT", str(directory / "state"))
+            bench.worker(directory / "input.json", bench.shared.sha((directory / "input.json").read_bytes()))
+        with (root / "completions.jsonl").open("a") as f:
+            f.write(json.dumps({"id": row["id"], "sha256": bench.shared.sha(
+                (directory / "terminal.json").read_bytes())}) + "\n")
+    q = bench.qualify_campaign(root)
+    assert q["qualified"], q["errors"]
+    assert q["calls"] == 4 and len(q["slots"]) == 32
+    assert all(not s["execution_success"] and not s["clear_eligible"] for s in q["slots"].values())
+    assert q["slots"]["t001"]["calls"] == 1 and q["slots"]["t002"]["calls"] == 3
+    assert sum(s["calls"] for s in q["slots"].values()) == 4
+    usage = scoring.stage_usage(q["slots"]["t002"])
+    assert set(usage) == {"census-behaviour", "census-execution", "census-integrity"}
+    assert all(v["calls"] == 1 for v in usage.values())
+    oracle = custody.read(root / "oracle.json")
+    for row in m["order"]:
+        slot = q["slots"][row["id"]]
+        score = annotation(slot, "operational_failure")
+        if row["id"] == "t001":
+            target = {"id": 1, "output": 0, "quote": "Touching intervals incorrectly overlap.",
+                      "native_id": None, "classification": "target", "cluster": "target",
+                      "reason": "The retained failed response quotes the target trigger.",
+                      "basis_quote": "", "witness_sha256": custody.json_digest(oracle[row["case"]]["witness"]),
+                      "additional_witness": None}
+            fp = {**target, "id": 2, "quote": "Empty intervals must overlap.",
+                  "classification": "false_positive", "cluster": "empty",
+                  "basis_quote": "Empty intervals share no points."}
+            score["findings"] = [target, fp]
+            for verdict in ("operational_failure", "unresolved"):
+                result = scoring.validate_annotation({**score, "verdict": verdict}, slot, oracle[row["case"]], row["arm"])
+                assert result["tp"] == result["fp"] == 0 and result["unscored"]
+        bench.shared.dump(root / row["id"] / "score.json", score)
+    scoring.seal_scores(root)
+    result = scoring.report(root)
+    assert result["custody_qualified"] and not result["comparative_qualified"]
+    assert result["calls"] == 4
+    assert result["summary"]["single"]["target_detections"] == 0
+    assert result["summary"]["single"]["unsupported_finding_clusters"] == 0
+    assert result["summary"]["single"]["unscored_slots"] == 1
+    assert not result["observed_superiority_criteria_met"]
+    packet = scoring.export_human(root)
+    assert len(packet["items"]) == 32
+
+
+def test_unresolved_clean_false_positive_counts_as_case_event(tmp_path, monkeypatch):
+    case = {"id": "clean"}
+    order = bench.schedule([case])
+    slots = {}
+    for row in order:
+        text = "Logging is required." if row["arm"] == "single" else "No actionable defects."
+        slots[row["id"]] = {"outputs": [{"result": text}], "audits": [], "errors": [],
+                           "execution_success": True, "clear_eligible": True,
+                           "attempts": [], "attempt_roles": {}, "elapsed_ms": 1, "dispatch_ms": 1, "calls": 0}
+    q = {"qualified": True, "errors": [], "calls": 0,
+         "manifest": {"order": order, "cases": [case]}, "slots": slots}
+    monkeypatch.setattr(scoring, "qualify_campaign", lambda root: q)
+    oracle = {"clean": {"defective": False, "specification": "Logging is optional."}}
+    bench.shared.dump(tmp_path / "oracle.json", oracle)
+    bench.shared.dump(tmp_path / "scoring-receipt.json", {})
+    for row in order:
+        slot = slots[row["id"]]
+        if row["arm"] == "single":
+            finding = {"id": 1, "output": 0, "quote": "Logging is required.", "native_id": None,
+                       "classification": "false_positive", "cluster": "logging",
+                       "reason": "The specification makes logging optional.", "basis_quote": "Logging is optional.",
+                       "witness_sha256": None, "additional_witness": None}
+            value = annotation(slot, "unresolved", [finding])
+        else:
+            value = annotation(slot)
+        (tmp_path / row["id"]).mkdir()
+        bench.shared.dump(tmp_path / row["id"] / "score.json", value)
+    result = scoring.report(tmp_path)
+    assert result["summary"]["single"]["false_positives"] == 2
+    assert result["summary"]["single"]["false_positive_rate"] == 1
+    assert result["summary"]["single"]["operational_or_unresolved"] == 2
