@@ -37,8 +37,10 @@ Prove shared guidance reaches initial and native retry authoring paths without o
 existing mechanized authority. Run the relevant tests, full suite and existing staged
 protocol mutation checks; do not invent a second acceptance engine.
 
-Q4. User-approved acceptance reopening (2026-09-07): replace the single-site experiment
-with one frozen recurring-defect experiment. Preserve the old campaign and its nonqualification.
+Q4. User-approved direct-authoring acceptance reopening (2026-09-07): retain both prior
+nonqualifying campaigns, including the recurring Codex parent that legitimately chose one-off
+debt. Freeze one new direct class-authoring experiment using the same calibrated two-gate
+fixture. Keep runtime classification policy unchanged; the explicit test task is bounded by Q4e.
 Live acceptance reuses isolated identity calibration and existing custody primitives.
 Bind source/CLI/input/snapshot/provider channels/native audits/lineage. Fresh candidate
 census per provider (Codex and Claude Opus) sees both original defects without oracle or repair
@@ -102,8 +104,41 @@ Run parent and continuation nodes serially, including each correction and cold f
 terminal qualification before starting another node. Keep the existing 32-attempt ceiling,
 native three-lane parallelism, no-rerun rules and all Q4a-Q4c custody/negative controls.
 No production prompt changes are admitted by this acceptance reopening. Requalify the harness
-with the new fixture through its production-handler smoke and existing resealed mutations
+with the direct task through its production-handler smoke and existing resealed mutations
 before native spend. Another nonqualifying campaign returns to the checkpoint without rerun.
+
+Q4e. The initial consolidation owns class authoring but receives manifests rather than the
+public focus input. Use one disclosed test-only wrapper around handlers._staged_call in
+scripts/run_class_authoring_acceptance.py, installed only in a parent execution process.
+For role=consolidation, prepend exactly this task and two newlines to the already composed
+production prompt. The exact task is this single line:
+
+    For this class-authoring acceptance task, author a reusable class for the shared blocking contract violation identified by the validated census manifests. Use the existing response schema.
+
+Do not supply a class definition, predicate, procedure,
+repair syntax, severity or evidence. Every other argument, parser, schema, call admission,
+provider execution and retry remains unchanged; the existing resumed retry inherits the
+initial task through its session. Reapply the existing consolidation prompt-size preflight
+to the augmented text before forwarding; the native call retains strict UTF-8 admission.
+All lane, correction and cold-final prompts remain exact
+production prompts. No new runtime option, instruction, class policy or public API.
+
+Bind the exact task in the frozen manifest and every parent input. Retain the original and
+augmented prompt with hashes in a sealed parent authoring record, before native spend.
+qualify_node/qualify_parent must join that record to the actual initial consolidation
+invocation through the existing native trace; require the exact task-plus-production-prompt
+relationship, exactly one augmentation, and no task in lane or continuation invocations.
+The complete native attempt graph, source/harness bindings, durable authored class, both
+gate citations, and all original fork/repair/final controls remain required. An absent,
+misbound or unfaithful class still fails; the directive is not permission to invent a violation.
+
+Add production-handler coverage that the wrapper forwards the same parser/schema/arguments
+and preserves the existing validation retry, and that both repair arms use unmodified native
+prompts. Add resealed missing-task, modified-task and task-in-lane controls to the existing
+complete replay, with zero dependent calls on rejection. Actual invocation bytes, not an
+operator assertion alone, must prove task scope. Report this as direct class-authoring
+acceptance, never evidence that an unprompted census will choose a reusable class. The
+prior one-off outcomes remain legitimate defect detection and nonqualifying class evidence.
 
 Q5. Update public guidance and AGENTS.md before review. After PLAN review, convergence
 stays on CODE bound to this exact contract. Before merge/push require relevant tests,

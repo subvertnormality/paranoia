@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+from contextlib import contextmanager
 import fcntl
 import json
 import os
@@ -25,6 +26,10 @@ from effectiveness_calibration import calibrate
 
 PROVIDERS = {"p01": "codex", "p02": "claude"}
 MODELS = {"codex": "gpt-6-astra", "claude": "opus"}
+AUTHORING_TASK = (
+    "For this class-authoring acceptance task, author a reusable class for the shared blocking "
+    "contract violation identified by the validated census manifests. Use the existing response schema."
+)
 ENTRY_POINTS = ("_validate_capture_attestations", "_validate_replacement_attestations")
 REPAIRS = {
     "exact": "type(index) is not int",
@@ -80,10 +85,11 @@ def verify_fixture(repo, case, fixture):
 
 def manifest(root):
     value = sealed(root / "manifest.json")
-    require(value["schema"] == 2 and value["models"] == MODELS, "campaign version/model differs")
+    require(value["schema"] == 3 and value["models"] == MODELS, "campaign version/model differs")
     require(value["providers"] == PROVIDERS and value["repairs"] == REPAIRS, "schedule changed")
     require(value["gate_lines"] == gate_lines(value["files"]["defect"]), "gate coordinates differ")
     require(value["maximum"] == 32, "call ceiling changed")
+    require(value["authoring_task"] == AUTHORING_TASK, "authoring task changed")
     shared.validate_source(value["source"])
     shared.validate_harness(value["harness"])
     require(shared.sha((ROOT / "docs/class-authoring-quality-plan.md").read_bytes()) == value["plan_sha256"],
@@ -113,7 +119,8 @@ def qualify_node(root, node, m):
     require(spec["case"]["provider"] == provider, "cross-provider node")
     require(spec["source"] == m["source"] and spec["harness"] == m["harness"]
             and spec["models"] == m["models"] and spec["versions"] == m["versions"]
-            and spec["stakes"] == m["stakes"], "node execution authority differs")
+            and spec["stakes"] == m["stakes"]
+            and spec["authoring_task"] == m["authoring_task"], "node execution authority differs")
     verify_fixture(directory / "repository", spec["case"], spec["fixture"])
     require(spec["case"]["files"] == m["files"][node.split("-")[1] if "-" in node else "defect"],
             "wrong repair bytes")
@@ -157,6 +164,7 @@ def qualify_node(root, node, m):
     require(events and shared.sha(state_file(directory).read_bytes()) == previous, "terminal state differs")
     require(len({r["sequence"] for r in q["attempts"]}) == len(q["attempts"]),
             "duplicate attempt")
+    qualify_authoring_prompts(directory, node, q)
     return q, binding
 
 
@@ -290,7 +298,7 @@ def freeze(root, seed):
     for name, result in checks.items():
         seal(root / (name + "-calibration.json"), result)
     m = {
-        "schema":2, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
+        "schema":3, "authoring_task":AUTHORING_TASK, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
         "source":source, "models":MODELS, "stakes":original["stakes"], "files":files,
         "gate_lines":gate_lines(files["defect"]),
         "versions":{e:subprocess.check_output([e, "--version"], text=True).strip() for e in PROVIDERS.values()},
@@ -316,7 +324,8 @@ def write_node(root, node, m, original, fixture, seed, parent):
     spec = deepcopy(original)
     provider = PROVIDERS[node.split("-")[0]]
     spec.update(source=m["source"], models=m["models"], versions=m["versions"], harness=m["harness"],
-                counter=str(root / "calls.txt"), maximum=32, fixture=fixture)
+                counter=str(root / "calls.txt"), maximum=32, fixture=fixture,
+                authoring_task=m["authoring_task"])
     spec["slot"] = {"id":node.split("-")[0], "arm":"staged", "case":"identity", "repetition":1}
     spec["case"]["provider"] = provider
     spec["case"]["files"] = m["files"][node.split("-")[1] if parent else "defect"]
@@ -353,6 +362,111 @@ def fork(root, node):
     write_node(root, node, m, original, fixture, seed, parent)
 
 
+@contextmanager
+def direct_authoring_scope(directory, *, parent):
+    """A disclosed acceptance task; no shipped policy or provider result changes."""
+    from paranoia_local import engines, handlers
+
+    original_call = handlers._staged_call
+    original_execute = engines.Engine._execute
+    prompt_dir = directory / "prompts"
+    prompt_dir.mkdir(exist_ok=True)
+
+    def staged_call(**kwargs):
+        if not parent or kwargs["role"] != "consolidation":
+            return original_call(**kwargs)
+        original = kwargs["prompt"]
+        require(AUTHORING_TASK not in original, "authoring task already present")
+        augmented = AUTHORING_TASK + "\n\n" + original
+        issue = handlers._staged_prompt_issue(
+            augmented, "direct-authoring consolidation prompt",
+            maximum=handlers.rc.MAX_CONSOLIDATION_PROMPT_CHARS,
+        )
+        require(issue is None, issue or "authoring task prompt admission failed")
+        record = directory / "authoring-task.json"
+        require(not record.exists(), "authoring task may augment only one initial consolidation")
+        seal(record, {
+            "task": AUTHORING_TASK, "original_prompt": original,
+            "original_sha256": shared.sha(original), "prompt": augmented,
+            "prompt_sha256": shared.sha(augmented),
+        })
+        return original_call(**{**kwargs, "prompt": augmented})
+
+    def execute(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
+        # These bytes are the actual native invocation, joined to its trace hash.
+        (prompt_dir / (shared.sha(prompt) + ".txt")).write_text(prompt, encoding="utf-8")
+        return original_execute(self, argv, prompt, cwd, runner, timeout, on_progress, response_schema)
+
+    handlers._staged_call = staged_call
+    engines.Engine._execute = execute
+    try:
+        yield
+    finally:
+        handlers._staged_call = original_call
+        engines.Engine._execute = original_execute
+
+
+def qualify_authoring_prompts(directory, node, q):
+    files = {p.stem: p for p in (directory / "prompts").glob("*.txt")}
+    require(set(files) == {r["prompt_sha256"] for r in q["attempts"]},
+            "authoring task invocation prompt inventory differs")
+    texts = {}
+    for digest, path in files.items():
+        text = path.read_text(encoding="utf-8")
+        require(shared.sha(text) == digest, "authoring task invocation prompt hash differs")
+        texts[digest] = text
+    initial = []
+    for row in q["attempts"]:
+        role = q["attempt_roles"][row["sequence"]]
+        text = texts[row["prompt_sha256"]]
+        if "-" not in node and role == "consolidation":
+            initial.append(row)
+        else:
+            require(AUTHORING_TASK not in text, "authoring task escaped initial parent consolidation")
+    record_path = directory / "authoring-task.json"
+    if "-" in node:
+        require(not initial and not record_path.exists(), "authoring task present in continuation")
+        return
+    require(len(initial) == 1, "authoring task requires one initial consolidation")
+    record = sealed(record_path)
+    require(set(record) == {"task", "original_prompt", "original_sha256", "prompt", "prompt_sha256"},
+            "authoring task record shape differs")
+    require(record["task"] == AUTHORING_TASK and AUTHORING_TASK not in record["original_prompt"],
+            "authoring task definition differs")
+    require(record["prompt"] == AUTHORING_TASK + "\n\n" + record["original_prompt"]
+            and record["original_sha256"] == shared.sha(record["original_prompt"])
+            and record["prompt_sha256"] == shared.sha(record["prompt"]),
+            "authoring task exact augmentation differs")
+    require(initial[0]["operation"] == "run"
+            and initial[0]["prompt_sha256"] == record["prompt_sha256"],
+            "authoring task native invocation differs")
+
+
+def mutate_invocation_prompt(directory, digest, text):
+    """Reseal only a disposable negative-control invocation, including native joins."""
+    replacement = shared.sha(text)
+    old = directory / "prompts" / (digest + ".txt")
+    (old.parent / (replacement + ".txt")).write_text(text, encoding="utf-8")
+    old.unlink()
+    path = directory / "attempts.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for row in rows:
+        if row["prompt_sha256"] == digest:
+            row["prompt_sha256"] = replacement
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    checks = custody.read(directory / "checks.json")
+    for row in checks:
+        if row["prompt_sha256"] == digest:
+            row["prompt_sha256"] = replacement
+    shared.dump(directory / "checks.json", checks)
+    for path in (directory / "logs").glob("*-run-*.json"):
+        trace = custody.read(path)
+        for row in trace["attempts"]:
+            if row["prompt_sha256"] == digest:
+                row["prompt_sha256"] = replacement
+        shared.dump(path, trace)
+
+
 def run_node(root, node):
     # The observer's counter has its own short lock. Hold the existing campaign
     # directory open for this separate, transient whole-node serial admission.
@@ -374,6 +488,7 @@ def _run_node(root, node):
     if "-" in node:
         qualify_parent(root, node.split("-")[0], m)
     spec, binding = sealed(directory / "input.json"), sealed(directory / "binding.json")
+    require(spec["authoring_task"] == m["authoring_task"], "authoring task input changed")
     require((directory / "seed-state.bin").read_bytes() == (
         state_file(directory).read_bytes() if "-" in node else b""), "initial seed differs")
     require(shared.sha((directory / "seed-state.bin").read_bytes()) == binding["seed_sha256"], "seed binding differs")
@@ -413,9 +528,10 @@ def _run_node(root, node):
             shared.CURRENT_STAGE[0] = STAGES[round_no - 1]
             call_started = time.perf_counter()
             try:
-                result = server.dispatch("critique_branch", request,
-                    default_engine_name=spec["case"]["provider"], log_dir=directory / "logs",
-                    on_progress=lambda s:print(s, flush=True))
+                with direct_authoring_scope(directory, parent="-" not in node):
+                    result = server.dispatch("critique_branch", request,
+                        default_engine_name=spec["case"]["provider"], log_dir=directory / "logs",
+                        on_progress=lambda s:print(s, flush=True))
             finally:
                 elapsed = round((time.perf_counter() - call_started) * 1000)
                 dispatch_ms += elapsed
@@ -459,15 +575,28 @@ def check_replay(root):
         "one-off", "parent", "fork-seed", "swapped-state", "swapped-result",
         "head", "snapshot", "channel", "cross-provider", "missing-audit", "duplicate-attempt",
         "gate-assessment-0", "gate-assessment-1", "gate-debt-0", "gate-debt-1",
+        "task-missing", "task-modified", "task-in-lane",
     )
     results = []
     for case in cases:
         with tempfile.TemporaryDirectory(prefix="class-authoring-negative-") as tmp:
             copy = Path(tmp) / "records"
             shutil.copytree(root, copy)
-            node = "p01" if case == "one-off" or case.startswith("gate-") else "p01-exact"
+            node = "p01" if case == "one-off" or case.startswith(("gate-", "task-")) else "p01-exact"
             directory = copy / node
-            if case.startswith("gate-"):
+            if case.startswith("task-"):
+                q, _ = qualify_node(copy, "p01", manifest(copy))
+                role = "census-behaviour" if case == "task-in-lane" else "consolidation"
+                row = next(r for r in q["attempts"] if q["attempt_roles"][r["sequence"]] == role)
+                text = (directory / "prompts" / (row["prompt_sha256"] + ".txt")).read_text()
+                if case == "task-missing":
+                    text = text.removeprefix(AUTHORING_TASK + "\n\n")
+                elif case == "task-modified":
+                    text = text.replace(AUTHORING_TASK, "Changed authoring task", 1)
+                else:
+                    text = AUTHORING_TASK + "\n\n" + text
+                mutate_invocation_prompt(directory, row["prompt_sha256"], text)
+            elif case.startswith("gate-"):
                 gate = manifest(copy)["gate_lines"][int(case[-1])]
                 if case.startswith("gate-assessment"):
                     assessment = sealed(directory / "assessment.json")
@@ -528,7 +657,7 @@ def check_replay(root):
             terminal = custody.read(directory / "terminal.json")
             custody.terminal(directory, terminal["outcome"], terminal["error"],
                              elapsed_ms=terminal["elapsed_ms"], dispatch_ms=terminal["dispatch_ms"])
-            if case == "one-off" or case.startswith("gate-"):
+            if case == "one-off" or case.startswith(("gate-", "task-")):
                 assessment = sealed(directory / "assessment.json")
                 assessment["state_sha256"] = shared.sha(state_file(directory).read_bytes())
                 assessment["terminal_sha256"] = shared.sha((directory / "terminal.json").read_bytes())
@@ -539,8 +668,9 @@ def check_replay(root):
                 results.append({"mutation":case, "rejection":str(exc)})
             else:
                 raise ValueError("negative control was accepted: " + case)
-            if case.startswith("gate-"):
-                expected = "parent assessment omits gate" if "assessment" in case else "parent debt omits gate"
+            if case.startswith(("gate-", "task-")):
+                expected = ("authoring task" if case.startswith("task-") else
+                            "parent assessment omits gate" if "assessment" in case else "parent debt omits gate")
                 require(expected in results[-1]["rejection"], "gate control rejected at the wrong boundary")
                 before = (copy / "calls.txt").read_bytes()
                 try:

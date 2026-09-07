@@ -692,6 +692,8 @@ Keep governing requirements separate from suggested repair syntax. This new card
 not reopen or mutate the completed predicate probe or its historical class lineage.
 The user-approved recurring-fixture acceptance reopening keeps production guidance frozen.
 Run its campaign nodes serially; only the native census lanes run concurrently.
+The subsequent user-approved direct-authoring acceptance uses only the disclosed test task
+in Q4e; preserve runtime classification policy, native validation and both repair/final gates.
 
 Issue #115 follows docs/claim-alias-retry-115-plan.md. Generate canonical prior-disposition
 fields and diagnose alias-pair collisions without accepting equal or conflicting duplicates.
