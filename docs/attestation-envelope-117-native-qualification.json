@@ -6,5 +6,5 @@
   "attempts": 18,
   "additional_provider_calls": 0,
   "supported_claims": 1,
-  "scope": "Retained native clear result with authoritative support; context-only capture failure does not govern claim closure. Original failed qualification remains immutable."
+  "scope": "Retained native clear result with authoritative support; the successfully captured and bound context-only source was intentionally excluded from governing attestation. Original failed qualification remains immutable."
 }

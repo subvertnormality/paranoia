@@ -136,7 +136,7 @@ def qualify_retained(output):
         "native_source_revision": source["production"]["revision"],
         "qualification_revision": current["revision"], "attempts": 18,
         "additional_provider_calls": 0, "supported_claims": len(claims),
-        "scope": "Retained native clear result with authoritative support; context-only capture failure does not govern claim closure. Original failed qualification remains immutable."}
+        "scope": "Retained native clear result with authoritative support; the successfully captured and bound context-only source was intentionally excluded from governing attestation. Original failed qualification remains immutable."}
     with output.open("x") as stream:
         json.dump(certificate, stream, indent=2)
         stream.write("\n")
