@@ -121,3 +121,10 @@ hash, all new prompts/channels/ledgers and reloaded state. Reject an edited pare
 production before provider admission. Preserve the structural-clear gate and all evidence
 gates. Prove parent-contamination rejection and the global call ceiling deterministically.
 This is a bounded repair continuation, not an unchanged rerun or new claim of first-run success.
+
+The user subsequently gave standing approval to run Paranoia. Complete the preserved
+twelve-call checkpoint with its required cold final and existing single validation retry,
+at most fourteen cumulative attempts. Bind the exact second retained archive as well as
+the original archive and unchanged complete production inventory. Preserve both failed
+qualifications and all quality gates. This supersedes the twelve-call delivery ceiling;
+it does not alter runtime review limits or authorize relabeling a failed run as successful.

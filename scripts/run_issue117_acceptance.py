@@ -44,12 +44,24 @@ def _require_evidence_phases(ledger):
 
 
 PARENT_ARCHIVE_SHA256 = "471a0b5407614ba1c170ba991d8cfac02b0e0b5af9958064e2eb4ea5af615e56"
+CONTINUATION_ARCHIVE_SHA256 = "d7c8dec1d8dd02fed63482e881e895ab3e48cfc1255fa6722899e0859424f4fd"
 
 
 def _load_parent(parent, source):
-    """Admit only the preserved eight-call campaign, never an edited/restarted parent."""
+    """Admit an exact retained checkpoint; never reset its cumulative call count."""
     archive = ROOT / "docs/attestation-envelope-117-native-evidence.tar.gz"
     assert hashlib.sha256(archive.read_bytes()).hexdigest() == PARENT_ARCHIVE_SHA256
+    with tarfile.open(archive) as retained:
+        original_inputs = [json.load(retained.extractfile(f"attempt-{i:02d}-input.json")) for i in range(1, 9)]
+        original_audit = next(m for m in retained.getmembers() if m.name.startswith("logs/") and "-critique_plan-" in m.name)
+        original_ledger = json.load(retained.extractfile(original_audit))["attempt_ledger"]
+        original_source = json.load(retained.extractfile("source.json"))
+    finishing = json.loads((parent / "qualification.json").read_text())["attempts"] == 12
+    digest = PARENT_ARCHIVE_SHA256
+    if finishing:
+        archive = ROOT / "docs/attestation-envelope-117-continuation-evidence.tar.gz"
+        digest = CONTINUATION_ARCHIVE_SHA256
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == digest
     with tarfile.open(archive) as retained:
         members = retained.getmembers()
         assert all(m.isfile() and not Path(m.name).is_absolute()
@@ -62,11 +74,18 @@ def _load_parent(parent, source):
     old_source = read("source.json")
     assert old_source["production"]["files"] == source["files"], "continuation changes production"
     assert read("qualification.json")["qualified"] is False
-    inputs = [read(f"attempt-{i:02d}-input.json") for i in range(1, 9)]
+    inputs = [read(f"attempt-{i:02d}-input.json") for i in (range(9, 13) if finishing else range(1, 9))]
     audit = json.loads(next((parent / "logs").glob("*-critique_plan-*.json")).read_text())
-    assert read("qualification.json")["attempts"] == len(inputs) == len(audit["attempt_ledger"]) == 8
+    assert len(inputs) == len(audit["attempt_ledger"]) == (4 if finishing else 8)
+    assert read("qualification.json")["attempts"] == (12 if finishing else 8)
     _require_evidence_phases(audit["attempt_ledger"])
-    return {"source": old_source, "inputs": inputs, "ledger": audit["attempt_ledger"],
+    if finishing:
+        assert original_source["production"]["files"] == source["files"]
+        assert read("durable.json")["review_state"]["phase"] == "final"
+        inputs = original_inputs + inputs
+    return {"source": old_source, "inputs": inputs,
+            "ledger": (original_ledger if finishing else []) + audit["attempt_ledger"],
+            "archive_sha256": digest, "next_round": 3 if finishing else 2,
             "arguments": read("invocation.json")["arguments"]}
 
 
@@ -77,6 +96,7 @@ def native(out, parent=None):
     shared, source = load_source(ROOT)
     prior = _load_parent(parent, source) if parent is not None else None
     base_calls = len(prior["inputs"]) if prior else 0
+    ceiling = 14 if base_calls == 12 else 12
     source_id = shared.sha(json.dumps(source, sort_keys=True).encode())
     helper_files = {}
     for name in ("scripts/run_issue117_acceptance.py", "scripts/benchmark_bootstrap.py",
@@ -89,7 +109,7 @@ def native(out, parent=None):
     write("source.json", {"production": source, "source_id": source_id, "helpers": helper_files})
     if prior:
         shutil.copytree(parent / "state", out / "state")
-        write("parent.json", {"archive_sha256": PARENT_ARCHIVE_SHA256,
+        write("parent.json", {"archive_sha256": prior["archive_sha256"],
             "source": prior["source"], "base_calls": base_calls,
             "seed_state_sha256": shared.sha((out / "state/lineages/issue117-native.json").read_bytes())})
     os.environ["PARANOIA_STATE_ROOT"] = str(out / "state")
@@ -119,7 +139,7 @@ def native(out, parent=None):
     write("loaded-before.json", loaded())
     write("runtime.json", {"requested_model": "opus", "effort": "high",
         "claude_version": subprocess.check_output(["claude", "--version"], text=True).strip(),
-        "python": sys.version, "source_id": source_id, "attempt_ceiling": 12,
+        "python": sys.version, "source_id": source_id, "attempt_ceiling": ceiling,
         "pycache_prefix": sys.pycache_prefix, "dont_write_bytecode": sys.dont_write_bytecode})
     repo = out / "repository"
     if prior:
@@ -135,7 +155,7 @@ def native(out, parent=None):
         "round": 1, "model": "opus", "effort": "high", "claim_verification": True,
         "web_search": True, "stakes": "Trusted single operator and OS. One tiny repository and one external release-date claim; static inputs, ordinary edits invalidate bindings, existing CLI network boundaries and native concurrency/timeouts. False evidence clearance high impact; recoverable blocking acceptable. No hostile local races, compromised OS, multi-tenancy or corrupted-state recovery."}
     if prior:
-        arguments = prior["arguments"] | {"repo_path": str(repo), "round": 2,
+        arguments = prior["arguments"] | {"repo_path": str(repo), "round": prior["next_round"],
             "plan_text": (ROOT / "docs/attestation-envelope-117-fixture-repair.md").read_text()}
     write("invocation.json", {"source_id": source_id, "arguments": arguments})
     original = engines.Engine._execute
@@ -143,7 +163,7 @@ def native(out, parent=None):
     lock = threading.Lock()
     def observe(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
         with lock:
-            if base_calls + len(attempts) >= 12:
+            if base_calls + len(attempts) >= ceiling:
                 raise RuntimeError("issue117 native attempt ceiling exhausted")
             number = base_calls + len(attempts) + 1
             row = {"sequence": number, "source_id": source_id, "role": self.role,
@@ -172,7 +192,7 @@ def native(out, parent=None):
     engines.Engine._execute = observe
     started = time.monotonic()
     try:
-        rounds = (2, 3) if prior else (1,)
+        rounds = tuple(range(prior["next_round"], 4)) if prior else (1,)
         for round_no in rounds:
             current = arguments | {"round": round_no}
             write(f"invocation-{round_no}.json", {"source_id": source_id, "arguments": current})
