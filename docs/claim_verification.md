@@ -70,6 +70,15 @@ an empty, verified register.
 
 ## Architecture
 
+Cold attestation uses the same complete output instructions initially and on its one
+same-session correction. It requires one envelope with only the permitted fields;
+explanations belong in the bounded authority and entailment reason fields. A correction
+replaces the whole rejected reply. Extra fields, competing envelopes and conflicting
+attestations remain rejected; the server never takes the last object as a repair.
+Both rendered prompts count toward admission. Ordinary packet fields and the complete
+captured text carried by expanded packets retain their existing behavior. Earlier native
+prompt-size measurements describe their recorded source, not this later wording.
+
 1. The selected reviewer CLI scans the plan and uses Codex live search or Claude `WebSearch`
    only to discover candidate public URLs. Claude `WebFetch` is not enabled. There is no search
    endpoint, API key, plugin, or provider abstraction.

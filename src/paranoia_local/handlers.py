@@ -71,6 +71,19 @@ MAX_BINDING_LOCATION_CHARS = 1_000
 MAX_BINDING_PASSAGE_CHARS = 8_000
 MAX_ATTESTATION_REPLY_CHARS = 500_000
 MAX_ATTESTATION_REASON_CHARS = 1_000
+
+ATTESTATION_OUTPUT_INSTRUCTIONS = f"""Independently judge publisher authority for the exact
+proposition and passage entailment of the declared relation using only the supplied packet.
+Return exactly one marker and one complete JSON object as illustrated below, with nothing
+before or after it. The sole envelope key is attestations. Each row has exactly the six
+illustrated keys; no note, explanation, alternative, correction or other extra keys.
+Return exactly one row per supplied (claim_index,evidence_index) pair, preserving its integer
+indices. Verdicts are JSON booleans, independently judged; the example values are not answers.
+Put all reasoning in authority_reason and entailment_reason, each a nonempty string of at
+most {MAX_ATTESTATION_REASON_CHARS} characters. No prose, fences, appended repairs, duplicate
+rows, second marker or competing envelope. Finish after the single complete object.
+=== EVIDENCE ATTESTATION JSON ===
+{{"attestations":[{{"claim_index":0,"evidence_index":0,"publisher_authority":true,"authority_reason":"specific reason","passage_entailment":true,"entailment_reason":"specific reason"}}]}}"""
 MAX_PLAN_CAPTURE_SOURCES = 200
 MAX_PLAN_BINDING_BATCHES = 5
 MAX_PLAN_ATTESTATION_BATCHES = 5
@@ -3710,21 +3723,18 @@ class _CapturedClaimEngine:
     @staticmethod
     def _attestation_prompt(items: list[dict[str, Any]]) -> str:
         return (
-            "You are a cold evidence attester with no web or repository tools. Independently "
-            "judge only whether each named publisher governs the exact proposition and whether "
-            "the exact passage entails the declared relation in the supplied captured context. "
-            "Return only:\n=== EVIDENCE ATTESTATION JSON ===\n"
-            '{"attestations":[{"claim_index":0,"evidence_index":0,'
-            '"publisher_authority":true,"authority_reason":"specific reason",'
-            '"passage_entailment":true,"entailment_reason":"specific reason"}]}\n\n'
+            "You are a cold evidence attester with no web or repository tools.\n"
+            + ATTESTATION_OUTPUT_INSTRUCTIONS + "\n\n"
             + json.dumps(items, ensure_ascii=False, separators=(",", ":"))
         )
 
     @staticmethod
     def _attestation_correction_prompt(rendered: str, issue: str) -> str:
         return (
-            f"Your cold evidence attestation was rejected: {issue}. Return one corrected "
-            "=== EVIDENCE ATTESTATION JSON === object for exactly this packet.\n\n"
+            f"Your cold evidence attestation was rejected: {issue}. Discard the entire "
+            "rejected reply and return its complete replacement for exactly this packet, "
+            "not edits or an alternative appended to it.\n"
+            + ATTESTATION_OUTPUT_INSTRUCTIONS + "\n\n"
             + rendered
         )
 

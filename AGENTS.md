@@ -1,5 +1,12 @@
 # Repository agent instructions
 
+Cold plan attestation initial and correction prompts share one complete output contract:
+one marker/envelope, only the permitted fields, one row per supplied integer identity pair,
+independent Boolean judgments and bounded reason fields. A correction replaces the entire
+reply. Preserve strict rejection and the single same-session retry; never choose a later
+envelope or recover competing attestations. Ordinary and expanded preflight use the actual
+renderers. Historical prompt measurements remain historical after authoring changes.
+
 For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
 
 These instructions govern work in paranoia-local. User instructions take precedence but do
