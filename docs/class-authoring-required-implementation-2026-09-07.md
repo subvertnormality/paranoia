@@ -53,6 +53,18 @@ The correction selects the owned src directory at harness startup, before any qu
 can import Paranoia, and removes the two late duplicate selections. A fresh-process test
 places a competing installed package ahead of the environment and verifies qualification
 loads the owned engine module. Both complete scripted graphs and all ten focused tests pass.
-The corrected source still needs its final full-suite result. No runtime policy change,
+The corrected source 690ba47 passes all 2,230 tests in 275.39 seconds. No runtime policy change,
 native campaign acceptance, speed improvement, merge eligibility, or closure of issues 49/50
 is claimed. Q4f's terminal-failure architecture checkpoint applies before another campaign.
+
+## Proposed checkpoint disposition
+
+After the corrected-source tests pass, authorize one fresh campaign on the committed
+source-selection fix. Keep schema version 4, the exact two-gate fixture, both repair forms,
+Codex gpt-6-astra and Claude opus at high effort, serial nodes, the maximum 32 attempts,
+original class/inventory preservation, cold finals and all custody gates. Do not reuse or
+rerun any terminal node from the failed campaign. Count its five calls separately in the
+cumulative report. This replaces the failed campaign's acceptance opportunity, not its
+evidence or cost. No runtime policy, reviewer-role, source-authority or quality-gate change
+is proposed. Another terminal failure returns to this checkpoint rather than an automatic
+campaign restart. CODE convergence and qualified native acceptance still precede delivery.
