@@ -324,7 +324,10 @@ def validate_artifact(
     before = artifact["before_lineage"]
     if before != _before_lineage_record():
         raise ValueError("before-lineage envelope is not closed and exact")
-    active = before["classes"]
+    # Stored dataclass fields omit this computed canonical class fact. Project it
+    # into the complete active-class view without altering retained lineage bytes.
+    active = [{**row, "mechanized": row["pattern"] is not None}
+              for row in before["classes"]]
     durable_debt = before["review_state"]["debt"]
     # This retained exchange predates the required issue #94 wire member. The
     # fixture has no prior concessions, so project only the uniquely valid empty
