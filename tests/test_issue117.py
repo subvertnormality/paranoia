@@ -304,6 +304,57 @@ def test_continuation_parent_binding(tmp_path):
     assert check(source).returncode != 0
 
 
+def test_continuation_global_ceiling_through_entry(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    program = r'''
+import runpy, sys, json, tarfile
+from pathlib import Path
+from types import SimpleNamespace
+entry, output, parent = map(Path, sys.argv[1:])
+with tarfile.open(entry.parent.parent / 'docs/attestation-envelope-117-native-evidence.tar.gz') as archive:
+    for member in archive.getmembers():
+        assert member.isfile() and not Path(member.name).is_absolute() and '..' not in Path(member.name).parts
+        target = parent / member.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(archive.extractfile(member).read())
+scope = runpy.run_path(str(entry))
+globals_ = scope['native'].__globals__
+load = globals_['load_source']
+calls = []
+def setup(root):
+    result = load(root)
+    sys.path.insert(0, str(root / 'src'))
+    from paranoia_local import engines, server
+    def fake_execute(*args, **kwargs):
+        calls.append(1)
+        return engines.Review(text='scripted', session_ref=None, raw='scripted')
+    engines.Engine._execute = fake_execute
+    def dispatch(*args, **kwargs):
+        for i in range(5):
+            engines.Engine._execute(SimpleNamespace(role='scripted-ceiling-control'), [], 'scripted', root, None, 300)
+        raise AssertionError('fifth new call admitted')
+    server.dispatch = dispatch
+    original = globals_['subprocess'].check_output
+    globals_['subprocess'].check_output = lambda args, **kw: 'scripted-version' if args == ['claude', '--version'] else original(args, **kw)
+    return result
+globals_['load_source'] = setup
+try:
+    scope['native'](output, parent)
+except RuntimeError as exc:
+    assert str(exc) == 'issue117 native attempt ceiling exhausted'
+else:
+    raise AssertionError('ceiling did not reject')
+assert len(calls) == 4
+assert [json.loads(p.read_text())['sequence'] for p in sorted(output.glob('attempt-*-input.json'))] == [9,10,11,12]
+qualification = json.loads((output / 'qualification.json').read_text())
+assert qualification['attempts'] == 12 and qualification['qualified'] is False
+'''
+    result = subprocess.run([sys.executable, "-c", program,
+        str(root / "scripts/run_issue117_acceptance.py"), str(tmp_path / "output"),
+        str(tmp_path / "parent")], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_native_phase_qualification_accepts_recorded_discovery_repair(tmp_path):
     import tarfile
     root = Path(__file__).resolve().parents[1]
