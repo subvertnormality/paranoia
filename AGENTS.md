@@ -1,11 +1,30 @@
 # Repository agent instructions
 
+For the behavioral class-authoring branch, the user's revised delivery gate is the fixture
+diagnostic-label fix, deterministic validation and broad Codex CODE convergence. Opus
+convergence and another complete native fixture campaign are not required. Preserve failed
+historical acceptance as failed evidence; never reinterpret it as a complete passing graph.
+The current gate is recorded at the top of docs/class-authoring-quality-plan.md.
+
 Cold plan attestation initial and correction prompts share one complete output contract:
 one marker/envelope, only the permitted fields, one row per supplied integer identity pair,
 independent Boolean judgments and bounded reason fields. A correction replaces the entire
 reply. Preserve strict rejection and the single same-session retry; never choose a later
 envelope or recover competing attestations. Ordinary and expanded preflight use the actual
 renderers. Historical prompt measurements remain historical after authoring changes.
+
+For new or replacement unmechanized class definitions, reviewers author specific stable member
+IDs from the invariant and validated evidence. Existing-class assessments retain the exact
+server-supplied inventory; reference IDs for existing debt, classes and lane sources cannot be
+invented. This ownership distinction does not alter class policy or canonical closure checks.
+
+The approved Q4f class-authoring acceptance harness may narrow only parent consolidation
+and its existing retry to a nonempty finding list using the existing new-class alternative.
+Keep runtime schemas and class policy unchanged. Seal and join original, expected and actual
+provider schemas for every role and retry; preserve both repair continuations, unchanged
+authored class inventories, cold finals, custody checks and the existing attempt ceiling.
+Validate the native-bound accepted parent response against that narrowed schema before fork
+admission and complete replay; rejected initial replies remain legitimate retry evidence.
 
 For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
 
@@ -693,6 +712,14 @@ as its new bounded contract. Preserve the original pilot and approved ratings;
 calibrate controls before a newly frozen full campaign. Historical fixture patches
 must be explicit, target defects must remain detectable, and a failed calibration
 blocks provider admission. No production review behavior changes in this card.
+
+For new behavioral class-authoring work, follow docs/class-authoring-quality-plan.md.
+Keep governing requirements separate from suggested repair syntax. This new card does
+not reopen or mutate the completed predicate probe or its historical class lineage.
+The user-approved recurring-fixture acceptance reopening keeps production guidance frozen.
+Run its campaign nodes serially; only the native census lanes run concurrently.
+The subsequent user-approved direct-authoring acceptance uses only the disclosed test task
+in Q4e; preserve runtime classification policy, native validation and both repair/final gates.
 
 Issue #115 follows docs/claim-alias-retry-115-plan.md. Generate canonical prior-disposition
 fields and diagnose alias-pair collisions without accepting equal or conflicting duplicates.

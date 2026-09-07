@@ -453,7 +453,7 @@ def staged_followup_instructions(mode: str, *, plan_contract: bool = False) -> s
     if mode == "plan":
         instructions += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
         instructions += "\n\n" + PLAN_RESTATEMENT_INSTRUCTIONS
-    return instructions + "\n\n" + COASSERTION_INSTRUCTIONS
+    return "\n\n".join((instructions, COASSERTION_INSTRUCTIONS, CLASS_AUTHORING_INSTRUCTIONS))
 
 
 STAGED_CENSUS_INSTRUCTIONS = """You are one independent lane in a cold structural review census.
@@ -496,7 +496,8 @@ cross-lane finding may classify as existing_class only when that class's integri
 violated and its cited source is included; otherwise classify the finding as one_off or new_class.
 Return one
 debt_outcome for every supplied open debt: open needs current evidence and a concrete remaining
-condition; closed needs current evidence. Do not invent debt or IDs. class_actions is keyed by every
+condition; closed needs current evidence. Use only supplied IDs when referring to existing debt,
+active classes, or lane sources. class_actions is keyed by every
 active class: use null when no independent action is needed, otherwise one lifecycle/severity
 decision. Closed mechanized violation requires replace with a corrected violation-only predicate;
 reopen applies only to unmechanized classes."""
@@ -504,12 +505,15 @@ reopen applies only to unmechanized classes."""
 
 def staged_consolidation_instructions(mode: str, *, plan_contract: bool = False) -> str:
     if mode == "plan":
-        return STAGED_CONSOLIDATION_INSTRUCTIONS + "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+        return "\n\n".join((
+            STAGED_CONSOLIDATION_INSTRUCTIONS, PLAN_PHASE_CLASS_INSTRUCTIONS,
+            CLASS_AUTHORING_INSTRUCTIONS,
+        ))
     if mode == "branch":
         instructions = STAGED_CONSOLIDATION_INSTRUCTIONS
         if plan_contract:
             instructions += "\n\nPreserve validated `plan:` anchors from the supplied manifests."
-        return instructions
+        return instructions + "\n\n" + CLASS_AUTHORING_INSTRUCTIONS
     raise ValueError(f"invalid staged mode {mode!r}")
 
 
@@ -573,6 +577,25 @@ its redundant close; the server derives it. Closed mechanized violation requires
 # text for undeclared classes is unachievable, so the contract asks plainly instead and
 # `docs/class_closure_plan.md` §1 scopes the guarantee to a class you register.
 
+CLASS_AUTHORING_INSTRUCTIONS = """## Author classes from governing requirements
+Derive each new or replacement invariant from the governing requirement and supported
+input/actor domain. Keep suggested repairs separate from closure obligations. A repair
+example, familiar idiom, or chosen predicate is not itself a governing requirement; do
+not strengthen an invariant merely to make a predicate close. Accept compliant alternative
+implementations unless an actual governing requirement mandates their representation.
+Preserve such explicit representation requirements rather than dismissing them as style.
+
+A mechanized predicate must match violations only, not compliant alternative repairs.
+Consider whether equivalent supported implementations would still match before choosing
+the predicate. When no honest line-level predicate expresses the violation, use the
+existing unmechanized procedure with its complete member inventory. In consolidation,
+make this judgement from the validated manifests; do not start another review.
+For a new or replacement unmechanized definition, author specific stable member IDs from
+the invariant and validated evidence; do not wait for pre-existing IDs in lane manifests.
+Existing-class assessments must preserve the exact server-supplied member IDs.
+These authoring rules do not rewrite existing classes or authorize ignoring a surviving
+predicate, weakening severity, omitting evidence/members, or bypassing canonical closure."""
+
 CLASS_REGISTER_INSTRUCTIONS = """## Register the defect CLASSES you found — mandatory terminal block
 
 A finding is a **class** when the reasoning that condemned this site would condemn
@@ -583,11 +606,6 @@ Registering a class is how it survives past this round. The server re-runs your 
 every future round, reports every surviving match as a recurrence, and refuses to report
 the loop unblocked while a BLOCKER or MAJOR class of yours is still open. A class you do
 not register is simply not tracked — nothing detects that, so it is on you.
-
-**A mechanized predicate matches VIOLATIONS ONLY.** Closure is defined as zero matches,
-so a pattern that also matches conforming code can never close and is worse than useless.
-If no line-level regex can express the violation, use PROCEDURE instead and say so — an
-honest unmechanized class is worth far more than a regex that quietly matches nothing.
 
 End your reply with EXACTLY this block, after everything else, records separated by blank
 lines. If you registered no class and changed no state, the whole body is `NONE`.
@@ -669,7 +687,10 @@ CLASS: <restated invariant>        (optional)
 Rules: one field per line; SEVERITY here is the class's ONLY severity; an unknown class
 id is rejected; PATTERN and PATHSPEC are NOT accepted for a plan review."""
 
-PLAN_CLASS_REGISTER_INSTRUCTIONS += "\n\n" + PLAN_PHASE_CLASS_INSTRUCTIONS
+CLASS_REGISTER_INSTRUCTIONS += "\n\n" + CLASS_AUTHORING_INSTRUCTIONS
+PLAN_CLASS_REGISTER_INSTRUCTIONS += "\n\n" + "\n\n".join((
+    PLAN_PHASE_CLASS_INSTRUCTIONS, CLASS_AUTHORING_INSTRUCTIONS,
+))
 
 
 def register_retry(reason: str) -> str:
@@ -689,4 +710,5 @@ no state, the entire body is the single word NONE:
 === CLASS REGISTER ===
 NONE"""
 
+_REGISTER_RETRY += "\n\n" + CLASS_AUTHORING_INSTRUCTIONS
 REGISTER_RETRY = _REGISTER_RETRY.replace("<REASON>", "the block was absent or unparseable")

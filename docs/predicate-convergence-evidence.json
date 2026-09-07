@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "archive_sha256": "251fe18b656490e9a1a860e6f8328af752d88be8ca07aaa964bd1fd937fd08cb",
+  "archive_bytes": 61786,
+  "seal_sha256": "01dd6f19b2c783b7675a8bc2858fa70fd1452fab0fb8cec55ddd8808d3246e77",
+  "verified_members": 63,
+  "summary": {
+    "failure": null,
+    "setup_ms": 2655,
+    "dispatch_ms": 60877,
+    "elapsed_ms": 63607,
+    "calls": 1,
+    "seed_unchanged": true,
+    "phase": "correction",
+    "qualified": true,
+    "clear": false
+  }
+}

@@ -20,6 +20,7 @@ from scripts.acceptance_sources import historical_inventory
 
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, review_census as rc, staged_protocol as sp
+from paranoia_local import prompts
 from paranoia_local.engines import Review
 
 OUTPUT = ROOT / "docs" / "class_occurrence_batch_acceptance_2026-08-30.json"
@@ -94,6 +95,14 @@ def _sha_text(value: str) -> str:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project the empty-concession additions out of this retained prompt."""
+    # Exact inverse of the later authoring addition; the complete historical
+    # prompt must still match the original provider bytes below.
+    prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
+    prompt = prompt.replace(
+        "Use only supplied IDs when referring to existing debt,\n"
+        "active classes, or lane sources. class_actions is keyed by every",
+        "Do not invent debt or IDs. class_actions is keyed by every",
+    )
     # Exact inverse of the read-only capability wording change; this replay still
     # proves only the retained historical provider prompt, never current live use.
     prompt = prompt.replace(
