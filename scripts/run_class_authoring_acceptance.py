@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import shutil
 import subprocess
@@ -22,6 +24,8 @@ import effectiveness_custody as custody
 from effectiveness_calibration import calibrate
 
 PROVIDERS = {"p01": "codex", "p02": "claude"}
+MODELS = {"codex": "gpt-6-astra", "claude": "opus"}
+ENTRY_POINTS = ("_validate_capture_attestations", "_validate_replacement_attestations")
 REPAIRS = {
     "exact": "type(index) is not int",
     "boolean": "isinstance(index, bool) or not isinstance(index, int)",
@@ -76,7 +80,9 @@ def verify_fixture(repo, case, fixture):
 
 def manifest(root):
     value = sealed(root / "manifest.json")
+    require(value["schema"] == 2 and value["models"] == MODELS, "campaign version/model differs")
     require(value["providers"] == PROVIDERS and value["repairs"] == REPAIRS, "schedule changed")
+    require(value["gate_lines"] == gate_lines(value["files"]["defect"]), "gate coordinates differ")
     require(value["maximum"] == 32, "call ceiling changed")
     shared.validate_source(value["source"])
     shared.validate_harness(value["harness"])
@@ -175,6 +181,11 @@ def qualify_parent(root, node, m):
     debt = [d for d in state["review_state"]["debt"]
             if d["status"] == "open" and target["class_id"] in d["class_ids"]]
     require(debt and {d["id"] for d in debt} == set(assessment["debt_ids"]), "target debt misbound")
+    for gate in m["gate_lines"]:
+        require(any(covers_gate(e, gate) for e in assessment["evidence"]),
+                f"parent assessment omits gate {gate}")
+        require(any(covers_gate(e, gate) for d in debt for e in d["evidence"]),
+                f"parent debt omits gate {gate}")
     require(set(assessment["evidence"]) <= {e for d in debt for e in d["evidence"]},
             "assessment evidence is not target evidence")
     return q, assessment
@@ -219,23 +230,69 @@ def qualify_trial_graph(root, *, complete=False):
     return {"nodes":rows, "calls":count, "complete":complete}
 
 
+def gate_lines(files):
+    lines = [i for i, line in enumerate(files["app.py"].splitlines(), 1)
+             if "not isinstance(index, int) or not 0 <= index < len(evidence)" in line]
+    require(len(lines) == 2, "recurring fixture must retain exactly two defective gates")
+    return lines
+
+
+def covers_gate(anchor, line):
+    match = re.fullmatch(r"repository/app\.py:(\d+)(?:-(\d+))?", anchor)
+    return bool(match and int(match[1]) <= line <= int(match[2] or match[1]))
+
+
+def recurring_files(files):
+    files = deepcopy(files)
+    entry, replacement = ENTRY_POINTS
+    marker = f"def {entry}("
+    require(files["app.py"].count(marker) == 1 and replacement not in files["app.py"],
+            "original fixture entry point changed")
+    body = files["app.py"][files["app.py"].index(marker):]
+    files["app.py"] += "\n" + body.replace(marker, f"def {replacement}(", 1)
+    phrase = f"{entry} accepts"
+    require(files["SPEC.md"].count(phrase) == 1, "original fixture specification changed")
+    files["SPEC.md"] = files["SPEC.md"].replace(
+        phrase, f"Each of {entry} and {replacement} independently accepts", 1,
+    )
+    gate_lines(files)
+    return files
+
+
+def calibrate_recurring(files, defective_paths):
+    entries = []
+    for entry, defective in zip(ENTRY_POINTS, defective_paths, strict=True):
+        projected = deepcopy(files)
+        if entry == ENTRY_POINTS[1]:
+            projected["app.py"] = projected["app.py"].replace(
+                f"def {ENTRY_POINTS[0]}(", "def _unused_capture_attestations(", 1,
+            ).replace(f"def {entry}(", f"def {ENTRY_POINTS[0]}(", 1)
+        result = calibrate("identity", projected, defective)
+        require(len(result["checks"]) == 100, "entry-point calibration incomplete")
+        entries.append({"entry_point":entry, "projection_app":projected["app.py"], "result":result})
+    return {"fixture_files_sha256":{k:shared.sha(v) for k,v in files.items()}, "entries":entries}
+
+
 def freeze(root, seed):
     original = custody.read(seed)
     source = shared.source_record(ROOT)
-    files = {"defect":original["case"]["files"]}
+    files = {"defect":recurring_files(original["case"]["files"])}
     gate = "not isinstance(index, int)"
-    require(files["defect"]["app.py"].count(gate) == 1, "fixture changed")
+    require(files["defect"]["app.py"].count(gate) == 2, "fixture changed")
     for name, repair in REPAIRS.items():
         files[name] = {**files["defect"], "app.py":files["defect"]["app.py"].replace(gate, repair)}
     root.mkdir(parents=True, exist_ok=False)
-    checks = {name:calibrate("identity", body, name == "defect") for name, body in files.items()}
-    require(all(len(c["checks"]) == 100 for c in checks.values()), "calibration incomplete")
-    require(all(not checks[name]["target_failures"] for name in REPAIRS), "repair calibration failed")
+    files["half"] = {**files["defect"], "app.py":files["defect"]["app.py"].replace(
+        gate, REPAIRS["exact"], 1,
+    )}
+    checks = {name:calibrate_recurring(body, (name == "defect", name in {"defect", "half"}))
+              for name, body in files.items()}
     for name, result in checks.items():
         seal(root / (name + "-calibration.json"), result)
     m = {
-        "schema":1, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
-        "source":source, "models":original["models"], "stakes":original["stakes"], "files":files,
+        "schema":2, "execution_root":str(root), "providers":PROVIDERS, "repairs":REPAIRS,
+        "source":source, "models":MODELS, "stakes":original["stakes"], "files":files,
+        "gate_lines":gate_lines(files["defect"]),
         "versions":{e:subprocess.check_output([e, "--version"], text=True).strip() for e in PROVIDERS.values()},
         "harness":{str(ROOT / "scripts" / n):shared.sha((ROOT / "scripts" / n).read_bytes())
                    for n in (*pilot.HARNESS_NAMES, Path(__file__).name)},
@@ -297,6 +354,20 @@ def fork(root, node):
 
 
 def run_node(root, node):
+    # The observer's counter has its own short lock. Hold the existing campaign
+    # directory open for this separate, transient whole-node serial admission.
+    descriptor = os.open(root, os.O_RDONLY)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("another campaign node is running; wait for terminal qualification") from exc
+        _run_node(root, node)
+    finally:
+        os.close(descriptor)
+
+
+def _run_node(root, node):
     m = manifest(root)
     directory = root / node
     require(not (directory / "terminal.json").exists(), "terminal node cannot rerun")
@@ -387,15 +458,28 @@ def check_replay(root):
     cases = (
         "one-off", "parent", "fork-seed", "swapped-state", "swapped-result",
         "head", "snapshot", "channel", "cross-provider", "missing-audit", "duplicate-attempt",
+        "gate-assessment-0", "gate-assessment-1", "gate-debt-0", "gate-debt-1",
     )
     results = []
     for case in cases:
         with tempfile.TemporaryDirectory(prefix="class-authoring-negative-") as tmp:
             copy = Path(tmp) / "records"
             shutil.copytree(root, copy)
-            node = "p01" if case == "one-off" else "p01-exact"
+            node = "p01" if case == "one-off" or case.startswith("gate-") else "p01-exact"
             directory = copy / node
-            if case == "one-off":
+            if case.startswith("gate-"):
+                gate = manifest(copy)["gate_lines"][int(case[-1])]
+                if case.startswith("gate-assessment"):
+                    assessment = sealed(directory / "assessment.json")
+                    assessment["evidence"] = [e for e in assessment["evidence"] if not covers_gate(e, gate)]
+                    seal(directory / "assessment.json", assessment)
+                else:
+                    state = custody.read(state_file(directory))
+                    for debt in state["review_state"]["debt"]:
+                        debt["evidence"] = [e for e in debt["evidence"] if not covers_gate(e, gate)]
+                    shared.dump(state_file(directory), state)
+                    (directory / "state-after-1.json").write_bytes(state_file(directory).read_bytes())
+            elif case == "one-off":
                 state = custody.read(state_file(directory))
                 state["classes"] = []
                 for debt in state["review_state"]["debt"]:
@@ -436,7 +520,7 @@ def check_replay(root):
                 path = directory / "attempts.jsonl"
                 with path.open("a") as handle:
                     handle.write(path.read_text().splitlines()[0] + "\n")
-            if case in {"one-off", "swapped-state"}:
+            if case in {"one-off", "swapped-state"} or case.startswith("gate-debt"):
                 events = sealed(directory / "events.json")
                 events[-1]["after_sha256"] = shared.sha(state_file(directory).read_bytes())
                 seal(directory / "events.json", events)
@@ -444,7 +528,7 @@ def check_replay(root):
             terminal = custody.read(directory / "terminal.json")
             custody.terminal(directory, terminal["outcome"], terminal["error"],
                              elapsed_ms=terminal["elapsed_ms"], dispatch_ms=terminal["dispatch_ms"])
-            if case == "one-off":
+            if case == "one-off" or case.startswith("gate-"):
                 assessment = sealed(directory / "assessment.json")
                 assessment["state_sha256"] = shared.sha(state_file(directory).read_bytes())
                 assessment["terminal_sha256"] = shared.sha((directory / "terminal.json").read_bytes())
@@ -455,6 +539,18 @@ def check_replay(root):
                 results.append({"mutation":case, "rejection":str(exc)})
             else:
                 raise ValueError("negative control was accepted: " + case)
+            if case.startswith("gate-"):
+                expected = "parent assessment omits gate" if "assessment" in case else "parent debt omits gate"
+                require(expected in results[-1]["rejection"], "gate control rejected at the wrong boundary")
+                before = (copy / "calls.txt").read_bytes()
+                try:
+                    fork(copy, "p01-exact")
+                except ValueError as exc:
+                    require(expected in str(exc), "fork did not reject incomplete parent coverage")
+                else:
+                    raise ValueError("fork admitted incomplete parent coverage")
+                require((copy / "calls.txt").read_bytes() == before, "negative control spent provider calls")
+                results[-1]["dependent_calls"] = 0
     qualify_trial_graph(root, complete=True)
     seal(root / "replay-checks.json", {"positive_replay":True, "negative_controls":results})
     return results

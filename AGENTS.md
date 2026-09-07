@@ -690,3 +690,5 @@ blocks provider admission. No production review behavior changes in this card.
 For new behavioral class-authoring work, follow docs/class-authoring-quality-plan.md.
 Keep governing requirements separate from suggested repair syntax. This new card does
 not reopen or mutate the completed predicate probe or its historical class lineage.
+The user-approved recurring-fixture acceptance reopening keeps production guidance frozen.
+Run its campaign nodes serially; only the native census lanes run concurrently.

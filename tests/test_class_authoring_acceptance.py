@@ -1,8 +1,11 @@
 """Acceptance orchestration tests; scripted judgments are not live quality evidence."""
 import json
+import fcntl
+import os
 import tarfile
 from pathlib import Path
 
+import pytest
 from paranoia_local import engines
 from scripts import run_class_authoring_acceptance as acceptance
 from tests.test_review_census import lane, payload, wire
@@ -31,11 +34,12 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
     monkeypatch.setattr(acceptance.shared, "validate_source", lambda source: None)
 
     def execute(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
-        anchor = "repository/app.py:23"
+        anchors = [f"repository/app.py:{line}" for line in acceptance.manifest(root)["gate_lines"]]
+        anchor = anchors[0]
         finding = {
             "id":"identity", "severity":"MAJOR",
             "summary":"Boolean identity admitted by the integer gate.",
-            "evidence":[anchor], "remedy":"Reject non-integer JSON identities.",
+            "evidence":anchors, "remedy":"Reject non-integer JSON identities at both entry points.",
         }
         if "ROLE: census lane " in prompt:
             name = next(l.split()[-1] for l in prompt.splitlines()
@@ -60,11 +64,11 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
                 cls = task["active_classes"][0]
                 value = {
                     "role":task["role"], "governing_findings":[],
-                    "debt_outcomes":[{"debt_id":d["id"], "status":"closed", "evidence":[anchor]}
+                    "debt_outcomes":[{"debt_id":d["id"], "status":"closed", "evidence":anchors}
                                      for d in task["existing_debt"]],
                     "class_outcomes":{cls["class_id"]:{
                         "verdict":"satisfied", "member_coverage":[{
-                            "member_id":"integer-identity", "evidence":[anchor],
+                            "member_id":"integer-identity", "evidence":anchors,
                         }],
                     }}, "class_actions":{cls["class_id"]:None},
                 }
@@ -79,6 +83,11 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
     monkeypatch.setattr(engines.Engine, "_execute", execute)
 
     acceptance.freeze(root, seed)
+    for variant, expected in {"defect":[True, True], "exact":[False, False],
+                              "boolean":[False, False], "half":[False, True]}.items():
+        calibration = acceptance.sealed(root / f"{variant}-calibration.json")
+        assert [bool(entry["result"]["target_failures"]) for entry in calibration["entries"]] == expected
+        assert all(len(entry["result"]["checks"]) == 100 for entry in calibration["entries"])
     def run(node):
         # Real runs use one process per node. Restore wrappers between simulated
         # workers to preserve that same observer/admission boundary.
@@ -100,7 +109,8 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
             "terminal_sha256":acceptance.shared.sha((root / parent / "terminal.json").read_bytes()),
             "faithful":True, "rationale":"Scripted unit class expresses exactly the fixture contract.",
             "class_id":target["class_id"], "definition":acceptance.definition(target),
-            "debt_ids":[d["id"] for d in debt], "evidence":["repository/app.py:23"],
+            "debt_ids":[d["id"] for d in debt],
+            "evidence":[f"repository/app.py:{line}" for line in acceptance.manifest(root)["gate_lines"]],
         })
         for repair in acceptance.REPAIRS:
             node = parent + "-" + repair
@@ -109,6 +119,21 @@ def test_acceptance_graph_and_resealed_negative_controls(tmp_path, monkeypatch):
     qualified = acceptance.qualify_trial_graph(root, complete=True)
     assert qualified["calls"] == 16
     results = acceptance.check_replay(root)
-    assert len(results) == 11
+    assert len(results) == 15
     assert all(row["rejection"] for row in results)
+    assert all(row["dependent_calls"] == 0 for row in results if row["mutation"].startswith("gate-"))
 
+
+def test_serial_admission_rejects_overlapping_node_before_work(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(acceptance, "_run_node", lambda root, node: calls.append(node))
+    descriptor = os.open(tmp_path, os.O_RDONLY)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(ValueError, match="another campaign node is running"):
+            acceptance.run_node(tmp_path, "p01")
+        assert calls == []
+    finally:
+        os.close(descriptor)
+    acceptance.run_node(tmp_path, "p01")
+    assert calls == ["p01"]

@@ -37,15 +37,18 @@ Prove shared guidance reaches initial and native retry authoring paths without o
 existing mechanized authority. Run the relevant tests, full suite and existing staged
 protocol mutation checks; do not invent a second acceptance engine.
 
-Q4. Live acceptance reuses isolated identity calibration and existing custody primitives.
+Q4. User-approved acceptance reopening (2026-09-07): replace the single-site experiment
+with one frozen recurring-defect experiment. Preserve the old campaign and its nonqualification.
+Live acceptance reuses isolated identity calibration and existing custody primitives.
 Bind source/CLI/input/snapshot/provider channels/native audits/lineage. Fresh candidate
-census per provider (Codex and Claude) sees the original defect without oracle or repair
+census per provider (Codex and Claude Opus) sees both original defects without oracle or repair
 hints. Copy each exact authored state/repository into two disclosed continuation arms for
 the two calibrated repairs. These share one census per provider; they are not independent
 samples. Each correction invokes ordinary cold final only after qualified native advance
 to final. Require original-defect detection and both repairs durably clear for both
-providers without unsupported blockers. Retain all failures/costs; no selective rerun,
-forced closure, class editing or second repair. Maximum 32 provider attempts including
+providers without unsupported blockers. Retain all failures/costs; no selective rerun
+or second repair; class immutability and prohibited interventions are defined in Q4b.
+Maximum 32 provider attempts including
 native retries under the operating contract. Calibration/source/settings/snapshot failure stops
 admission; custody failure stops dependent work and withholds acceptance. Failed live
 acceptance triggers an architecture checkpoint, not an automatic prompt-patching loop.
@@ -55,7 +58,7 @@ continuation gate, reusing effectiveness_custody.collect_slot and join_invocatio
 benchmark_effectiveness.install_checks, and shared source/channel validation. Freeze
 calibration files/observations, source/harness/settings and per-provider parent records.
 Each parent must qualify before copying; require a durably registered blocking class
-bound to the original Boolean-identity defect, retaining its actual definition, debt,
+bound to both original Boolean-identity defects, retaining its actual definition, debt,
 resolved evidence and an implementer assessment of Q1 compliance. A one-off, missing,
 misbound or unfaithful target cannot qualify. This is evidence-bound adjudication,
 not an independent human rating or lexical semantic-proof checker.
@@ -73,8 +76,34 @@ Q4c. Executable acceptance for qualify_trial_graph includes positive qualified r
 negative controls for one-off-only success, substituted parent/fork seed, swapped arm
 state/result, wrong repair head/changed snapshot, altered channel/cross-provider evidence,
 missing audit and duplicate attempt. Include resealed mutations to exercise relational
-joins rather than only outer hashes. Every rejection retains cost, stops dependent calls
+joins rather than only outer hashes. Also retain a registered blocking target while omitting
+either gate's assessment coverage or bound debt coverage in separate resealed controls.
+Exercise both qualify_trial_graph and pre-spend fork/admission: reject each incomplete
+two-gate parent with zero dependent calls and unchanged prior attempt cost. The positive
+production-handler replay must cover both gates; a shared class member may cover both.
+Every rejection retains cost, stops dependent calls
 and withholds acceptance. Frozen parent records never become mutable continuation state.
+
+Q4d. Derive the fixture once from the original identity seed: preserve its imports and
+capture-attestation function, add an independently called replacement-attestation function
+with the same body and contract, and name both entry points in the governing specification.
+Both gates contain the original Boolean-as-integer defect. Do not mention classes, expected
+findings or repair forms in reviewer-visible fixture material. Freeze Codex gpt-6-astra and
+Claude opus at high effort with browsing disabled, recording the resolved provider model.
+Both prescribed repairs change both gates and nothing else. Run the existing 100-case identity
+calibration independently for each entry point; capture the exact name-only projection used
+to reuse the existing calibration. Require each defective path to expose its target defect,
+both repaired paths to pass, and a half-repaired control to retain the other path's defect.
+Bind the two exact server-derived gate line coordinates to the frozen fixture. The parent
+assessment and target debt evidence must each cover both independently reachable gates;
+the class definition and inventory must account for both, without requiring an invented
+one-class-member-per-line shape. A one-off-only parent still stops its arms.
+Run parent and continuation nodes serially, including each correction and cold final through
+terminal qualification before starting another node. Keep the existing 32-attempt ceiling,
+native three-lane parallelism, no-rerun rules and all Q4a-Q4c custody/negative controls.
+No production prompt changes are admitted by this acceptance reopening. Requalify the harness
+with the new fixture through its production-handler smoke and existing resealed mutations
+before native spend. Another nonqualifying campaign returns to the checkpoint without rerun.
 
 Q5. Update public guidance and AGENTS.md before review. After PLAN review, convergence
 stays on CODE bound to this exact contract. Before merge/push require relevant tests,
