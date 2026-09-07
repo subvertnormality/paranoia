@@ -273,3 +273,8 @@ def test_one_class_authoring_rule_reaches_all_authoring_prompts_and_legacy_retry
     assert "explicit representation requirements" in shared
     assert "do not rewrite existing classes" in shared
     assert "complete member inventory" in shared
+    assert "author specific stable member IDs" in shared
+    assert "Existing-class assessments must preserve the exact server-supplied member IDs" in shared
+    consolidation = prompts.staged_consolidation_instructions("branch")
+    assert "Do not invent debt or IDs" not in consolidation
+    assert "Use only supplied IDs when referring to existing debt" in consolidation

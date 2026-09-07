@@ -103,7 +103,12 @@ one-class-member-per-line shape. A one-off-only parent still stops its arms.
 Run parent and continuation nodes serially, including each correction and cold final through
 terminal qualification before starting another node. Keep the existing 32-attempt ceiling,
 native three-lane parallelism, no-rerun rules and all Q4a-Q4c custody/negative controls.
-No production prompt changes are admitted by this acceptance reopening. Requalify the harness
+The separately approved ownership clarification permits new/replacement unmechanized member
+IDs to be authored from the invariant and validated evidence, while existing-class assessments
+preserve supplied IDs. Narrow the consolidation prohibition to existing debt, active-class and
+lane-source references. No other production prompt or runtime-policy change is admitted by this
+reopening. Freeze one fresh campaign after this clarification; preserve all earlier failures.
+Requalify the harness
 with the direct task through its production-handler smoke and existing resealed mutations
 before native spend. Another nonqualifying campaign returns to the checkpoint without rerun.
 

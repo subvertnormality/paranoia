@@ -98,6 +98,11 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     # Exact inverse of the later authoring addition; the complete historical
     # prompt must still match the original provider bytes below.
     prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
+    prompt = prompt.replace(
+        "Use only supplied IDs when referring to existing debt,\n"
+        "active classes, or lane sources. class_actions is keyed by every",
+        "Do not invent debt or IDs. class_actions is keyed by every",
+    )
     # Exact inverse of the read-only capability wording change; this replay still
     # proves only the retained historical provider prompt, never current live use.
     prompt = prompt.replace(

@@ -225,6 +225,11 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     # Historical replay only: retain the original prompt and its full comparison.
     prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
+    prompt = prompt.replace(
+        "Use only supplied IDs when referring to existing debt,\n"
+        "active classes, or lane sources. class_actions is keyed by every",
+        "Do not invent debt or IDs. class_actions is keyed by every",
+    )
     # Exact inverse of issue 115's added instruction; retained bytes still
     # require complete equality, and every other historical projection is unchanged.
     prompt = prompt.replace(pc.PRIOR_DISPOSITION_INSTRUCTIONS + "\n", "")

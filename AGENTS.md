@@ -1,5 +1,10 @@
 # Repository agent instructions
 
+For new or replacement unmechanized class definitions, reviewers author specific stable member
+IDs from the invariant and validated evidence. Existing-class assessments retain the exact
+server-supplied inventory; reference IDs for existing debt, classes and lane sources cannot be
+invented. This ownership distinction does not alter class policy or canonical closure checks.
+
 For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
 
 These instructions govern work in paranoia-local. User instructions take precedence but do

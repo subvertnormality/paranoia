@@ -496,7 +496,8 @@ cross-lane finding may classify as existing_class only when that class's integri
 violated and its cited source is included; otherwise classify the finding as one_off or new_class.
 Return one
 debt_outcome for every supplied open debt: open needs current evidence and a concrete remaining
-condition; closed needs current evidence. Do not invent debt or IDs. class_actions is keyed by every
+condition; closed needs current evidence. Use only supplied IDs when referring to existing debt,
+active classes, or lane sources. class_actions is keyed by every
 active class: use null when no independent action is needed, otherwise one lifecycle/severity
 decision. Closed mechanized violation requires replace with a corrected violation-only predicate;
 reopen applies only to unmechanized classes."""
@@ -589,6 +590,9 @@ Consider whether equivalent supported implementations would still match before c
 the predicate. When no honest line-level predicate expresses the violation, use the
 existing unmechanized procedure with its complete member inventory. In consolidation,
 make this judgement from the validated manifests; do not start another review.
+For a new or replacement unmechanized definition, author specific stable member IDs from
+the invariant and validated evidence; do not wait for pre-existing IDs in lane manifests.
+Existing-class assessments must preserve the exact server-supplied member IDs.
 These authoring rules do not rewrite existing classes or authorize ignoring a surviving
 predicate, weakening severity, omitting evidence/members, or bypassing canonical closure."""
 
