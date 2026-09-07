@@ -90,6 +90,59 @@ def _load_parent(parent, source):
             "arguments": arguments}
 
 
+def _require_supported_claims(state):
+    claims = list(state["claim_state"]["claims"].values())
+    assert claims and all(c["verdict"] == "supported" for c in claims)
+    for claim in claims:
+        assert claim["evidence"] and claim["capture_attestations"] and claim["capture_provenance"]
+        assert any(e["relation"] == "supports_claim"
+                   and e["publisher_authority"] is True and e["passage_entailment"] is True
+                   for e in claim["capture_attestations"])
+    return claims
+
+
+def qualify_retained(output):
+    """Zero-call validation of the exact clear run; keep its original rejection intact."""
+    _, current = load_source(ROOT)
+    archive = ROOT / "docs/attestation-envelope-117-complete-evidence.tar.gz"
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    assert digest == "3132b2d705956ac23f91f39ba8b5e78642d9e5bf82db6dcbaa0253635e373f70"
+    with tarfile.open(archive) as retained:
+        read = lambda name: json.load(retained.extractfile(name))
+        source = read("source.json")
+        assert source["production"]["files"] == current["files"]
+        original = read("qualification.json")
+        assert original["qualified"] is False and original["attempts"] == 18
+        assert 'assert all(e["publisher_authority"]' in original["traceback"]
+        state = read("durable.json")
+        assert state["review_state"]["phase"] == "clear"
+        claims = _require_supported_claims(state)
+        result = retained.extractfile("result.txt").read().decode()
+        verdicts = [line for line in result.splitlines() if line.startswith("CONVERGENCE:")]
+        assert len(verdicts) == 1 and verdicts[0].startswith("CONVERGENCE: NOT-BLOCKED")
+        audits = [read(m.name) for m in retained.getmembers() if m.name.startswith("logs/") and "-critique_plan-" in m.name]
+        traces = [read(m.name) for m in retained.getmembers() if m.name.startswith("logs/") and "-run-" in m.name]
+        assert len(audits) == len(traces) == 1
+        ledger = audits[0]["attempt_ledger"]
+        assert [(a["role"], a["outcome"]) for a in ledger] == [(r, "completed") for r in ("claim-discovery", "claim-binding", "claim-attestation", "final")]
+        inputs = [read(f"attempt-{i:02d}-input.json") for i in range(15, 19)]
+        assert len(traces[0]["attempts"]) == len(inputs) == len(ledger)
+        assert Counter(a["prompt_sha256"] for a in traces[0]["attempts"]) == Counter(a["prompt_sha256"] for a in inputs)
+        assert traces[0]["source_observed_at_import"]["revision"] == source["production"]["revision"]
+        assert all(a["source_id"] == source["source_id"] for a in inputs)
+        assert all(read(f"attempt-{i:02d}-output.json")["returncode"] == 0 for i in range(15, 19))
+        assert read("loaded-before.json") and read("loaded-after.json")
+    certificate = {"qualified": True, "archive_sha256": digest,
+        "native_source_revision": source["production"]["revision"],
+        "qualification_revision": current["revision"], "attempts": 18,
+        "additional_provider_calls": 0, "supported_claims": len(claims),
+        "scope": "Retained native clear result with authoritative support; context-only capture failure does not govern claim closure. Original failed qualification remains immutable."}
+    with output.open("x") as stream:
+        json.dump(certificate, stream, indent=2)
+        stream.write("\n")
+    print(json.dumps(certificate), flush=True)
+
+
 def native(out, parent=None):
     out.mkdir(parents=True, exist_ok=False)
     def write(name, value):
@@ -222,13 +275,7 @@ def native(out, parent=None):
             assert _load_parent(parent, source) == prior
             assert state.review_state.get("phase") == "clear"
         assert not pc.is_blocked(state.claim_state)
-        claims = list(state.claim_state["claims"].values())
-        assert claims and all(c["verdict"] == "supported" for c in claims)
-        for claim in claims:
-            assert claim["evidence"]
-            assert claim["capture_attestations"] and claim["capture_provenance"]
-            assert all(e["publisher_authority"] and e["passage_entailment"]
-                       for e in claim["capture_attestations"])
+        claims = _require_supported_claims(cc._to_json(state))
         verdicts = [line for line in result.splitlines() if line.startswith("CONVERGENCE:")]
         assert len(verdicts) == 1 and verdicts[0].startswith("CONVERGENCE: NOT-BLOCKED")
         write("qualification.json", {"qualified": True, "source_id": source_id,
@@ -249,5 +296,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--continue-from", type=Path)
+    parser.add_argument("--qualify-retained", action="store_true")
     args = parser.parse_args()
-    native(args.output.resolve(), args.continue_from.resolve() if args.continue_from else None)
+    if args.qualify_retained:
+        assert args.continue_from is None
+        qualify_retained(args.output.resolve())
+    else:
+        native(args.output.resolve(), args.continue_from.resolve() if args.continue_from else None)

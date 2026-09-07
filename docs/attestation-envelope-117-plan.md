@@ -135,3 +135,11 @@ fresh discovery/binding and exhausted before attestation. Preserve that third fa
 checkpoint. Under standing authorization, reserve eight further calls for the complete
 discovery, binding, attestation and cold-final path, each with its existing single retry:
 twenty-two cumulative maximum. Keep the fixture, source and quality gates unchanged.
+
+The completed native final cleared at eighteen cumulative calls. Its original harness
+incorrectly required even a non-governing context source's failed capture to be attested.
+The stated native gate requires at least one qualifying authoritative source per supported
+claim. Correct that assertion and validate the exact immutable clear-run archive without
+provider calls, retaining its original failed qualification separately. Context failure
+must remain recorded and must never count as authority or entailment. Negative controls
+remove authority, entailment, governing relation or supported verdict and must reject.

@@ -325,6 +325,11 @@ remaining = 8 if base >= 12 else 4
 scope = runpy.run_path(str(entry))
 globals_ = scope['native'].__globals__
 load = globals_['load_source']
+# Isolate the execution-budget control from later production changes. The separate
+# parent-binding test proves real source mismatches reject; no native claim is made here.
+admit = globals_['_load_parent']
+archived_source = json.loads((parent / 'source.json').read_text())['production']
+globals_['_load_parent'] = lambda path, source: admit(path, archived_source)
 calls = []
 def setup(root):
     result = load(root)
@@ -358,6 +363,30 @@ assert qualification['attempts'] == base + remaining and qualification['qualifie
         str(root / "scripts/run_issue117_acceptance.py"), str(tmp_path / "output"),
         str(tmp_path / "parent"), campaign], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_retained_support_requires_governing_authority_and_entailment(tmp_path):
+    import tarfile
+    root = Path(__file__).resolve().parents[1]
+    with tarfile.open(root / "docs/attestation-envelope-117-complete-evidence.tar.gz") as archive:
+        state = json.load(archive.extractfile("durable.json"))
+    program = "import runpy,json,sys; s=runpy.run_path(sys.argv[1]); s['_require_supported_claims'](json.loads(sys.argv[2]))"
+    def check(value):
+        return subprocess.run([sys.executable, "-c", program,
+            str(root / "scripts/run_issue117_acceptance.py"), json.dumps(value)],
+            capture_output=True, text=True)
+    result = check(state)
+    assert result.returncode == 0, result.stderr
+    for key, value in (("publisher_authority", False), ("passage_entailment", False), ("relation", "context")):
+        changed = copy.deepcopy(state)
+        for claim in changed["claim_state"]["claims"].values():
+            for row in claim["capture_attestations"]:
+                row[key] = value
+        assert check(changed).returncode != 0
+    changed = copy.deepcopy(state)
+    for claim in changed["claim_state"]["claims"].values():
+        claim["verdict"] = "unverified"
+    assert check(changed).returncode != 0
 
 
 def test_native_phase_qualification_accepts_recorded_discovery_repair(tmp_path):
