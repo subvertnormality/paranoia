@@ -12,7 +12,7 @@ import runpy
 
 runpy.run_path(str(Path(__file__).with_name("benchmark_bootstrap.py")))
 import benchmark_review_modes as shared
-from benchmark_effectiveness import qualify_campaign
+from benchmark_effectiveness import qualify_campaign, scoring_binding
 from effectiveness_custody import read, json_digest
 
 DISCLOSURE = (
@@ -55,7 +55,7 @@ def validate_annotation(annotation, slot, oracle, arm):
     covered, seen_ids, clusters = set(), set(), {}
     for finding in annotation["findings"]:
         required = {"id", "output", "quote", "native_id", "classification", "cluster",
-                    "reason", "basis_quote", "witness_sha256"}
+                    "reason", "basis_quote", "witness_sha256", "additional_witness"}
         if set(finding) != required or type(finding["id"]) is not int or finding["id"] in seen_ids:
             raise ValueError("invalid or duplicate finding annotation")
         seen_ids.add(finding["id"])
@@ -87,6 +87,14 @@ def validate_annotation(annotation, slot, oracle, arm):
                 raise ValueError("disproved assertion requires quoted counterevidence and cluster")
             if finding["basis_quote"] not in oracle["specification"]:
                 raise ValueError("counterevidence is not an exact frozen specification quotation")
+        if kind == "fixture_problem":
+            witness = finding["additional_witness"]
+            if (not isinstance(witness, dict) or set(witness) != {"code", "result"}
+                    or any(not isinstance(v, str) or not v.strip() for v in witness.values())
+                    or finding["witness_sha256"] != json_digest(witness)):
+                raise ValueError("unexpected valid defect requires a recorded executable witness")
+        elif finding["additional_witness"] is not None:
+            raise ValueError("additional witness belongs to a fixture problem")
         if kind in {"target", "false_positive", "unscored", "fixture_problem"}:
             cluster = finding["cluster"]
             if not isinstance(cluster, str) or not cluster:
@@ -143,6 +151,7 @@ def report(root):
         rows.append({**trial, **score, "defective": oracle[trial["case"]]["defective"],
                      "execution_success": slot["execution_success"], "custody_errors": slot["errors"],
                      "elapsed_ms": slot["elapsed_ms"], "calls": slot["calls"],
+                     "dispatch_ms": slot["dispatch_ms"],
                      "stage_usage": stage_usage(slot),
                      "retries": sum("validation-retry" in a.get("role", "") for audit in slot["audits"]
                                     for a in audit.get("attempt_ledger", []))})
@@ -162,6 +171,7 @@ def report(root):
             "unscored_slots": sum(r["unscored"] for r in group),
             "operational_or_unresolved": sum(r["verdict"] in {"operational_failure", "unresolved", "unscored"} for r in group),
             "calls": sum(r["calls"] for r in group), "total_slot_ms": sum(r["elapsed_ms"] for r in group),
+            "total_dispatch_ms": sum(r["dispatch_ms"] for r in group),
             "min_ms": min(r["elapsed_ms"] for r in group), "median_ms": statistics.median(r["elapsed_ms"] for r in group),
             "max_ms": max(r["elapsed_ms"] for r in group),
         }
@@ -173,9 +183,11 @@ def report(root):
             comparable = all(r["execution_success"] and not r["unscored"] for r in (a, b))
             pairs.append({"case": case["id"], "repetition": repetition, "comparable": comparable,
                           "delta_ms": b["elapsed_ms"] - a["elapsed_ms"] if comparable else None,
+                          "delta_dispatch_ms": b["dispatch_ms"] - a["dispatch_ms"] if comparable else None,
                           "delta_calls": b["calls"] - a["calls"],
                           "delta_detections": b["tp"] - a["tp"]})
-    comparative = q["qualified"] and not annotation_errors and not any(r["unscored"] for r in rows)
+    sealed = (root / "scoring-receipt.json").exists()
+    comparative = q["qualified"] and sealed and not annotation_errors and not any(r["unscored"] for r in rows)
     a, b = summary["single"], summary["staged"]
     superiority = comparative and b["false_clears"] == 0 and all(
         a[k] is not None and b[k] is not None and b[k] >= a[k] for k in ("finding_precision", "target_recall")
@@ -184,7 +196,7 @@ def report(root):
               "comparative_qualified": comparative, "annotation_errors": annotation_errors,
               "observed_superiority_criteria_met": superiority, "calls": q["calls"],
               "summary": summary, "trials": rows, "pairs": pairs,
-              "human_acceptance": "pending", "subscription_dollar_cost": None,
+              "human_acceptance": "pending", "scoring_sealed": sealed, "subscription_dollar_cost": None,
               "limitations": [
                   "Eight scoped fixtures, including extracted public defects; not a population or all-mode evaluation.",
                   "Implementer adjudication is not independent human acceptance.",
@@ -195,6 +207,20 @@ def report(root):
               ]}
     shared.dump(root / "report.json", result)
     return result
+
+
+def seal_scores(root):
+    q = qualify_campaign(root)
+    if not q["qualified"]:
+        raise ValueError("custody must qualify before adjudication is sealed")
+    oracle = read(root / "oracle.json")
+    for row in q["manifest"]["order"]:
+        validate_annotation(read(root / row["id"] / "score.json"),
+                            q["slots"][row["id"]], oracle[row["case"]], row["arm"])
+    path = root / "scoring-receipt.json"
+    if path.exists():
+        raise ValueError("scoring is already sealed")
+    shared.dump(path, scoring_binding(root, q["manifest"]))
 
 
 def strip_native_footer(text, audit):
@@ -288,8 +314,11 @@ def main():
     parser.add_argument("root", type=Path)
     parser.add_argument("--human", action="store_true")
     parser.add_argument("--ratings", type=Path)
+    parser.add_argument("--seal", action="store_true")
     args = parser.parse_args()
-    if args.human:
+    if args.seal:
+        seal_scores(args.root)
+    elif args.human:
         export_human(args.root)
     elif args.ratings:
         result = validate_ratings(args.root, read(args.ratings))

@@ -26,8 +26,8 @@ def pilot_slot(tmp_path, monkeypatch):
         for name in ("run", "resume"):
             if cls.__dict__.get(name) is getattr(engines.Engine, name):
                 monkeypatch.delattr(cls, name)
-    def create(arm="single"):
-        case = build(ROOT)[0][0]
+    def create(arm="single", control=False):
+        case = build(ROOT)[0][int(control)]
         directory = tmp_path / arm
         fixture = bench.setup_repo(directory / "repository", case["files"])
         fixture["packet_sha256"] = bench.shared.sha(orientation.build_packet(
@@ -64,8 +64,9 @@ def pilot_slot(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("arm", ["single", "staged"])
-def test_real_public_handlers_bind_fixture_attempts_outputs_and_clear(pilot_slot, arm):
-    directory, spec = pilot_slot(arm)
+@pytest.mark.parametrize("control", [False, True])
+def test_real_public_handlers_bind_fixture_attempts_outputs_and_clear(pilot_slot, arm, control):
+    directory, spec = pilot_slot(arm, control)
     bench.worker(directory / "input.json", bench.shared.sha((directory / "input.json").read_bytes()))
     slot = custody.collect_slot(directory, spec)
     assert not slot["errors"], (slot["errors"], custody.read(directory / "terminal.json"))
@@ -187,7 +188,8 @@ def test_symmetric_scoring_clusters_counterevidence_and_unknowns():
     oracle = {"defective": True, "witness": {"input": 1}, "specification": "Endpoints are half-open."}
     finding = {"id": 1, "output": 0, "quote": "bad boundary", "native_id": None,
                "classification": "target", "cluster": "target", "reason": "Witness reproduces it.",
-               "basis_quote": "", "witness_sha256": custody.json_digest(oracle["witness"])}
+               "basis_quote": "", "witness_sha256": custody.json_digest(oracle["witness"]),
+               "additional_witness": None}
     duplicate = {**finding, "id": 2, "quote": "repeated boundary"}
     scored = scoring.validate_annotation(annotation(slot, "defect", [finding, duplicate]), slot, oracle, "single")
     assert scored["tp"] == 1 and scored["fp"] == 0
@@ -201,7 +203,11 @@ def test_symmetric_scoring_clusters_counterevidence_and_unknowns():
     with pytest.raises(ValueError, match="quotation"):
         scoring.validate_annotation({**annotation(slot), "verdict_quote": "invented"}, slot, oracle, "single")
     for classification in ("advisory", "non_finding", "unscored", "fixture_problem"):
-        result = scoring.validate_annotation(annotation(slot, "unresolved", [{**fp, "classification": classification}]),
+        item = {**fp, "classification": classification}
+        if classification == "fixture_problem":
+            item["additional_witness"] = {"code": "assert False, 'unexpected contract violation'", "result": "AssertionError: unexpected contract violation"}
+            item["witness_sha256"] = custody.json_digest(item["additional_witness"])
+        result = scoring.validate_annotation(annotation(slot, "unresolved", [item]),
                                              slot, oracle, "single")
         assert result["tp"] == result["fp"] == 0
         assert result["unscored"] == (classification in {"unscored", "fixture_problem"})
@@ -286,3 +292,80 @@ def test_exhausted_admission_never_invokes_provider(pilot_slot, monkeypatch):
     slot = custody.collect_slot(directory, spec)
     assert not slot["execution_success"] and slot["calls"] == 0
     assert (directory / "refusals.jsonl").exists()
+
+
+
+def test_prompt_contamination_is_rejected_before_provider(pilot_slot, monkeypatch):
+    directory, spec = pilot_slot()
+    from paranoia_local import handlers
+    original = handlers._query_body
+    monkeypatch.setattr(handlers, "_query_body", lambda *a, **k: original(*a, **k) + "\noracle.json")
+    monkeypatch.setattr(engines.Engine, "_execute", lambda *a, **k: pytest.fail("contaminated provider admission"))
+    bench.worker(directory / "input.json", bench.shared.sha((directory / "input.json").read_bytes()))
+    assert custody.collect_slot(directory, spec)["calls"] == 0
+    assert not custody.collect_slot(directory, spec)["execution_success"]
+
+
+def test_ordinary_query_edit_after_call_retains_cost_without_credit(pilot_slot, monkeypatch):
+    directory, spec = pilot_slot()
+    original = engines.Engine._execute
+    def changed(*args, **kwargs):
+        review = original(*args, **kwargs)
+        (directory / "repository/app.py").write_text("ordinary edit")
+        return review
+    monkeypatch.setattr(engines.Engine, "_execute", changed)
+    bench.worker(directory / "input.json", bench.shared.sha((directory / "input.json").read_bytes()))
+    slot = custody.collect_slot(directory, spec)
+    assert slot["calls"] == 1 and not slot["execution_success"]
+
+
+def test_contaminated_base_rejects_even_with_consistent_head_history(tmp_path):
+    import subprocess
+    case = build(ROOT)[0][0]
+    repo = tmp_path / "repository"
+    fixture = bench.setup_repo(repo, case["files"])
+    # Rebuild the two-commit chain with a control in the base, preserving all
+    # internally consistent hashes/history. The explicit base check must reject.
+    base = fixture["base"]
+    tree = bench.shared.git(repo, "rev-parse", fixture["head"] + "^{tree}")
+    env = {**__import__("os").environ, "GIT_AUTHOR_NAME": "fixture",
+           "GIT_AUTHOR_EMAIL": "fixture@example.test", "GIT_COMMITTER_NAME": "fixture",
+           "GIT_COMMITTER_EMAIL": "fixture@example.test"}
+    bad_base = subprocess.check_output(["git", "commit-tree", tree, "-m", "Specification"],
+                                      cwd=repo, env=env, text=True).strip()
+    head = subprocess.check_output(["git", "commit-tree", tree, "-p", bad_base, "-m", "Implementation"],
+                                  cwd=repo, env=env, text=True).strip()
+    bench.shared.git(repo, "reset", "--hard", head)
+    fixture.update(base=bad_base, head=head,
+                   history=bench.shared.git(repo, "log", "--format=%H%x09%aI%x09%an%x09%s", "HEAD"))
+    with pytest.raises(ValueError, match="base contains"):
+        bench.verify_fixture(repo, case, fixture)
+
+
+def test_scoring_receipt_binds_original_terminals_and_later_annotations(pilot_slot, monkeypatch):
+    directory, spec = pilot_slot()
+    bench.worker(directory / "input.json", bench.shared.sha((directory / "input.json").read_bytes()))
+    root = directory.parent
+    row = spec["slot"]
+    target = root / row["id"]
+    directory.rename(target)
+    manifest = {"order": [row], "call_limit": bench.CALL_LIMIT}
+    bench.shared.dump(root / "manifest.json", manifest)
+    (root / "calls.txt").write_text("1")
+    (root / "completions.jsonl").write_text(json.dumps({
+        "id": row["id"], "sha256": bench.shared.sha((target / "terminal.json").read_bytes())}) + "\n")
+    monkeypatch.setattr(bench, "load_manifest", lambda root: manifest)
+    monkeypatch.setattr(bench, "specification", lambda *args: spec)
+    slot = custody.collect_slot(target, spec)
+    bench.shared.dump(target / "score.json", annotation(slot))
+    bench.shared.dump(root / "oracle.json", build(ROOT)[1])
+    terminal_before = (target / "terminal.json").read_bytes()
+    scoring.seal_scores(root)
+    assert bench.qualify_campaign(root)["qualified"]
+    assert (target / "terminal.json").read_bytes() == terminal_before
+    value = custody.read(target / "score.json")
+    value["verdict"] = "unresolved"
+    bench.shared.dump(target / "score.json", value)
+    q = bench.qualify_campaign(root)
+    assert not q["qualified"] and q["calls"] == 1
+    assert any("scoring custody" in e for e in q["errors"])

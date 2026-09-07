@@ -38,6 +38,7 @@ Keep the harness checkout and source unchanged until replay is complete.
     python scripts/benchmark_effectiveness.py /tmp/pilot --freeze --source /path/to/source
     python scripts/benchmark_effectiveness.py /tmp/pilot --run
     python scripts/benchmark_effectiveness.py /tmp/pilot
+    python scripts/score_effectiveness.py /tmp/pilot --seal
     python scripts/score_effectiveness.py /tmp/pilot
     python scripts/score_effectiveness.py /tmp/pilot --human
     python scripts/score_effectiveness.py /tmp/pilot --ratings /path/to/ratings.json
@@ -47,6 +48,12 @@ fixture history/bytes, native invocation and audit, process channels, attempt
 admission sequence and terminal receipt. Errors retain readable attempts and
 costs but remove semantic credit. Failed provider prose, zero-call slots and
 unsettled census cannot score clear. Validation retries remain native calls.
+
+Initial provider prompts must match the native query renderer or contain the
+exact frozen census diff; withheld benchmark markers reject before admission.
+After adjudication, --seal creates a receipt binding score bytes to the original
+immutable terminal hashes. Report replay rejects changed scores or terminals.
+It never rewrites an execution terminal to attach later adjudication.
 
 Slot wall time includes preflight/context preparation, actual dispatch and
 postflight, including failed dispatches; per-dispatch wall time is retained
@@ -79,3 +86,21 @@ The current work does not claim a 20% speedup. #50 is justified by measured
 maintenance simplification and exact behavioral equivalence. Any later speed
 candidate must meet the user's separate end-to-end time/cost gate.
 
+## Qualification status
+
+The first frozen campaign at ec39686 was stopped before adjudication when a
+contract check identified missing explicit prompt-contamination admission and
+later scoring custody. Four slots completed, 28 were honestly cancelled, and
+10 calls were retained. Its original custody gate passes; no effectiveness
+comparison is claimed from this stopped campaign. The complete replacement
+schedule must include all 32 slots, not selected outcomes, and its freeze uses
+--call-limit 182 so combined admission remains below the original 192 ceiling.
+The stopped campaign lives at /tmp/paranoia-effectiveness-pilot-2026-09-07;
+campaign-stop.json records the reason, slots and exact spend.
+
+Before replacement admission, the new deterministic gate has 32 passing tests,
+including both fixture variants through both public handlers, contaminated base
+history/prompts, ordinary edits before and after dispatch, failed providers,
+missing consolidation, custody tampering, and score/human-rating bindings.
+The full suite passed 2,112 tests before those last added harness checks.
+CODE review and complete live measurement remain delivery gates.

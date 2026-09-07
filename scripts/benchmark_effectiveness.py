@@ -104,7 +104,8 @@ def load_manifest(root):
                 "cases", "order", "fixtures", "oracle_sha256", "call_limit", "plan_sha256"}
     if set(m) != required or m["schema"] != 1:
         raise ValueError("closed manifest required")
-    if m["order"] != schedule(m["cases"]) or m["call_limit"] != CALL_LIMIT:
+    if (m["order"] != schedule(m["cases"]) or type(m["call_limit"]) is not int
+            or not 0 < m["call_limit"] <= CALL_LIMIT):
         raise ValueError("schedule/admission changed")
     if len(m["cases"]) != 8 or Counter(c["provider"] for c in m["cases"]) != {"codex": 4, "claude": 4}:
         raise ValueError("invalid provider/case cardinality")
@@ -129,7 +130,7 @@ def specification(root, manifest, row):
             "maximum": manifest["call_limit"]}
 
 
-def freeze(root, source):
+def freeze(root, source, call_limit=CALL_LIMIT):
     from effectiveness_corpus import build
     selected = shared.source_record(source)
     sys.path.insert(0, str(Path(selected["path"]) / "src"))
@@ -146,7 +147,7 @@ def freeze(root, source):
             for name in shared.MODELS},
         "stakes": STAKES, "question": QUESTION, "cases": cases, "order": schedule(cases),
         "fixtures": {}, "oracle_sha256": shared.sha((root / "oracle.json").read_bytes()),
-        "call_limit": CALL_LIMIT,
+        "call_limit": call_limit,
         "plan_sha256": shared.sha((ROOT / "docs/effectiveness-lifecycle-plan.md").read_bytes()),
     }
     for row in manifest["order"]:
@@ -170,7 +171,7 @@ def install_checks(engines, spec, repo, directory):
     for operation in ("run", "resume"):
         original = getattr(engines.Engine, operation)
         signature = inspect.signature(original)
-        def wrap(original=original, signature=signature):
+        def wrap(original=original, signature=signature, operation=operation):
             @wraps(original)
             def checked(*args, **kwargs):
                 v = signature.bind(*args, **kwargs).arguments
@@ -179,6 +180,7 @@ def install_checks(engines, spec, repo, directory):
                 packet = orientation.build_packet(repo, spec["fixture"]["base"], spec["fixture"]["head"])
                 if shared.sha(packet) != spec["fixture"]["packet_sha256"]:
                     raise ValueError("fixture packet changed")
+                inspect_prompt(v["prompt"], spec, repo, operation, v.get("response_schema"))
                 if spec["arm"] == "single":
                     if cwd.resolve() != repo.resolve():
                         raise ValueError("query cwd differs")
@@ -211,12 +213,32 @@ def install_checks(engines, spec, repo, directory):
     shared.dump(directory / "checks.json", checks)
 
 
+def inspect_prompt(prompt, spec, repo, operation, schema):
+    """Check native initial context and withheld metadata before provider admission."""
+    if any(marker in prompt for marker in (
+            "oracle.json", "human-private-map.json", "score.json",
+            "historical-extracted", "oracle_sha256", "witness_sha256")):
+        raise ValueError("benchmark metadata contaminated provider prompt")
+    if spec["arm"] == "single":
+        from paranoia_local import handlers, prompts
+        expected = prompts.compose(prompts.QUERY_INSTRUCTIONS, handlers._query_body(
+            spec["question"], [], None, repo_grounded=True))
+        if prompt != expected:
+            raise ValueError("query prompt differs from frozen native input")
+    elif operation == "run" and schema and "lane" in schema.get("properties", {}):
+        diff = shared.git(repo, "diff", "--no-ext-diff", spec["fixture"]["base"],
+                          spec["fixture"]["head"], "--")
+        if diff not in prompt:
+            raise ValueError("census prompt lacks exact frozen fixture diff")
+
+
 def worker(path, expected_digest):
     if shared.sha(path.read_bytes()) != expected_digest:
         raise ValueError("worker input differs from frozen launch")
     spec = custody.read(path)
     directory, repo = path.parent, path.parent / "repository"
     started_slot = time.perf_counter()
+    dispatch_ms = 0
     outcome, failure = "failed", None
     try:
         shared.validate_harness(spec["harness"])
@@ -242,8 +264,11 @@ def worker(path, expected_digest):
                 "lineage": "pilot-" + spec["slot"]["id"], "round": round_no, "stakes": spec["stakes"],
             }
             started = time.perf_counter()
-            result = server.dispatch(mode, args, default_engine_name=provider, log_dir=directory / "logs")
-            elapsed = round((time.perf_counter() - started) * 1000)
+            try:
+                result = server.dispatch(mode, args, default_engine_name=provider, log_dir=directory / "logs")
+            finally:
+                elapsed = round((time.perf_counter() - started) * 1000)
+                dispatch_ms += elapsed
             traces = [custody.read(p) for p in (directory / "logs").glob("*.json")]
             traces = [t for t in traces if t.get("tool") == "run"
                       and t.get("result_sha256") == shared.sha(result)]
@@ -265,7 +290,8 @@ def worker(path, expected_digest):
     except Exception as exc:
         failure = type(exc).__name__ + ": " + str(exc)
     custody.terminal(directory, outcome, failure,
-                     elapsed_ms=round((time.perf_counter() - started_slot) * 1000))
+                     elapsed_ms=round((time.perf_counter() - started_slot) * 1000),
+                     dispatch_ms=dispatch_ms)
 
 
 def run(root):
@@ -352,8 +378,26 @@ def qualify_campaign(root):
     if errors:
         for slot in slots.values():
             slot["execution_success"] = slot["clear_eligible"] = False
+    receipt_path = root / "scoring-receipt.json"
+    if receipt_path.exists():
+        try:
+            if custody.read(receipt_path) != scoring_binding(root, manifest):
+                raise ValueError("scoring receipt changed")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            errors.append("scoring custody: " + str(exc))
+            for slot in slots.values():
+                slot["execution_success"] = slot["clear_eligible"] = False
     return {"qualified": not errors, "errors": errors, "calls": count,
             "manifest": manifest, "slots": slots}
+
+
+def scoring_binding(root, manifest):
+    """Bind later adjudication to immutable execution terminals without rewriting them."""
+    return {"schema": 1, "manifest_sha256": shared.sha((root / "manifest.json").read_bytes()),
+            "slots": {r["id"]: {
+                "terminal_sha256": shared.sha((root / r["id"] / "terminal.json").read_bytes()),
+                "score_sha256": shared.sha((root / r["id"] / "score.json").read_bytes()),
+            } for r in manifest["order"]}}
 
 
 def main():
@@ -364,11 +408,12 @@ def main():
     p.add_argument("--run", action="store_true")
     p.add_argument("--worker", type=Path)
     p.add_argument("--digest")
+    p.add_argument("--call-limit", type=int, default=CALL_LIMIT)
     args = p.parse_args()
     if args.worker:
         worker(args.worker, args.digest)
     elif args.freeze:
-        freeze(args.root.resolve(), args.source.resolve())
+        freeze(args.root.resolve(), args.source.resolve(), args.call_limit)
     elif args.run:
         run(args.root.resolve())
     else:

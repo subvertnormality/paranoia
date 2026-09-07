@@ -25,11 +25,14 @@ def runtime_files(directory):
     return {p.relative_to(directory).as_posix(): shared.sha(p.read_bytes()) for p in sorted(paths)}
 
 
-def terminal(directory, outcome, error=None, *, elapsed_ms=None):
+def terminal(directory, outcome, error=None, *, elapsed_ms=None, dispatch_ms=None):
+    if dispatch_ms is None:
+        dispatch_ms = sum(read(p)["elapsed_ms"] for p in directory.glob("output-*.json"))
     if elapsed_ms is None:
         elapsed_ms = sum(read(p)["elapsed_ms"] for p in directory.glob("output-*.json"))
     shared.dump(directory / "terminal.json", {
-        "outcome": outcome, "error": error, "elapsed_ms": elapsed_ms, "files": runtime_files(directory),
+        "outcome": outcome, "error": error, "elapsed_ms": elapsed_ms,
+        "dispatch_ms": dispatch_ms, "files": runtime_files(directory),
     })
 
 
@@ -145,4 +148,5 @@ def collect_slot(directory, spec):
             "errors": errors, "terminal": t, "execution_success": successful and not errors,
             "clear_eligible": clear and not errors, "state": state,
             "elapsed_ms": t.get("elapsed_ms", sum(o["elapsed_ms"] for o in outputs)),
+            "dispatch_ms": t.get("dispatch_ms", sum(o["elapsed_ms"] for o in outputs)),
             "calls": len(rows)}
