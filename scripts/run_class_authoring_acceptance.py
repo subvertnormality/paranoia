@@ -258,7 +258,8 @@ def recurring_files(files):
     require(files["app.py"].count(marker) == 1 and replacement not in files["app.py"],
             "original fixture entry point changed")
     body = files["app.py"][files["app.py"].index(marker):]
-    files["app.py"] += "\n" + body.replace(marker, f"def {replacement}(", 1)
+    copied = body.replace(marker, f"def {replacement}(", 1)
+    files["app.py"] += "\n" + copied.replace("capture_attestation", "replacement_attestation")
     phrase = f"{entry} accepts"
     require(files["SPEC.md"].count(phrase) == 1, "original fixture specification changed")
     files["SPEC.md"] = files["SPEC.md"].replace(

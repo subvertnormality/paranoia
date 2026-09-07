@@ -1,5 +1,11 @@
 # Repository agent instructions
 
+For the behavioral class-authoring branch, the user's revised delivery gate is the fixture
+diagnostic-label fix, deterministic validation and broad Codex CODE convergence. Opus
+convergence and another complete native fixture campaign are not required. Preserve failed
+historical acceptance as failed evidence; never reinterpret it as a complete passing graph.
+The current gate is recorded at the top of docs/class-authoring-quality-plan.md.
+
 Cold plan attestation initial and correction prompts share one complete output contract:
 one marker/envelope, only the permitted fields, one row per supplied integer identity pair,
 independent Boolean judgments and bounded reason fields. A correction replaces the entire

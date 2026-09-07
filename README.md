@@ -559,3 +559,9 @@ defect/control comparisons, preserves native reviewer calls, and separates
 implementer scoring from digest-bound human acceptance. The [typed lifecycle
 boundary](docs/typed-lifecycle.md) records measured simplification and exact
 baseline equivalence without claiming an end-to-end speedup.
+# Class-authoring delivery scope
+
+The behavioral class-authoring change separates governing requirements from suggested repair
+syntax and preserves alternative compliant implementations. Its delivery gate is broad Codex
+code-review convergence with deterministic regression coverage. Retained fixture campaigns
+are bounded evidence, including their failures; they do not establish a general speedup.

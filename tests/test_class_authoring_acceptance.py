@@ -272,6 +272,48 @@ def test_fresh_qualification_selects_owned_source_before_installed_package(tmp_p
                    env=environment, check=True, capture_output=True, text=True)
 
 
+def test_recurring_fixture_labels_preserve_behavior_and_code():
+    import ast
+    with tarfile.open(acceptance.ROOT / "docs/predicate-convergence-evidence.tar.gz") as archive:
+        original = json.load(archive.extractfile("input.json"))
+    original["case"]["files"]["app.py"] = original["case"]["files"]["app.py"].replace(
+        "isinstance(index, bool) or ", "", 1)
+    files = acceptance.recurring_files(original["case"]["files"])
+    capture, replacement = ast.parse(files["app.py"]).body[-2:]
+    assert capture.name == acceptance.ENTRY_POINTS[0]
+    assert replacement.name == acceptance.ENTRY_POINTS[1]
+    original_capture = ast.parse(original["case"]["files"]["app.py"]).body[-1]
+    assert ast.dump(capture) == ast.dump(original_capture)
+    replacement.name = capture.name
+    labels = 0
+    for node in ast.walk(replacement):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            assert "capture_attestation" not in node.value
+            if "replacement_attestation" in node.value:
+                labels += 1
+                node.value = node.value.replace("replacement_attestation", "capture_attestation")
+    assert labels == 13 and ast.dump(capture) == ast.dump(replacement)
+    for variant in ("defect", "exact", "boolean", "half"):
+        candidate = deepcopy(files)
+        if variant in acceptance.REPAIRS:
+            candidate["app.py"] = candidate["app.py"].replace(
+                "not isinstance(index, int)", acceptance.REPAIRS[variant])
+        elif variant == "half":
+            candidate["app.py"] = candidate["app.py"].replace(
+                "not isinstance(index, int)", acceptance.REPAIRS["exact"], 1)
+        calibrated = acceptance.calibrate_recurring(
+            candidate, (variant == "defect", variant in {"defect", "half"}))
+        for label, entry in zip(("capture_attestation", "replacement_attestation"),
+                                calibrated["entries"], strict=True):
+            assert len(entry["result"]["checks"]) == 100
+            errors = [c["actual"]["reason"] for c in entry["result"]["checks"]
+                      if c["actual"]["kind"] == "error"]
+            assert errors
+            assert all(("replacement_attestation" not in reason if label == "capture_attestation"
+                        else "capture_attestation" not in reason) for reason in errors)
+            assert any(label in reason for reason in errors)
+
+
 def test_serial_admission_rejects_overlapping_node_before_work(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(acceptance, "_run_node", lambda root, node: calls.append(node))

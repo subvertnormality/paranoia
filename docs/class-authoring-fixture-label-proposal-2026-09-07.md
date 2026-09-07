@@ -1,6 +1,8 @@
 # Proposed fixture-only acceptance revision
 
-Status: awaiting approval to reopen this narrow acceptance-design boundary.
+Status: the user approved the label fix and broad Codex CODE convergence as the delivery
+gate. The proposal below is retained as history; its proposed new PLAN review and complete
+two-provider campaign are superseded by the current gate in class-authoring-quality-plan.md.
 
 Correct only the thirteen diagnostic string constants in the generated replacement validator:
 `capture_attestation` becomes `replacement_attestation`, including the plural form.

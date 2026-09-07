@@ -1,5 +1,19 @@
 # Behavioral class authoring and bounded performance investigation
 
+## Current delivery gate — explicit user revision
+The user now directs: fix the fixture labels, then run broad Codex Paranoia CODE review
+to convergence; that convergence means this branch is ready. Opus convergence is not
+required. This supersedes Q4/Q5's requirement for another complete two-provider native
+campaign before delivery. Preserve all historical failed campaigns and their qualification
+results; do not relabel them as complete acceptance. Correct the thirteen copied diagnostic
+labels only, prove unchanged executable structure apart from those strings and verify both
+entry points across the existing 800 calibration checks. Retain Q1-Q3 behavior and validation
+invariants. Use the existing native Codex and Opus evidence as bounded evidence, with the
+fixture limitation disclosed. Review the actual branch broadly against main with this full
+contract, resolve in-scope blockers and complete any required cold final. No new PLAN review
+or native fixture campaign is required. S1-S3 remain separate possible follow-up work and
+are not this branch's readiness gate; no speed improvement is claimed by this delivery.
+
 ## Frozen operating model
 One trusted local operator and OS run the MCP server and authenticated reviewer CLIs.
 Repository, plan and provider bytes are untrusted static data. Reviewers inspect but do
