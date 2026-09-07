@@ -57,7 +57,10 @@ The corrected source 690ba47 passes all 2,230 tests in 275.39 seconds. No runtim
 native campaign acceptance, speed improvement, merge eligibility, or closure of issues 49/50
 is claimed. Q4f's terminal-failure architecture checkpoint applies before another campaign.
 
-## Proposed checkpoint disposition
+## Approved checkpoint disposition
+
+The user approved this campaign. Its retained outcome and subsequent checkpoint are in
+class-authoring-required-fixed-result-2026-09-07.md; the campaign remains nonqualifying.
 
 After the corrected-source tests pass, authorize one fresh campaign on the committed
 source-selection fix. Keep schema version 4, the exact two-gate fixture, both repair forms,

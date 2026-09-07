@@ -1,0 +1,50 @@
+{
+  "status": "nonqualifying",
+  "source_revision": "690ba470aeb4963b4feb2992808fb38e3e3635b9",
+  "nodes": {
+    "p01": {
+      "calls": 5,
+      "dispatch_ms": 165462,
+      "execution_success": true,
+      "clear": false
+    },
+    "p01-exact": {
+      "calls": 2,
+      "dispatch_ms": 123436,
+      "execution_success": true,
+      "clear": true
+    },
+    "p01-boolean": {
+      "calls": 2,
+      "dispatch_ms": 111888,
+      "execution_success": true,
+      "clear": true
+    },
+    "p02": {
+      "calls": 4,
+      "dispatch_ms": 550295,
+      "execution_success": true,
+      "clear": false
+    },
+    "p02-exact": {
+      "calls": 1,
+      "dispatch_ms": 162663,
+      "execution_success": true,
+      "clear": false
+    }
+  },
+  "calls": 14,
+  "dispatch_ms": 1113744,
+  "complete_graph_rejection": "arm did not clear through final",
+  "codex_both_arms_clear": true,
+  "opus_target_class_closed": true,
+  "opus_remaining_blocking_class": "98cda3e5",
+  "opus_exact_cold_final_ran": false,
+  "opus_boolean_arm_ran": false,
+  "reason": "The copied replacement-validator fixture retains thirteen capture-attestation diagnostic labels. Opus preserved blocking diagnostic debt after the only prescribed exact-integer repair. No extra repair, class edit or terminal rerun was made.",
+  "earlier_required_campaign": {
+    "calls": 5,
+    "dispatch_ms": 170060,
+    "status": "nonqualifying source custody mismatch"
+  }
+}
