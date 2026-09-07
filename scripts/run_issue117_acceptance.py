@@ -33,6 +33,13 @@ def load_source(root):
     return shared, source
 
 
+def _require_evidence_phases(ledger):
+    for phase in ("claim-discovery", "claim-binding", "claim-attestation"):
+        attempts = [a for a in ledger if a["role"] in {phase, phase + "-validation-retry"}]
+        assert attempts and attempts[0]["role"] == phase
+        assert attempts[-1]["outcome"] == "completed"
+
+
 def native(out):
     out.mkdir(parents=True, exist_ok=False)
     def write(name, value):
@@ -135,8 +142,7 @@ def native(out):
         assert len(audit["attempt_ledger"]) == len(trace["attempts"]) == len(attempts)
         assert Counter(a["prompt_sha256"] for a in trace["attempts"]) == Counter(a["prompt_sha256"] for a in attempts)
         assert trace["source_observed_at_import"]["revision"] == source["revision"]
-        for phase in ("claim-discovery", "claim-binding", "claim-attestation"):
-            assert any(a["role"] == phase and a["outcome"] == "completed" for a in audit["attempt_ledger"])
+        _require_evidence_phases(audit["attempt_ledger"])
         assert any(a["role"] == engines.ROLE_TEXT for a in attempts)
         assert not pc.is_blocked(state.claim_state)
         claims = list(state.claim_state["claims"].values())

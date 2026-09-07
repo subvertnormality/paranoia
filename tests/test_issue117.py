@@ -271,3 +271,26 @@ def test_issue117_exact_historical_exception_and_outside_mutation(name):
         changed["routes"][0]["publisher_authority"] = not changed["routes"][0]["publisher_authority"]
         with pytest.raises(AssertionError):
             check_historical_boundary(original, changed, name)
+
+def test_native_phase_qualification_accepts_recorded_discovery_repair(tmp_path):
+    import tarfile
+    root = Path(__file__).resolve().parents[1]
+    with tarfile.open(root / "docs/attestation-envelope-117-native-evidence.tar.gz") as archive:
+        member = next(m for m in archive.getmembers() if "/logs/" not in m.name
+                      and m.name.startswith("logs/") and "-critique_plan-" in m.name)
+        ledger = json.load(archive.extractfile(member))["attempt_ledger"]
+    entry = root / "scripts/run_issue117_acceptance.py"
+    program = ("import runpy,json,sys; scope=runpy.run_path(sys.argv[1]); "
+               "scope['_require_evidence_phases'](json.loads(sys.argv[2]))")
+    result = subprocess.run([sys.executable, "-c", program, str(entry), json.dumps(ledger)],
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    for role in ("claim-discovery-validation-retry", "claim-attestation"):
+        changed = copy.deepcopy(ledger)
+        for row in changed:
+            if row["role"] == role:
+                row["outcome"] = "validation-invalid"
+        result = subprocess.run([sys.executable, "-c", program, str(entry), json.dumps(changed)],
+                                capture_output=True, text=True)
+        assert result.returncode != 0
+        assert "AssertionError" in result.stderr
