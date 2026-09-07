@@ -686,3 +686,6 @@ as its new bounded contract. Preserve the original pilot and approved ratings;
 calibrate controls before a newly frozen full campaign. Historical fixture patches
 must be explicit, target defects must remain detectable, and a failed calibration
 blocks provider admission. No production review behavior changes in this card.
+
+Issue #115 follows docs/claim-alias-retry-115-plan.md. Generate canonical prior-disposition
+fields and diagnose alias-pair collisions without accepting equal or conflicting duplicates.
