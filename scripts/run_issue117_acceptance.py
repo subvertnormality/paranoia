@@ -48,45 +48,46 @@ CONTINUATION_ARCHIVE_SHA256 = "d7c8dec1d8dd02fed63482e881e895ab3e48cfc1255fa6722
 
 
 def _load_parent(parent, source):
-    """Admit an exact retained checkpoint; never reset its cumulative call count."""
-    archive = ROOT / "docs/attestation-envelope-117-native-evidence.tar.gz"
-    assert hashlib.sha256(archive.read_bytes()).hexdigest() == PARENT_ARCHIVE_SHA256
-    with tarfile.open(archive) as retained:
-        original_inputs = [json.load(retained.extractfile(f"attempt-{i:02d}-input.json")) for i in range(1, 9)]
-        original_audit = next(m for m in retained.getmembers() if m.name.startswith("logs/") and "-critique_plan-" in m.name)
-        original_ledger = json.load(retained.extractfile(original_audit))["attempt_ledger"]
-        original_source = json.load(retained.extractfile("source.json"))
-    finishing = json.loads((parent / "qualification.json").read_text())["attempts"] == 12
-    digest = PARENT_ARCHIVE_SHA256
-    if finishing:
-        archive = ROOT / "docs/attestation-envelope-117-continuation-evidence.tar.gz"
-        digest = CONTINUATION_ARCHIVE_SHA256
-    assert hashlib.sha256(archive.read_bytes()).hexdigest() == digest
-    with tarfile.open(archive) as retained:
-        members = retained.getmembers()
-        assert all(m.isfile() and not Path(m.name).is_absolute()
-                   and ".." not in Path(m.name).parts for m in members)
-        assert {str(f.relative_to(parent)) for f in parent.rglob("*") if f.is_file()} == {m.name for m in members}
-        for member in members:
-            path = parent / member.name
-            assert not path.is_symlink() and path.read_bytes() == retained.extractfile(member).read()
-    read = lambda name: json.loads((parent / name).read_text())
-    old_source = read("source.json")
-    assert old_source["production"]["files"] == source["files"], "continuation changes production"
-    assert read("qualification.json")["qualified"] is False
-    inputs = [read(f"attempt-{i:02d}-input.json") for i in (range(9, 13) if finishing else range(1, 9))]
-    audit = json.loads(next((parent / "logs").glob("*-critique_plan-*.json")).read_text())
-    assert len(inputs) == len(audit["attempt_ledger"]) == (4 if finishing else 8)
-    assert read("qualification.json")["attempts"] == (12 if finishing else 8)
-    _require_evidence_phases(audit["attempt_ledger"])
-    if finishing:
-        assert original_source["production"]["files"] == source["files"]
-        assert read("durable.json")["review_state"]["phase"] == "final"
-        inputs = original_inputs + inputs
-    return {"source": old_source, "inputs": inputs,
-            "ledger": (original_ledger if finishing else []) + audit["attempt_ledger"],
-            "archive_sha256": digest, "next_round": 3 if finishing else 2,
-            "arguments": read("invocation.json")["arguments"]}
+    """Admit a byte-exact retained checkpoint and account for every earlier call."""
+    campaigns = (
+        (8, "native", PARENT_ARCHIVE_SHA256),
+        (12, "continuation", CONTINUATION_ARCHIVE_SHA256),
+        (14, "final-budget", "0832e48413041fc0921bf6138bd4ddfa0fb859fd4b029c24a41c5fc4ed8448ee"),
+    )
+    count = json.loads((parent / "qualification.json").read_text())["attempts"]
+    assert count in {row[0] for row in campaigns}
+    inputs, ledger, previous = [], [], 0
+    for total, name, digest in campaigns:
+        archive = ROOT / f"docs/attestation-envelope-117-{name}-evidence.tar.gz"
+        assert hashlib.sha256(archive.read_bytes()).hexdigest() == digest
+        with tarfile.open(archive) as retained:
+            members = retained.getmembers()
+            assert all(m.isfile() and not Path(m.name).is_absolute()
+                       and ".." not in Path(m.name).parts for m in members)
+            read = lambda name: json.load(retained.extractfile(name))
+            old_source = read("source.json")
+            assert old_source["production"]["files"] == source["files"], "continuation changes production"
+            qualification = read("qualification.json")
+            assert qualification["qualified"] is False and qualification["attempts"] == total
+            inputs.extend(read(f"attempt-{i:02d}-input.json") for i in range(previous + 1, total + 1))
+            for member in members:
+                if member.name.startswith("logs/") and "-critique_plan-" in member.name:
+                    ledger.extend(read(member.name)["attempt_ledger"])
+            previous = total
+            if total == count:
+                assert {str(f.relative_to(parent)) for f in parent.rglob("*") if f.is_file()} == {m.name for m in members}
+                for member in members:
+                    path = parent / member.name
+                    assert not path.is_symlink() and path.read_bytes() == retained.extractfile(member).read()
+                if count >= 12:
+                    assert read("durable.json")["review_state"]["phase"] == "final"
+                arguments = read("invocation.json")["arguments"]
+                break
+    assert len(inputs) == count
+    _require_evidence_phases(ledger)
+    return {"source": old_source, "inputs": inputs, "ledger": ledger,
+            "archive_sha256": digest, "next_round": 3 if count >= 12 else 2,
+            "arguments": arguments}
 
 
 def native(out, parent=None):
@@ -96,7 +97,7 @@ def native(out, parent=None):
     shared, source = load_source(ROOT)
     prior = _load_parent(parent, source) if parent is not None else None
     base_calls = len(prior["inputs"]) if prior else 0
-    ceiling = 14 if base_calls == 12 else 12
+    ceiling = base_calls + 8 if base_calls >= 12 else 12
     source_id = shared.sha(json.dumps(source, sort_keys=True).encode())
     helper_files = {}
     for name in ("scripts/run_issue117_acceptance.py", "scripts/benchmark_bootstrap.py",

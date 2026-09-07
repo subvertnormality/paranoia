@@ -128,3 +128,10 @@ at most fourteen cumulative attempts. Bind the exact second retained archive as 
 the original archive and unchanged complete production inventory. Preserve both failed
 qualifications and all quality gates. This supersedes the twelve-call delivery ceiling;
 it does not alter runtime review limits or authorize relabeling a failed run as successful.
+
+The unchanged fixture repeats its assertion, so its supported anchor cannot freeze under
+the existing conservative occurrence rule. The fourteen-call attempt therefore required
+fresh discovery/binding and exhausted before attestation. Preserve that third failed
+checkpoint. Under standing authorization, reserve eight further calls for the complete
+discovery, binding, attestation and cold-final path, each with its existing single retry:
+twenty-two cumulative maximum. Keep the fixture, source and quality gates unchanged.

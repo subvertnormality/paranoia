@@ -272,11 +272,12 @@ def test_issue117_exact_historical_exception_and_outside_mutation(name):
         with pytest.raises(AssertionError):
             check_historical_boundary(original, changed, name)
 
-def test_continuation_parent_binding(tmp_path):
+@pytest.mark.parametrize("campaign", ["native", "continuation", "final-budget"])
+def test_continuation_parent_binding(tmp_path, campaign):
     import tarfile
     root = Path(__file__).resolve().parents[1]
     parent = tmp_path / "parent"
-    with tarfile.open(root / "docs/attestation-envelope-117-native-evidence.tar.gz") as archive:
+    with tarfile.open(root / f"docs/attestation-envelope-117-{campaign}-evidence.tar.gz") as archive:
         for member in archive.getmembers():
             assert member.isfile() and not Path(member.name).is_absolute()
             assert ".." not in Path(member.name).parts
@@ -294,7 +295,8 @@ def test_continuation_parent_binding(tmp_path):
     changed = copy.deepcopy(source)
     changed["files"]["src/paranoia_local/handlers.py"] = "0" * 64
     assert check(changed).returncode != 0
-    for name in ("qualification.json", "attempt-01-input.json", "state/lineages/issue117-native.json"):
+    first_input = next(parent.glob("attempt-*-input.json")).name
+    for name in ("qualification.json", first_input, "state/lineages/issue117-native.json"):
         target = parent / name
         original = target.read_bytes()
         target.write_bytes(original + b" ")
@@ -304,19 +306,22 @@ def test_continuation_parent_binding(tmp_path):
     assert check(source).returncode != 0
 
 
-def test_continuation_global_ceiling_through_entry(tmp_path):
+@pytest.mark.parametrize("campaign", ["native", "continuation", "final-budget"])
+def test_continuation_global_ceiling_through_entry(tmp_path, campaign):
     root = Path(__file__).resolve().parents[1]
     program = r'''
 import runpy, sys, json, tarfile
 from pathlib import Path
 from types import SimpleNamespace
-entry, output, parent = map(Path, sys.argv[1:])
-with tarfile.open(entry.parent.parent / 'docs/attestation-envelope-117-native-evidence.tar.gz') as archive:
+entry, output, parent = map(Path, sys.argv[1:4])
+with tarfile.open(entry.parent.parent / ('docs/attestation-envelope-117-' + sys.argv[4] + '-evidence.tar.gz')) as archive:
     for member in archive.getmembers():
         assert member.isfile() and not Path(member.name).is_absolute() and '..' not in Path(member.name).parts
         target = parent / member.name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(archive.extractfile(member).read())
+base = json.loads((parent / 'qualification.json').read_text())['attempts']
+remaining = 8 if base >= 12 else 4
 scope = runpy.run_path(str(entry))
 globals_ = scope['native'].__globals__
 load = globals_['load_source']
@@ -330,9 +335,9 @@ def setup(root):
         return engines.Review(text='scripted', session_ref=None, raw='scripted')
     engines.Engine._execute = fake_execute
     def dispatch(*args, **kwargs):
-        for i in range(5):
+        for i in range(remaining + 1):
             engines.Engine._execute(SimpleNamespace(role='scripted-ceiling-control'), [], 'scripted', root, None, 300)
-        raise AssertionError('fifth new call admitted')
+        raise AssertionError('excess new call admitted')
     server.dispatch = dispatch
     original = globals_['subprocess'].check_output
     globals_['subprocess'].check_output = lambda args, **kw: 'scripted-version' if args == ['claude', '--version'] else original(args, **kw)
@@ -344,14 +349,14 @@ except RuntimeError as exc:
     assert str(exc) == 'issue117 native attempt ceiling exhausted'
 else:
     raise AssertionError('ceiling did not reject')
-assert len(calls) == 4
-assert [json.loads(p.read_text())['sequence'] for p in sorted(output.glob('attempt-*-input.json'))] == [9,10,11,12]
+assert len(calls) == remaining
+assert [json.loads(p.read_text())['sequence'] for p in sorted(output.glob('attempt-*-input.json'))] == list(range(base + 1, base + remaining + 1))
 qualification = json.loads((output / 'qualification.json').read_text())
-assert qualification['attempts'] == 12 and qualification['qualified'] is False
+assert qualification['attempts'] == base + remaining and qualification['qualified'] is False
 '''
     result = subprocess.run([sys.executable, "-c", program,
         str(root / "scripts/run_issue117_acceptance.py"), str(tmp_path / "output"),
-        str(tmp_path / "parent")], capture_output=True, text=True)
+        str(tmp_path / "parent"), campaign], capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
