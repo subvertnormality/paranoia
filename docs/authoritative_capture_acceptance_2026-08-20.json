@@ -31,8 +31,14 @@
       "attestation_prompt_characters": 627110,
       "attestation_prompt_sha256": "8dae6abd09297d0c0f38e5e534518c8d2023a8ab5ad10e8988f0d09e8d923626",
       "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
-      "binding_reply_sha256": ["edfc4a50be49cc25efaa186da26e527cfeac0949b4f8f9ebc89810f13bef1069", "5806844a5a3c81d3a198b0d667a5f1277924e233ef1e0d3e5d44455a168b1534"],
-      "binding_raw_sha256": ["7fdb8f1850f213aa3d5f62054e4064595724672ccc02ca9b178a6fa7421113f9", "f691740fee3ba83982de92dd6ecfd73dd2307f3a8161c1347563153eb7ebf0ae"],
+      "binding_reply_sha256": [
+        "edfc4a50be49cc25efaa186da26e527cfeac0949b4f8f9ebc89810f13bef1069",
+        "5806844a5a3c81d3a198b0d667a5f1277924e233ef1e0d3e5d44455a168b1534"
+      ],
+      "binding_raw_sha256": [
+        "7fdb8f1850f213aa3d5f62054e4064595724672ccc02ca9b178a6fa7421113f9",
+        "f691740fee3ba83982de92dd6ecfd73dd2307f3a8161c1347563153eb7ebf0ae"
+      ],
       "attestation_raw_sha256": "e072617a20e3a4c1623424b255a6b0619dd87c4b8266d54a50df802266782da3",
       "binding_calls": 2,
       "binding_validation_retries": 1,
@@ -56,8 +62,14 @@
       "attestation_prompt_characters": 626965,
       "attestation_prompt_sha256": "9e48b40446251a1027609140412749447524c63a8d6d51dc1cbccf222f8b3335",
       "bootstrap_reply_sha256": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
-      "binding_reply_sha256": ["95c2ac4a02c8dac2c55c3192841b3e8f90f414b4dab3f859192f1d2ddf7e5f27", "056413e60bb7d9958f75036152627617c441163a686566acfa729baf4d329708"],
-      "binding_raw_sha256": ["a1bb7ec5a6ea587e13a1e6646a9c323ee31d957b427fdacaee20bf4d73d3dccb", "80a6fb5dd684bc007bf0b64a76c3704c761c729399a122386e3d03473c357ae5"],
+      "binding_reply_sha256": [
+        "95c2ac4a02c8dac2c55c3192841b3e8f90f414b4dab3f859192f1d2ddf7e5f27",
+        "056413e60bb7d9958f75036152627617c441163a686566acfa729baf4d329708"
+      ],
+      "binding_raw_sha256": [
+        "a1bb7ec5a6ea587e13a1e6646a9c323ee31d957b427fdacaee20bf4d73d3dccb",
+        "80a6fb5dd684bc007bf0b64a76c3704c761c729399a122386e3d03473c357ae5"
+      ],
       "attestation_raw_sha256": "546c4fce58e09b874f1d66e32e16e40581c45830d363994752d1725d451f5c26",
       "binding_calls": 2,
       "binding_validation_retries": 1,
@@ -103,10 +115,10 @@
     "base_commit": "18fb074e3066e91602b99931e58da41f99cee06e",
     "source_commit": "20464241b5838dbac30f2df5c44897b1e7075f2e",
     "allowed_later_handlers_diff": {
-      "sha256": "e8e2351c4e71469646015ac44b3b8b0eb68e3436bbc539be27852784ca9497d5",
+      "sha256": "f6c67771791b2b7165b90a1a309dc995504dfe5c0d70a5bf75e7551e65853bff",
       "additions": 2237,
       "deletions": 355,
-      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, ordered terminal retry diagnostics, exact durable concessions, and malformed-state preflight through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through structural final settlement only. Issue #106 threads authoritative class members into fresh and retried integrity-lane decoding and exercises shared-anchor correction/final durable settlement. Issue #108 replaces the former permanent block for absent pre-inventory unmechanized rows with one deterministic whole-class compatibility member, permitting ordinary evidenced closure transitions. Issues #111/#112 add structural correction diagnostics and evidence projection; retained provider exchanges and capture, binding, cold-attestation, prompt-size, and source-admission behavior remain unchanged. Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, bounded combined claim-audit correction, typed census execution extraction, explicit withdrawal of the unqualified empty-census experiment, fail-closed discovery session validation, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them."
+      "scope": "Plan structural protocol, correction-control, exact audit-trailer, branch plan-contract, operator-facing failure taxonomy, plan-only closure-candidate correction, closed shared staged-state validation, bounded evidence-bound mechanized-class registration, exact mode/gate inputs to server-authored class-action guidance, server-owned evidence-phase labels, aggregate capture/pre-binding deadline classification, field-bounded capture-group retrieval debt with identity hashes, ordered terminal retry diagnostics, exact durable concessions, and malformed-state preflight through this revision; does not alter capture, binding, cold-attestation success behavior, prompt-size, or source-admission semantics proved by this record. Issue #91 additionally rejects zero-line plan files before provider or lineage work, gives plan and plan-backed branch lanes and correction/final retries exact plan-bound coordinate repair, keeps every server-authored plan citation example in bounds while retaining the malformed provider anchor only in the validation diagnostic, gives plan-backed consolidation bound-only manifest guidance, and leaves contract-free branch retries unchanged. Issue #95 threads engine identity through structural final settlement only. Issue #106 threads authoritative class members into fresh and retried integrity-lane decoding and exercises shared-anchor correction/final durable settlement. Issue #108 replaces the former permanent block for absent pre-inventory unmechanized rows with one deterministic whole-class compatibility member, permitting ordinary evidenced closure transitions. Issues #111/#112 add structural correction diagnostics and evidence projection; retained provider exchanges and capture, binding, cold-attestation, prompt-size, and source-admission behavior remain unchanged. Additional delivery allowance: Historical provider evidence only. Later changes add pure phase decisions, class-only cold final scheduling, validated checkpoints, bounded subprocess teardown, diagnostic run traces, provenance-based rebut routing, contract navigation, truthful capability/neutrality guidance, bounded combined claim-audit correction, typed census execution extraction, explicit withdrawal of the unqualified empty-census experiment, fail-closed discovery session validation, and current deterministic acceptance. This allowance binds changed bytes; it does not claim the historical provider exercised them. The behavioral class-authoring card adds only shared authoring guidance to existing staged validation retries; original capture acceptance remains historical and new authoring behavior requires separate live acceptance."
     },
     "allowed_later_review_census_diff": {
       "sha256": "99edf114c6818ffaa6261b8a85cbe05ebaf34ca4c00c7a092a385c2d7dff503b",
