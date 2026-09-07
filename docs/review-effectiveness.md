@@ -119,3 +119,57 @@ and derives case false positives from adjudicated clusters. All 34 benchmark
 tests now pass, including a complete 32-slot failure/exhaustion campaign through
 qualification, sealing, reporting and human export. Those are deterministic
 handler tests, not live effectiveness observations.
+
+## Completed pilot: 7 September 2026
+
+The [sealed report](effectiveness-pilot-2026-09-07/report.json) contains all 32
+completed slots at source 52f71d900e0057a98d8c7196d377a66f35313527. Custody
+qualifies with no errors; comparative quality does not qualify. Both arms found
+their eight intended defect instances, but seven slots contain unscored fixture
+problems or ambiguity. These observations cannot establish superiority or
+non-inferiority, and zero adjudicated false positives is not a clean-control claim.
+
+| Observed workload | Single query | Native staged branch |
+| --- | ---: | ---: |
+| Completed slots | 16 | 16 |
+| Provider calls | 16 | 66 |
+| Median slot time | 51.8 s | 131.2 s |
+| Total slot time | 804.5 s | 1,999.0 s |
+| Unscored slots | 4 | 3 |
+
+The staged arm retained two successful validation retries. These are workflow
+observations on tiny fixtures, not baseline/candidate speed measurements. Native
+stage usage and overlapping provider durations remain in the report; subscription
+dollar cost is unknown. The stopped campaign consumed 10 calls and the complete
+campaign 82, totaling 92 against the original 192 ceiling. Earlier completed
+slots may have warmed provider caches; fresh sessions do not eliminate that
+timing confound. No speedup or all-mode conclusion is claimed.
+
+The frozen historical parser control accepts an unmatched closing fence and can
+truncate later row diagnostics after long excerpts. Its count-ceiling behavior
+also exposes an ambiguity in the frozen specification. Exact implementer
+[reproduction witnesses](effectiveness-pilot-2026-09-07/fixture-problems.json)
+are retained; no oracle or specification was narrowed after seeing reviews.
+Corpus calibration and a newly frozen full evaluation remain #49 work, owned by
+the benchmark maintainer, with complete qualified scoring as the acceptance
+boundary. Independent human acceptance remains Andy's separate residual.
+
+The [human packet](effectiveness-pilot-2026-09-07/human-packet.json) contains all
+32 exact native review projections, and the
+[ratings template](effectiveness-pilot-2026-09-07/human-ratings-template.json)
+is pending. Native provider/workflow cues may remain. For an independent rating,
+read the packet before the report, oracle or implementer annotations.
+
+The [complete two-campaign archive](effectiveness-pilot-2026-09-07/campaigns.tar.gz)
+retains original manifests, fixture Git histories, raw provider channels, native
+audits, terminal receipts, annotations and the score seal. SHA-256:
+bf734adfefc9ce9fd715c17c953b23210cf711d470a90f79021609250d3127be.
+For replay on a separate machine, extract under /tmp without overwriting existing
+campaigns and create the source checkouts at the exact paths/revisions recorded
+in each manifest (ec39686 for the stopped campaign, 52f71d9 for the complete one).
+Use each source's own scripts and the recorded CLI versions; do not rerun --run,
+--freeze or --seal. Run qualification/reporting and validate ratings as above.
+The historical absolute bindings are deliberately preserved. The source commits
+are ancestors of this delivery. Complete source inventory, exact equivalence,
+seven historical groups, 33 mutation probes and 2,120 passing tests support #50;
+CODE convergence remains the final delivery gate.
