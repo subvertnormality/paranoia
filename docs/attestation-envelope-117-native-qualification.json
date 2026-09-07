@@ -1,0 +1,10 @@
+{
+  "qualified": true,
+  "archive_sha256": "3132b2d705956ac23f91f39ba8b5e78642d9e5bf82db6dcbaa0253635e373f70",
+  "native_source_revision": "85f54b6388da2991972d4b3473503027c8c0d6a9",
+  "qualification_revision": "164aff918f2268c8b64e86700d3e7915dad3b2f6",
+  "attempts": 18,
+  "additional_provider_calls": 0,
+  "supported_claims": 1,
+  "scope": "Retained native clear result with authoritative support; context-only capture failure does not govern claim closure. Original failed qualification remains immutable."
+}
