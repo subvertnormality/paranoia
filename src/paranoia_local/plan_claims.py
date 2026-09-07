@@ -23,6 +23,21 @@ from . import inert_git
 
 
 AUDIT_MARKER = "=== CLAIM AUDIT JSON ==="
+PRIOR_DISPOSITION_EXAMPLE = (
+    '{"claim_id":"C-example","disposition":"removed","reason":"The old anchor is absent."}'
+)
+PRIOR_DISPOSITION_INSTRUCTIONS = (
+    "For coverage.prior_dispositions, emit only the canonical row fields "
+    "claim_id, disposition and reason. Never emit both claim_id and prior_claim_id, "
+    "or both reason and rationale, even when their values are equal. The aliases "
+    "prior_claim_id and rationale are input compatibility alternatives, not extra fields "
+    "to emit. Claim objects have their own prior_claim_id and rationale fields; do not "
+    "copy those names into disposition rows.\n"
+    "Minimal valid disposition example: " + PRIOR_DISPOSITION_EXAMPLE + "\n"
+    "Replace C-example with the actual ID from the supplied prior packets and give the "
+    "actual removal reason. A removed disposition is permitted only when that prior "
+    "external anchor is absent from the current plan; the example does not authorize removal."
+)
 MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
@@ -435,7 +450,10 @@ def _validate_dispositions(raw: Any, text: str) -> tuple[dict[str, str], ...]:
         ):
             raise AuditError(
                 f"prior disposition {index} must contain one claim ID, disposition, "
-                "and one reason (prior_claim_id and rationale are accepted as wire aliases)",
+                f"and one reason; row /coverage/prior_dispositions/{index}. "
+                f"Observed ID fields: {', '.join(sorted(id_fields)) or '(none)'}. "
+                f"Observed reason fields: {', '.join(sorted(reason_fields)) or '(none)'}. "
+                + PRIOR_DISPOSITION_INSTRUCTIONS,
                 text,
             )
         try:
@@ -1461,6 +1479,7 @@ entry in coverage.prior_dispositions. The only disposition is "removed", and it 
 when the old verbatim external anchor is absent from the current plan. If an eligible claim
 became a local decision, edit away the old externally asserted wording; do not merely relabel it.
 prior_claim_id is contextual only and cannot transfer identity to edited wording.
+{PRIOR_DISPOSITION_INSTRUCTIONS}
 
 RETAINED CLAIMS REQUIRING FULL CURRENT PACKETS (JSON):
 {retained_full}
@@ -1551,6 +1570,7 @@ condition does not prove that a dated external audit/report event occurred. Use 
 for new or edited eligible external propositions. Every absent prior claim
 needs a `removed` disposition; edited wording mints a new claim and does not inherit the old
 identity or verdict.
+{PRIOR_DISPOSITION_INSTRUCTIONS}
 {_universal_scope_instruction()}
 
 RETAINED CLAIMS REQUIRING FULL EVIDENCE PACKETS (JSON):
@@ -1599,6 +1619,7 @@ def retry_instructions(
 
 Reason: {error.reason}
 Rejected payload sha256: {error.raw_sha256}
+{PRIOR_DISPOSITION_INSTRUCTIONS}
 
 Return the COMPLETE corrected audit for the plan, not a patch. Use exactly one
 {AUDIT_MARKER} marker followed by one JSON object and nothing else. Every claim uses the
