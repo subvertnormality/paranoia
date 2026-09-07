@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "findings": [
+    {
+      "slot": "t011",
+      "case": "c-4325c23d6702",
+      "id": 1,
+      "output": 0,
+      "quote": "Malformed JSON can produce a successful Audit: the default decoder accepts NaN and infinities, and the cited coverage example passes structural and helper checks in either mode despite the explicit rejection contract.",
+      "native_id": "behaviour:B1",
+      "classification": "fixture_problem",
+      "cluster": "non-json-constants",
+      "reason": "Confirmed unexpected control defect: NaN and infinities return a successful Audit through extra coverage metadata in both modes despite malformed-JSON rejection. No frozen bytes or specification changed; comparative qualification must remain withheld.",
+      "basis_quote": "",
+      "witness_sha256": "347c425a3378ebf7d23d0e9b064d18774a7e71b1c2b6b7e89992210b1068d475",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t011/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nrows=[]\nwith fixture(files) as (ns,h):\n for constant in [\"NaN\",\"Infinity\",\"-Infinity\"]:\n  for partial in [False,True]:\n   text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+constant+'}}'\n   value=ns[\"parse_audit\"](text,\"\",allow_partial=partial)\n   rows.append({\"constant\":constant,\"allow_partial\":partial,\"actual\":\"returned Audit\",\"extra\":repr(value.coverage[\"extra\"]),\"expected\":\"AuditError\"})\nprint(json.dumps(rows,indent=2))\n",
+        "result": "All six combinations (NaN, Infinity, -Infinity; allow_partial=False/True) returned Audit, retaining extra metadata as nan/inf/-inf, instead of raising AuditError."
+      }
+    },
+    {
+      "slot": "t012",
+      "case": "c-4325c23d6702",
+      "id": 1,
+      "output": 0,
+      "quote": "1. **Medium \u2014 malformed JSON accepted**, [app.py:25](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository/app.py:25).  \n   **Trigger:** After the marker, supply:\n   ```text\n   {\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":NaN}}\n   ```\n   The default decoder accepts `NaN`, `Infinity`, and `-Infinity`, although they are outside JSON syntax. Both modes return success because coverage metadata is retained. [Python documentation](https://docs.python.org/3/library/json.html#infinite-and-nan-number-values).  \n   **Required repair:** Reject these constants through `parse_constant`, raising `AuditError`.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "non-json-constants",
+      "reason": "Confirmed success for non-JSON constants despite malformed-JSON rejection.",
+      "basis_quote": "",
+      "witness_sha256": "347c425a3378ebf7d23d0e9b064d18774a7e71b1c2b6b7e89992210b1068d475",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t011/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nrows=[]\nwith fixture(files) as (ns,h):\n for constant in [\"NaN\",\"Infinity\",\"-Infinity\"]:\n  for partial in [False,True]:\n   text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+constant+'}}'\n   value=ns[\"parse_audit\"](text,\"\",allow_partial=partial)\n   rows.append({\"constant\":constant,\"allow_partial\":partial,\"actual\":\"returned Audit\",\"extra\":repr(value.coverage[\"extra\"]),\"expected\":\"AuditError\"})\nprint(json.dumps(rows,indent=2))\n",
+        "result": "All six combinations (NaN, Infinity, -Infinity; allow_partial=False/True) returned Audit, retaining extra metadata as nan/inf/-inf, instead of raising AuditError."
+      }
+    },
+    {
+      "slot": "t012",
+      "case": "c-4325c23d6702",
+      "id": 2,
+      "output": 0,
+      "quote": "2. **Medium \u2014 input-triggered exceptions escape `AuditError`**, [app.py:25\u201327](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository/app.py:25) and [app.py:90](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository/app.py:90).  \n   **Trigger:** Otherwise valid input containing coverage metadata with arrays nested beyond the interpreter\u2019s recursion limit. Decoding can raise `RecursionError`; sufficiently deep decoded metadata can also fail during `deepcopy`. Only `JSONDecodeError` is caught, and copying has no handler.  \n   **Consequence:** Both modes can escape the specified error interface. **Required repair:** Translate these input-driven recursion failures into `AuditError`.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "input-recursion-errors",
+      "reason": "Confirmed input-driven RecursionError escapes the promised AuditError interface; no nesting bound is stated.",
+      "basis_quote": "",
+      "witness_sha256": "aa97f54530a28d5e2e2b07eac0a4982b0f30cfefc3c35588205107d9b8a39b7c",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nwith fixture(files) as (ns,h):\n for partial in [False,True]:\n  text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+'['*2000+'0'+']'*2000+'}}'\n  try: ns[\"parse_audit\"](text,\"\",allow_partial=partial); print(\"deep\",partial,\"returned\")\n  except Exception as exc: print(\"deep\",partial,type(exc).__name__,str(exc))\n suffix=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[]}}'\n a=ns[\"parse_audit\"](chr(0xd800)+suffix,\"\")\n b=ns[\"parse_audit\"](\"?\"+suffix,\"\")\n print(\"distinct-input-same-digest\",a.digest==b.digest,a.digest)\n",
+        "result": "Both strict and partial modes leaked RecursionError for 2,000 nested metadata arrays. Distinct lone-surrogate and question-mark preambles returned identical digest d52f4f79c56cf1e9d38816532e5fd895e9692c0f196015072b640e2c372a3fa5."
+      }
+    },
+    {
+      "slot": "t012",
+      "case": "c-4325c23d6702",
+      "id": 3,
+      "output": 0,
+      "quote": "3. **Medium \u2014 digest does not bind distinct original strings**, [app.py:91](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository/app.py:91).  \n   **Trigger:** Two otherwise identical valid inputs whose preambles contain respectively an actual lone surrogate `U+D800` and `?`. Both are Python strings; the specification excludes neither.  \n   **Consequence:** `text.encode(\"utf-8\", \"replace\")` produces identical bytes and therefore identical digests. Python documents that encoding replacement uses `?`. [Encoding documentation](https://docs.python.org/3/library/codecs.html#error-handlers).  \n   **Required repair:** Use an encoding that preserves distinct permitted strings, or explicitly restrict and validate the input domain.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "original-text-digest",
+      "reason": "Confirmed distinct allowed Python strings bind the same replacement-encoded digest; the frozen input domain excludes neither.",
+      "basis_quote": "",
+      "witness_sha256": "aa97f54530a28d5e2e2b07eac0a4982b0f30cfefc3c35588205107d9b8a39b7c",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nwith fixture(files) as (ns,h):\n for partial in [False,True]:\n  text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+'['*2000+'0'+']'*2000+'}}'\n  try: ns[\"parse_audit\"](text,\"\",allow_partial=partial); print(\"deep\",partial,\"returned\")\n  except Exception as exc: print(\"deep\",partial,type(exc).__name__,str(exc))\n suffix=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[]}}'\n a=ns[\"parse_audit\"](chr(0xd800)+suffix,\"\")\n b=ns[\"parse_audit\"](\"?\"+suffix,\"\")\n print(\"distinct-input-same-digest\",a.digest==b.digest,a.digest)\n",
+        "result": "Both strict and partial modes leaked RecursionError for 2,000 nested metadata arrays. Distinct lone-surrogate and question-mark preambles returned identical digest d52f4f79c56cf1e9d38816532e5fd895e9692c0f196015072b640e2c372a3fa5."
+      }
+    },
+    {
+      "slot": "t026",
+      "case": "c-1c9e7eed4363",
+      "id": 2,
+      "output": 0,
+      "quote": "4. **Malformed numeric tokens are accepted \u2014 [app.py:25](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t026/repository/app.py:25).** Trigger: `{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":NaN}}`. Both modes return an `Audit`. Python\u2019s default decoder accepts `NaN`, `Infinity`, and `-Infinity`, although these are invalid JSON tokens. [Python documentation](https://docs.python.org/3/library/json.html#infinite-and-nan-number-values). **Repair:** reject these through `parse_constant`, translating rejection into `AuditError`.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "non-json-constants",
+      "reason": "Reproduced non-JSON constants returning Audit in both modes in this exact defective variant.",
+      "basis_quote": "",
+      "witness_sha256": "e59536b5f62fa341de5eddf2d0c3b63c46796fdc2901bff2bfe388c5817211ca",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t026/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nrows=[]\nwith fixture(files) as (ns,h):\n for constant in [\"NaN\",\"Infinity\",\"-Infinity\"]:\n  for partial in [False,True]:\n   text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+constant+'}}'\n   value=ns[\"parse_audit\"](text,\"\",allow_partial=partial)\n   rows.append({\"constant\":constant,\"allow_partial\":partial,\"actual\":\"returned Audit\",\"extra\":repr(value.coverage[\"extra\"]),\"expected\":\"AuditError\"})\nprint(json.dumps(rows,indent=2))\n",
+        "result": "All six combinations (NaN, Infinity, -Infinity; allow_partial=False/True) returned Audit, retaining extra metadata as nan/inf/-inf, instead of raising AuditError."
+      }
+    },
+    {
+      "slot": "t026",
+      "case": "c-1c9e7eed4363",
+      "id": 3,
+      "output": 0,
+      "quote": "5. **Nesting failures escape as ordinary exceptions \u2014 [app.py:26](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t026/repository/app.py:26).** Trigger: otherwise admissible coverage metadata containing arrays nested beyond the interpreter\u2019s recursion limit. Decoding raises `RecursionError`, which `except json.JSONDecodeError` does not catch, violating \u201cErrors use AuditError.\u201d The specification supplies no nesting restriction; Python documents interpreter-imposed limits. [Python documentation](https://docs.python.org/3/library/json.html#implementation-limitations). **Repair:** translate nesting-limit failures into `AuditError`; also cover recursive copying at line 78.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "input-recursion-errors",
+      "reason": "Reproduced RecursionError leakage from nested metadata in this exact defective variant; the frozen specification gives no nesting restriction.",
+      "basis_quote": "",
+      "witness_sha256": "fc8af799c11aa0464311e3c649c4c1f00e19824539e1c5031bce27bb61424083",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t026/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nwith fixture(files) as (ns,h):\n for partial in [False,True]:\n  text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+'['*2000+'0'+']'*2000+'}}'\n  try: ns[\"parse_audit\"](text,\"\",allow_partial=partial); print(\"deep\",partial,\"returned\")\n  except Exception as exc: print(\"deep\",partial,type(exc).__name__,str(exc))\n suffix=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[]}}'\n a=ns[\"parse_audit\"](chr(0xd800)+suffix,\"\")\n b=ns[\"parse_audit\"](\"?\"+suffix,\"\")\n print(\"distinct-input-same-digest\",a.digest==b.digest,a.digest)\n",
+        "result": "Both strict and partial modes leaked RecursionError for 2,000 nested metadata arrays. Distinct lone-surrogate and question-mark preambles returned identical digest d52f4f79c56cf1e9d38816532e5fd895e9692c0f196015072b640e2c372a3fa5."
+      }
+    },
+    {
+      "slot": "t027",
+      "case": "c-4325c23d6702",
+      "id": 1,
+      "output": 0,
+      "quote": "1. **Malformed JSON constants are accepted \u2014 [app.py:25](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t027/repository/app.py:25).**  \n   Trigger, in either mode:\n   ```text\n   === CLAIM AUDIT JSON ===\n   {\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":NaN}}\n   ```\n   The default decoder accepts `NaN`, `Infinity`, and `-Infinity`, although these are invalid JSON literals. Coverage permits extra metadata, so this returns a successful `Audit`, violating SPEC.md:3\u2019s malformed-JSON rejection requirement. [Python documentation](https://docs.python.org/3/library/json.html#infinite-and-nan-number-values).  \n   **Required repair:** reject these tokens through `parse_constant`, raising `AuditError`.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "non-json-constants",
+      "reason": "Confirmed NaN and infinity acceptance in the identical frozen control bytes.",
+      "basis_quote": "",
+      "witness_sha256": "347c425a3378ebf7d23d0e9b064d18774a7e71b1c2b6b7e89992210b1068d475",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t011/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nrows=[]\nwith fixture(files) as (ns,h):\n for constant in [\"NaN\",\"Infinity\",\"-Infinity\"]:\n  for partial in [False,True]:\n   text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+constant+'}}'\n   value=ns[\"parse_audit\"](text,\"\",allow_partial=partial)\n   rows.append({\"constant\":constant,\"allow_partial\":partial,\"actual\":\"returned Audit\",\"extra\":repr(value.coverage[\"extra\"]),\"expected\":\"AuditError\"})\nprint(json.dumps(rows,indent=2))\n",
+        "result": "All six combinations (NaN, Infinity, -Infinity; allow_partial=False/True) returned Audit, retaining extra metadata as nan/inf/-inf, instead of raising AuditError."
+      }
+    },
+    {
+      "slot": "t027",
+      "case": "c-4325c23d6702",
+      "id": 2,
+      "output": 0,
+      "quote": "2. **Input-induced exceptions escape the `AuditError` contract \u2014 [app.py:26](/tmp/paranoia-effectiveness-calibrated-2026-09-07/t027/repository/app.py:26).**  \n   Trigger: replace `NaN` above with a 4,301-digit integer on Python with its default integer-conversion limit. Decoding raises plain `ValueError`; `except json.JSONDecodeError` does not catch it. Consequently, callers handling `AuditError` miss the failure. Python documents the default 4,300-digit limit and exception. [Integer conversion documentation](https://docs.python.org/3/library/stdtypes.html#integer-string-conversion-length-limitation). Excessive nesting similarly exposes recursion failures during decoding or the unguarded `deepcopy` at app.py:90.  \n   **Required repair:** translate these input-processing failures into `AuditError`, including failures during coverage copying.\n\n",
+      "native_id": null,
+      "classification": "fixture_problem",
+      "cluster": "input-error-interface",
+      "reason": "Confirmed plain ValueError at the configured 4,300-digit limit in Python 3.11.9, independently of the already reproduced recursion failure.",
+      "basis_quote": "",
+      "witness_sha256": "9f3bba2970ddaa54601a06968de55b4ec69ce914790309cab5d8b7af5077562e",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t027/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nprint(\"runtime\",sys.version.split()[0],\"integer_digit_limit\",sys.get_int_max_str_digits())\nwith fixture(files) as (ns,h):\n for partial in [False,True]:\n  text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+'1'*4301+'}}'\n  try: ns[\"parse_audit\"](text,\"\",allow_partial=partial);print(\"integer\",partial,\"returned\")\n  except Exception as exc:print(\"integer\",partial,type(exc).__name__,isinstance(exc,h.AuditError),str(exc))\n",
+        "result": "Python 3.11.9 reported integer_digit_limit=4300. A 4,301-digit metadata integer raised plain ValueError (not AuditError) in both strict and partial modes."
+      }
+    },
+    {
+      "slot": "t028",
+      "case": "c-4325c23d6702",
+      "id": 1,
+      "output": 0,
+      "quote": "Lossy encoding allows distinct valid original inputs to receive the same digest, violating original-text binding.",
+      "native_id": "census:original-text-binding",
+      "classification": "fixture_problem",
+      "cluster": "original-text-digest",
+      "reason": "The distinct-string equal-digest witness reproduces in the identical frozen control bytes.",
+      "basis_quote": "",
+      "witness_sha256": "aa97f54530a28d5e2e2b07eac0a4982b0f30cfefc3c35588205107d9b8a39b7c",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t012/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nwith fixture(files) as (ns,h):\n for partial in [False,True]:\n  text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+'['*2000+'0'+']'*2000+'}}'\n  try: ns[\"parse_audit\"](text,\"\",allow_partial=partial); print(\"deep\",partial,\"returned\")\n  except Exception as exc: print(\"deep\",partial,type(exc).__name__,str(exc))\n suffix=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[]}}'\n a=ns[\"parse_audit\"](chr(0xd800)+suffix,\"\")\n b=ns[\"parse_audit\"](\"?\"+suffix,\"\")\n print(\"distinct-input-same-digest\",a.digest==b.digest,a.digest)\n",
+        "result": "Both strict and partial modes leaked RecursionError for 2,000 nested metadata arrays. Distinct lone-surrogate and question-mark preambles returned identical digest d52f4f79c56cf1e9d38816532e5fd895e9692c0f196015072b640e2c372a3fa5."
+      }
+    },
+    {
+      "slot": "t028",
+      "case": "c-4325c23d6702",
+      "id": 2,
+      "output": 0,
+      "quote": "JSON admission accepts nonstandard numeric constants and returns successful audits in both modes, violating the malformed-JSON rejection contract.",
+      "native_id": "census:json-admission",
+      "classification": "fixture_problem",
+      "cluster": "non-json-constants",
+      "reason": "All three non-JSON constants return successful Audit in both modes in the identical frozen control bytes.",
+      "basis_quote": "",
+      "witness_sha256": "347c425a3378ebf7d23d0e9b064d18774a7e71b1c2b6b7e89992210b1068d475",
+      "additional_witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import fixture\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t011/repository\")\nfiles={n:(r/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nrows=[]\nwith fixture(files) as (ns,h):\n for constant in [\"NaN\",\"Infinity\",\"-Infinity\"]:\n  for partial in [False,True]:\n   text=h.AUDIT_MARKER+'\\n{\"claims\":[],\"coverage\":{\"prior_dispositions\":[],\"prior_assessments\":[],\"extra\":'+constant+'}}'\n   value=ns[\"parse_audit\"](text,\"\",allow_partial=partial)\n   rows.append({\"constant\":constant,\"allow_partial\":partial,\"actual\":\"returned Audit\",\"extra\":repr(value.coverage[\"extra\"]),\"expected\":\"AuditError\"})\nprint(json.dumps(rows,indent=2))\n",
+        "result": "All six combinations (NaN, Infinity, -Infinity; allow_partial=False/True) returned Audit, retaining extra metadata as nan/inf/-inf, instead of raising AuditError."
+      }
+    }
+  ],
+  "disposition": "Frozen corpus unchanged; comparative qualification withheld; C10 corpus-design checkpoint."
+}

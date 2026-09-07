@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "provisional": false,
+  "observations": [
+    {
+      "slot": "t005",
+      "output_sha256": "4fa60c2a5b3200b5a46dabb1f1e00e6f6c702d65af0d210edd2978aaa0d262e6",
+      "quote": "the error compounds with no recovery path",
+      "observation": "Caller owns and can inspect or restore the mutable state. This overstates the demonstrated mutation-on-refusal defect.",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t006",
+      "output_sha256": "837fefd456122735fddb92ce7c46da41aef8746ed64aae7f5cb4207d328efbfc",
+      "quote": "The single caller cannot distinguish this from a clean refusal",
+      "observation": "Caller-visible state distinguishes the erroneous refusal; subsequent negative-state calls also exceed the stated input domain.",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t013",
+      "output_sha256": "a9e9acc0d6ed71c0ac924ecf23951abaf8ffa49921197ca0898dee095abfd340",
+      "quote": "any downstream type check on the index fails",
+      "observation": "An isinstance(index, int) downstream check accepts a bool; the exact-integer contract violation is real, but this universal consequence is too broad.",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t021",
+      "output_sha256": "b58d02a9797c074de2aaf274c2eb171ebccabd99d0ca7bd5c77c489e84a8c06e",
+      "quote": "the single caller is permanently wedged after one rejection",
+      "observation": "Caller-owned state can be inspected/restored; the permanent-wedge consequence repeats the earlier approved rejection. Later negative-state calls exceed the declared caller domain.",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t024",
+      "output_sha256": "9203673eecdabfe423bf7dd1381808d5638fe177efe88842603e37d14afad48b",
+      "quote": "SPEC.md line 1 states helpers.py supplies pre-existing fixture context",
+      "observation": "The frozen specification says helpers.py supplies documented fixture context and is not the proposed change under review; it does not claim the file is pre-existing. app.py is the explicit review target. The MINOR scope complaint is not a blocking false-positive metric event, but remains an accuracy/actionability concern.",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t029",
+      "output_sha256": "4d22ff4b7cd817e42362df96eccf995b90f4b2e021b81c478a2ca5899f021b1a",
+      "quote": "Use the type(...) form rather than adding an isinstance(bool) exclusion so the mechanized class predicate stays violation-only.",
+      "observation": "The supplied type-based fix is valid, but the generated invariant prohibits an equally valid explicit Boolean guard. That alternate repair passes all 100 finite identity calibration checks while the retained predicate still matches it. This demonstrates an overbroad predicate, not an observed additional live convergence round. No fixture or lineage was edited.",
+      "witness": {
+        "code": "\nfrom pathlib import Path\nimport sys,json,subprocess\nsys.path.insert(0,\"/tmp/paranoia-49-calibrated-source/scripts\")\nfrom effectiveness_calibration import calibrate\nr=Path(\"/tmp/paranoia-effectiveness-calibrated-2026-09-07/t029\")\nfiles={n:(r/\"repository\"/n).read_text() for n in [\"app.py\",\"helpers.py\",\"SPEC.md\"]}\nneedle=\"if not isinstance(index, int) or\"\nreplacement=\"if isinstance(index, bool) or not isinstance(index, int) or\"\nassert files[\"app.py\"].count(needle)==1\nfiles[\"app.py\"]=files[\"app.py\"].replace(needle,replacement)\nresult=calibrate(\"identity\",files,False)\nprint(\"in-memory alternate repair:\",len(result[\"checks\"]),\"checks passed\")\naudits=[json.loads(p.read_text()) for p in (r/\"logs\").glob(\"*critique_branch*.json\")]\nrecord=audits[0][\"staged_settlement\"][\"class_records\"][0]\nline=next(line for line in files[\"app.py\"].splitlines() if replacement in line)\nmatch=subprocess.run([\"grep\",\"-En\",\"--\",record[\"pattern\"]],input=line+\"\\n\",text=True,capture_output=True)\nprint(\"class pattern\",repr(record[\"pattern\"]))\nprint(\"grep returncode\",match.returncode,\"matches repaired line\",match.returncode==0)\nprint(\"repaired line\",line.strip())\nassert match.returncode==0\n",
+        "result": "An in-memory repair adding isinstance(index, bool) before the existing integer check passed all 100 identity calibration checks. The retained governing class predicate still matched that repaired line (grep -E return code 0). Frozen fixture and lineage bytes were unchanged."
+      },
+      "witness_sha256": "8cff96d1730d19b35bbbdda964dc5d921d44d63b9d7548e0579794f7b90cfb67",
+      "status": "implementer observation; independent review rating pending"
+    },
+    {
+      "slot": "t030",
+      "output_sha256": "b689b5b966dc5945564b9d1c77da98fced128649e4db5dc7848f447d718d9ce8",
+      "quote": "I could not read git history because the `git log` command required approval in this non-interactive session",
+      "observation": "The query explicitly disclosed a provider tool-permission limitation. Native dispatch returned success and the frozen scorer retains target credit from the current-file witness; this is not evidence that every attempted repository read succeeded. Independent accuracy/actionability assessment must retain the limitation.",
+      "status": "disclosed execution limitation; independent review rating pending"
+    }
+  ],
+  "note": "These are follow-up observations, not accepted/rejected human ratings. The final packet preserves every output.",
+  "scope": "Selected exact-output implementer accuracy concerns after all 32 outputs were inspected; not independent accept/reject ratings."
+}

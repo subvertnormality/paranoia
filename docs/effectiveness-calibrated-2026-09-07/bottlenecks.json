@@ -1,0 +1,1124 @@
+{
+  "schema": 1,
+  "manifest_sha256": "27826fda714a1504cd56cd2b6677e80be601e4552ac3e5a02e8af996d9f67344",
+  "source": {
+    "path": "/tmp/paranoia-49-calibrated-source",
+    "revision": "b2d00313cbe9901fd79a275aecbf5e7845d5faab",
+    "files": {
+      "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+      "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+      "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+      "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+      "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+      "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+      "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+      "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+      "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+      "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+      "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+      "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+      "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+      "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+      "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+      "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+      "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+      "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+      "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+      "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+      "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+      "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+      "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+      "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+      "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+      "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+      "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+      "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+      "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+      "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+    }
+  },
+  "summary": {
+    "single": {
+      "slots": 16,
+      "slot_ms": 1059463,
+      "dispatch_ms": 995606,
+      "outside_dispatch_ms": 63857,
+      "outside_dispatch_fraction": 0.060272987353026955,
+      "calls": 16,
+      "retry_calls": 0,
+      "retry_call_fraction": 0.0,
+      "retry_call_ms": 0,
+      "retry_critical_path_proxy_ms": 0,
+      "retry_critical_path_proxy_fraction": 0.0,
+      "failed_slots": []
+    },
+    "staged": {
+      "slots": 16,
+      "slot_ms": 2195433,
+      "dispatch_ms": 2132137,
+      "outside_dispatch_ms": 63296,
+      "outside_dispatch_fraction": 0.028830759125876307,
+      "calls": 70,
+      "retry_calls": 6,
+      "retry_call_fraction": 0.08571428571428572,
+      "retry_call_ms": 175957,
+      "retry_critical_path_proxy_ms": 141154,
+      "retry_critical_path_proxy_fraction": 0.06429437837547308,
+      "failed_slots": [
+        "t014"
+      ]
+    }
+  },
+  "slots": [
+    {
+      "slot": "t001",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 39964,
+      "dispatch_ms": 33949,
+      "outside_dispatch_ms": 6015,
+      "attempts": [
+        {
+          "sequence": 1,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 33726
+        }
+      ],
+      "model_critical_path_proxy_ms": 33726,
+      "dispatch_minus_model_proxy_ms": 223,
+      "idealized_retry_free_proxy_ms": 33726,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t002",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 85023,
+      "dispatch_ms": 81342,
+      "outside_dispatch_ms": 3681,
+      "attempts": [
+        {
+          "sequence": 3,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 54894
+        },
+        {
+          "sequence": 4,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 56254
+        },
+        {
+          "sequence": 2,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 58385
+        },
+        {
+          "sequence": 5,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 22063
+        }
+      ],
+      "model_critical_path_proxy_ms": 80448,
+      "dispatch_minus_model_proxy_ms": 894,
+      "idealized_retry_free_proxy_ms": 80448,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t003",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 75215,
+      "dispatch_ms": 69557,
+      "outside_dispatch_ms": 5658,
+      "attempts": [
+        {
+          "sequence": 8,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 54975
+        },
+        {
+          "sequence": 7,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 58483
+        },
+        {
+          "sequence": 6,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 59002
+        },
+        {
+          "sequence": 9,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 9294
+        }
+      ],
+      "model_critical_path_proxy_ms": 68296,
+      "dispatch_minus_model_proxy_ms": 1261,
+      "idealized_retry_free_proxy_ms": 68296,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t004",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 57360,
+      "dispatch_ms": 53311,
+      "outside_dispatch_ms": 4049,
+      "attempts": [
+        {
+          "sequence": 10,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 53094
+        }
+      ],
+      "model_critical_path_proxy_ms": 53094,
+      "dispatch_minus_model_proxy_ms": 217,
+      "idealized_retry_free_proxy_ms": 53094,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t005",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 35989,
+      "dispatch_ms": 31413,
+      "outside_dispatch_ms": 4576,
+      "attempts": [
+        {
+          "sequence": 11,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 31243
+        }
+      ],
+      "model_critical_path_proxy_ms": 31243,
+      "dispatch_minus_model_proxy_ms": 170,
+      "idealized_retry_free_proxy_ms": 31243,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t006",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 109213,
+      "dispatch_ms": 106072,
+      "outside_dispatch_ms": 3141,
+      "attempts": [
+        {
+          "sequence": 13,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 55308
+        },
+        {
+          "sequence": 12,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 56706
+        },
+        {
+          "sequence": 14,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 71268
+        },
+        {
+          "sequence": 15,
+          "role": "census-execution-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 27510
+        },
+        {
+          "sequence": 16,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 20869
+        }
+      ],
+      "model_critical_path_proxy_ms": 105085,
+      "dispatch_minus_model_proxy_ms": 987,
+      "idealized_retry_free_proxy_ms": 92137,
+      "retry_critical_path_proxy_ms": 12948,
+      "rejected_payloads": [
+        {
+          "role": "census-execution",
+          "sequence": 2,
+          "sha256": "87942467f710cbab3ddca2dadbe65e0e13309dff776d0db6e291c0ad04f53172",
+          "validation_issue": "/coverage/1/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'"
+        }
+      ]
+    },
+    {
+      "slot": "t007",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 78349,
+      "dispatch_ms": 73781,
+      "outside_dispatch_ms": 4568,
+      "attempts": [
+        {
+          "sequence": 19,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 50744
+        },
+        {
+          "sequence": 18,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 55024
+        },
+        {
+          "sequence": 17,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 63100
+        },
+        {
+          "sequence": 20,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 10068
+        }
+      ],
+      "model_critical_path_proxy_ms": 73168,
+      "dispatch_minus_model_proxy_ms": 613,
+      "idealized_retry_free_proxy_ms": 73168,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t008",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 28689,
+      "dispatch_ms": 25212,
+      "outside_dispatch_ms": 3477,
+      "attempts": [
+        {
+          "sequence": 21,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 25087
+        }
+      ],
+      "model_critical_path_proxy_ms": 25087,
+      "dispatch_minus_model_proxy_ms": 125,
+      "idealized_retry_free_proxy_ms": 25087,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t009",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 70918,
+      "dispatch_ms": 68055,
+      "outside_dispatch_ms": 2863,
+      "attempts": [
+        {
+          "sequence": 22,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 67907
+        }
+      ],
+      "model_critical_path_proxy_ms": 67907,
+      "dispatch_minus_model_proxy_ms": 148,
+      "idealized_retry_free_proxy_ms": 67907,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t010",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 140572,
+      "dispatch_ms": 136867,
+      "outside_dispatch_ms": 3705,
+      "attempts": [
+        {
+          "sequence": 25,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 87345
+        },
+        {
+          "sequence": 23,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 92068
+        },
+        {
+          "sequence": 24,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 96179
+        },
+        {
+          "sequence": 26,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 39985
+        }
+      ],
+      "model_critical_path_proxy_ms": 136164,
+      "dispatch_minus_model_proxy_ms": 703,
+      "idealized_retry_free_proxy_ms": 136164,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t011",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 162785,
+      "dispatch_ms": 159528,
+      "outside_dispatch_ms": 3257,
+      "attempts": [
+        {
+          "sequence": 28,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 84202
+        },
+        {
+          "sequence": 29,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 109153
+        },
+        {
+          "sequence": 27,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 133886
+        },
+        {
+          "sequence": 30,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 24964
+        }
+      ],
+      "model_critical_path_proxy_ms": 158850,
+      "dispatch_minus_model_proxy_ms": 678,
+      "idealized_retry_free_proxy_ms": 158850,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t012",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 147822,
+      "dispatch_ms": 143339,
+      "outside_dispatch_ms": 4483,
+      "attempts": [
+        {
+          "sequence": 31,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 143002
+        }
+      ],
+      "model_critical_path_proxy_ms": 143002,
+      "dispatch_minus_model_proxy_ms": 337,
+      "idealized_retry_free_proxy_ms": 143002,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t013",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 85166,
+      "dispatch_ms": 79181,
+      "outside_dispatch_ms": 5985,
+      "attempts": [
+        {
+          "sequence": 32,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 78727
+        }
+      ],
+      "model_critical_path_proxy_ms": 78727,
+      "dispatch_minus_model_proxy_ms": 454,
+      "idealized_retry_free_proxy_ms": 78727,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t014",
+      "arm": "staged",
+      "execution_success": false,
+      "slot_ms": 220833,
+      "dispatch_ms": 214713,
+      "outside_dispatch_ms": 6120,
+      "attempts": [
+        {
+          "sequence": 33,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 125124
+        },
+        {
+          "sequence": 35,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 135697
+        },
+        {
+          "sequence": 34,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 135855
+        },
+        {
+          "sequence": 36,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 51972
+        },
+        {
+          "sequence": 37,
+          "role": "consolidation-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 26082
+        }
+      ],
+      "model_critical_path_proxy_ms": 213909,
+      "dispatch_minus_model_proxy_ms": 804,
+      "idealized_retry_free_proxy_ms": 187827,
+      "retry_critical_path_proxy_ms": 26082,
+      "rejected_payloads": [
+        {
+          "role": "consolidation",
+          "sequence": 4,
+          "sha256": "848aecb032c54921880c0f5053b86b6dca0f04afd1c7b766a5875a6eb1892ffd",
+          "validation_issue": "/governing_findings/0/classification/definition/pattern: predicate could not run: fatal: -e option, '^(?!.*isinstance\\(\\s*\\w+\\s*,\\s*bool\\s*\\)).*\\bisinstance\\(\\s*\\w+\\s*,\\s*int\\s*\\)': Invalid preceding regular expression"
+        },
+        {
+          "role": "consolidation-validation-retry",
+          "sequence": 5,
+          "sha256": "6a2c41b8f6f2ad62601c94171203de235549e3a3306af44c952b09dc519f1101",
+          "validation_issue": "/governing_findings/0/classification/definition/pattern: mechanized predicate did not match any cited violation line (repository/app.py:23, repository/app.py:44, repository/app.py:41, repository/SPEC.md:3, repository/app.py:22-24, repository/app.py:43-44, repository/app.py:40-42); use a violation-only POSIX ERE that matches the occurrence, or use an unmechanized procedure"
+        }
+      ]
+    },
+    {
+      "slot": "t015",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 274006,
+      "dispatch_ms": 269101,
+      "outside_dispatch_ms": 4905,
+      "attempts": [
+        {
+          "sequence": 39,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 103407
+        },
+        {
+          "sequence": 40,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 103785
+        },
+        {
+          "sequence": 38,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 155708
+        },
+        {
+          "sequence": 41,
+          "role": "census-execution-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 43331
+        },
+        {
+          "sequence": 42,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 38454
+        },
+        {
+          "sequence": 43,
+          "role": "consolidation-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 30122
+        }
+      ],
+      "model_critical_path_proxy_ms": 267615,
+      "dispatch_minus_model_proxy_ms": 1486,
+      "idealized_retry_free_proxy_ms": 194162,
+      "retry_critical_path_proxy_ms": 73453,
+      "rejected_payloads": [
+        {
+          "role": "census-execution",
+          "sequence": 2,
+          "sha256": "83616fcfcc9af533dcd8f142108dbbc0bcb0603d19f6f6d85e9d04a70bfb8f74",
+          "validation_issue": "/coverage/7: finding status and finding_ids must agree"
+        },
+        {
+          "role": "consolidation",
+          "sequence": 5,
+          "sha256": "c4abcb683e728f3d72a07f7e428fd0c068e594cc303962f1eff720ee18f9c3c1",
+          "validation_issue": "/governing_findings/0/classification/definition/pattern: mechanized predicate did not match any cited violation line (repository/app.py:1-5, repository/app.py:7-57, repository/app.py:26, repository/app.py:33); use a violation-only POSIX ERE that matches the occurrence, or use an unmechanized procedure"
+        }
+      ]
+    },
+    {
+      "slot": "t016",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 71438,
+      "dispatch_ms": 65624,
+      "outside_dispatch_ms": 5814,
+      "attempts": [
+        {
+          "sequence": 44,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 65391
+        }
+      ],
+      "model_critical_path_proxy_ms": 65391,
+      "dispatch_minus_model_proxy_ms": 233,
+      "idealized_retry_free_proxy_ms": 65391,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t017",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 101340,
+      "dispatch_ms": 96365,
+      "outside_dispatch_ms": 4975,
+      "attempts": [
+        {
+          "sequence": 47,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 59744
+        },
+        {
+          "sequence": 45,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 60105
+        },
+        {
+          "sequence": 46,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 66671
+        },
+        {
+          "sequence": 48,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 29294
+        }
+      ],
+      "model_critical_path_proxy_ms": 95965,
+      "dispatch_minus_model_proxy_ms": 400,
+      "idealized_retry_free_proxy_ms": 95965,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t018",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 34692,
+      "dispatch_ms": 30364,
+      "outside_dispatch_ms": 4328,
+      "attempts": [
+        {
+          "sequence": 49,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 30251
+        }
+      ],
+      "model_critical_path_proxy_ms": 30251,
+      "dispatch_minus_model_proxy_ms": 113,
+      "idealized_retry_free_proxy_ms": 30251,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t019",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 32361,
+      "dispatch_ms": 29947,
+      "outside_dispatch_ms": 2414,
+      "attempts": [
+        {
+          "sequence": 50,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 29867
+        }
+      ],
+      "model_critical_path_proxy_ms": 29867,
+      "dispatch_minus_model_proxy_ms": 80,
+      "idealized_retry_free_proxy_ms": 29867,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t020",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 74009,
+      "dispatch_ms": 71482,
+      "outside_dispatch_ms": 2527,
+      "attempts": [
+        {
+          "sequence": 52,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 56284
+        },
+        {
+          "sequence": 51,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 56389
+        },
+        {
+          "sequence": 53,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 62583
+        },
+        {
+          "sequence": 54,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 8562
+        }
+      ],
+      "model_critical_path_proxy_ms": 71145,
+      "dispatch_minus_model_proxy_ms": 337,
+      "idealized_retry_free_proxy_ms": 71145,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t021",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 82173,
+      "dispatch_ms": 79058,
+      "outside_dispatch_ms": 3115,
+      "attempts": [
+        {
+          "sequence": 57,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 45705
+        },
+        {
+          "sequence": 55,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 59578
+        },
+        {
+          "sequence": 56,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 59847
+        },
+        {
+          "sequence": 58,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 18900
+        }
+      ],
+      "model_critical_path_proxy_ms": 78747,
+      "dispatch_minus_model_proxy_ms": 311,
+      "idealized_retry_free_proxy_ms": 78747,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t022",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 27760,
+      "dispatch_ms": 24271,
+      "outside_dispatch_ms": 3489,
+      "attempts": [
+        {
+          "sequence": 59,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 24200
+        }
+      ],
+      "model_critical_path_proxy_ms": 24200,
+      "dispatch_minus_model_proxy_ms": 71,
+      "idealized_retry_free_proxy_ms": 24200,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t023",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 27479,
+      "dispatch_ms": 24835,
+      "outside_dispatch_ms": 2644,
+      "attempts": [
+        {
+          "sequence": 60,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 24760
+        }
+      ],
+      "model_critical_path_proxy_ms": 24760,
+      "dispatch_minus_model_proxy_ms": 75,
+      "idealized_retry_free_proxy_ms": 24760,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t024",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 120973,
+      "dispatch_ms": 117976,
+      "outside_dispatch_ms": 2997,
+      "attempts": [
+        {
+          "sequence": 63,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 43672
+        },
+        {
+          "sequence": 61,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 48116
+        },
+        {
+          "sequence": 64,
+          "role": "census-behaviour-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 20241
+        },
+        {
+          "sequence": 62,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 71370
+        },
+        {
+          "sequence": 65,
+          "role": "census-integrity-validation-retry",
+          "engine": "claude",
+          "elapsed_ms": 28671
+        },
+        {
+          "sequence": 66,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 17504
+        }
+      ],
+      "model_critical_path_proxy_ms": 117545,
+      "dispatch_minus_model_proxy_ms": 431,
+      "idealized_retry_free_proxy_ms": 88874,
+      "retry_critical_path_proxy_ms": 28671,
+      "rejected_payloads": [
+        {
+          "role": "census-behaviour",
+          "sequence": 1,
+          "sha256": "166b4efe8279ecb171f17f60667f04beebbf25b185ae08bbf4391945432858f8",
+          "validation_issue": "/coverage/3/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'"
+        },
+        {
+          "role": "census-integrity",
+          "sequence": 3,
+          "sha256": "64078ce9acb5fd9ec2b8d0ed9e9441e3bf9f6023d65b1ca9e872f6b4d1d977c2",
+          "validation_issue": "/coverage/0/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'\n/coverage/7/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'\n/coverage/8/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'\n/findings/0/evidence/1: out-of-range repository anchor 'repository/helpers.py:1'"
+        }
+      ]
+    },
+    {
+      "slot": "t025",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 130874,
+      "dispatch_ms": 128341,
+      "outside_dispatch_ms": 2533,
+      "attempts": [
+        {
+          "sequence": 67,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 91848
+        },
+        {
+          "sequence": 69,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 96556
+        },
+        {
+          "sequence": 68,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 96675
+        },
+        {
+          "sequence": 70,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 31223
+        }
+      ],
+      "model_critical_path_proxy_ms": 127898,
+      "dispatch_minus_model_proxy_ms": 443,
+      "idealized_retry_free_proxy_ms": 127898,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t026",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 142884,
+      "dispatch_ms": 139448,
+      "outside_dispatch_ms": 3436,
+      "attempts": [
+        {
+          "sequence": 71,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 139326
+        }
+      ],
+      "model_critical_path_proxy_ms": 139326,
+      "dispatch_minus_model_proxy_ms": 122,
+      "idealized_retry_free_proxy_ms": 139326,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t027",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 134616,
+      "dispatch_ms": 130622,
+      "outside_dispatch_ms": 3994,
+      "attempts": [
+        {
+          "sequence": 72,
+          "role": "query",
+          "engine": "codex",
+          "elapsed_ms": 130326
+        }
+      ],
+      "model_critical_path_proxy_ms": 130326,
+      "dispatch_minus_model_proxy_ms": 296,
+      "idealized_retry_free_proxy_ms": 130326,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t028",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 183611,
+      "dispatch_ms": 178551,
+      "outside_dispatch_ms": 5060,
+      "attempts": [
+        {
+          "sequence": 75,
+          "role": "census-behaviour",
+          "engine": "codex",
+          "elapsed_ms": 121512
+        },
+        {
+          "sequence": 73,
+          "role": "census-integrity",
+          "engine": "codex",
+          "elapsed_ms": 128725
+        },
+        {
+          "sequence": 74,
+          "role": "census-execution",
+          "engine": "codex",
+          "elapsed_ms": 135264
+        },
+        {
+          "sequence": 76,
+          "role": "consolidation",
+          "engine": "codex",
+          "elapsed_ms": 42706
+        }
+      ],
+      "model_critical_path_proxy_ms": 177970,
+      "dispatch_minus_model_proxy_ms": 581,
+      "idealized_retry_free_proxy_ms": 177970,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t029",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 198010,
+      "dispatch_ms": 194657,
+      "outside_dispatch_ms": 3353,
+      "attempts": [
+        {
+          "sequence": 78,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 104830
+        },
+        {
+          "sequence": 77,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 113092
+        },
+        {
+          "sequence": 79,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 139017
+        },
+        {
+          "sequence": 80,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 55252
+        }
+      ],
+      "model_critical_path_proxy_ms": 194269,
+      "dispatch_minus_model_proxy_ms": 388,
+      "idealized_retry_free_proxy_ms": 194269,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t030",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 60875,
+      "dispatch_ms": 57881,
+      "outside_dispatch_ms": 2994,
+      "attempts": [
+        {
+          "sequence": 81,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 57798
+        }
+      ],
+      "model_critical_path_proxy_ms": 57798,
+      "dispatch_minus_model_proxy_ms": 83,
+      "idealized_retry_free_proxy_ms": 57798,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t031",
+      "arm": "single",
+      "execution_success": true,
+      "slot_ms": 61450,
+      "dispatch_ms": 58154,
+      "outside_dispatch_ms": 3296,
+      "attempts": [
+        {
+          "sequence": 82,
+          "role": "query",
+          "engine": "claude",
+          "elapsed_ms": 58043
+        }
+      ],
+      "model_critical_path_proxy_ms": 58043,
+      "dispatch_minus_model_proxy_ms": 111,
+      "idealized_retry_free_proxy_ms": 58043,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    },
+    {
+      "slot": "t032",
+      "arm": "staged",
+      "execution_success": true,
+      "slot_ms": 158447,
+      "dispatch_ms": 154746,
+      "outside_dispatch_ms": 3701,
+      "attempts": [
+        {
+          "sequence": 84,
+          "role": "census-execution",
+          "engine": "claude",
+          "elapsed_ms": 118423
+        },
+        {
+          "sequence": 83,
+          "role": "census-behaviour",
+          "engine": "claude",
+          "elapsed_ms": 123673
+        },
+        {
+          "sequence": 85,
+          "role": "census-integrity",
+          "engine": "claude",
+          "elapsed_ms": 125922
+        },
+        {
+          "sequence": 86,
+          "role": "consolidation",
+          "engine": "claude",
+          "elapsed_ms": 28291
+        }
+      ],
+      "model_critical_path_proxy_ms": 154213,
+      "dispatch_minus_model_proxy_ms": 533,
+      "idealized_retry_free_proxy_ms": 154213,
+      "retry_critical_path_proxy_ms": 0,
+      "rejected_payloads": []
+    }
+  ],
+  "limitations": [
+    "Single frozen workload; no candidate/baseline speed comparison or all-mode inference.",
+    "Outside-dispatch time includes benchmark custody/preflight work, not solely production context preparation.",
+    "Model critical-path proxy is max(sum calls per census lane) plus serial calls; actual start offsets are unavailable.",
+    "Retry-free proxy assumes initial calls would validate at their observed durations; it is an idealized opportunity estimate, not a demonstrated optimization or quality-preserving guarantee.",
+    "Call fraction is not token, dollar or subscription cost. Actual subscription cost remains unknown.",
+    "Operational failures remain in totals; no selective retry or removal."
+  ]
+}

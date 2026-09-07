@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "campaign_root": "/tmp/paranoia-effectiveness-calibrated-2026-09-07",
+  "source_root": "/tmp/paranoia-49-calibrated-source",
+  "source_commit": "b2d00313cbe9901fd79a275aecbf5e7845d5faab",
+  "manifest_sha256": "27826fda714a1504cd56cd2b6677e80be601e4552ac3e5a02e8af996d9f67344",
+  "archive_sha256": "0f3f1c4651899e11d813d02f03c5684e4c76395d07b11bd3f302964fe9c6ef1b",
+  "archive_bytes": 1246967,
+  "original_files_verified": 1647,
+  "custody_qualified": true,
+  "custody_errors": [],
+  "comparative_qualified": false,
+  "human_acceptance": "pending",
+  "secret_scan": {
+    "known_credential_patterns": 4,
+    "matching_paths": []
+  },
+  "public_files": {
+    "bottlenecks.json": "39e2caf3cdfa39e25e3137aa69a28ae377d91c36da942bd79d1abe7f78047fb3",
+    "calibration-summary.json": "7254010118f6d9f3cd20570c5bdf3593405403641ca203cac74d413e6c8eda8b",
+    "campaigns.tar.gz": "0f3f1c4651899e11d813d02f03c5684e4c76395d07b11bd3f302964fe9c6ef1b",
+    "fixture-problems.json": "20272cf22a80d63c0f15bfe2a1d8760a6dd7a7944995211e7d971ddaa1135fe7",
+    "human-packet.json": "90b12eb57c9928e203e1384492b877294dfb056437e2ecfd17705c28cabde08f",
+    "human-ratings-template.json": "20ad24d87c95b298ee093e02556a983812cb4045587dc2bf3588258a5b666a5f",
+    "manifest.json": "27826fda714a1504cd56cd2b6677e80be601e4552ac3e5a02e8af996d9f67344",
+    "report.json": "5854772cc2e0976e1c59d22120bc133fd9ddebe45508c3addbf774c77aaee651",
+    "review-quality-observations.json": "042424b64fca186284d48eea4ad205e3fd9841153008edd362f791195e4cdebd",
+    "scoring-receipt.json": "3b9214efabb2c40e1f9e38a2aa8ec49826e101bea0c657df0e265f13b9909e75"
+  }
+}

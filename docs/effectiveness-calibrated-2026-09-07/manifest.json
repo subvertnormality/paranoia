@@ -1,0 +1,715 @@
+{
+  "schema": 1,
+  "source": {
+    "path": "/tmp/paranoia-49-calibrated-source",
+    "revision": "b2d00313cbe9901fd79a275aecbf5e7845d5faab",
+    "files": {
+      "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+      "src/paranoia_local/arbitrate_handler.py": "8d5a351b2ffc2e56e777814157fbccfed5b5ab3d7ac40f1c0ebdedc3b7192a15",
+      "src/paranoia_local/arbitration.py": "e2bd15dab7d7d8548d945b53d57505c7f211ce43221637ab39fb5db84cdb2e55",
+      "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+      "src/paranoia_local/census_execution.py": "33a29f1cdd78ce338d0d724583505d22a6f230ae1853772a592a4177e4d037b1",
+      "src/paranoia_local/class_closure.py": "561c2df090188694e59207f5dd7b1c388db7fd5881dae83ec8a6c926d261ca52",
+      "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+      "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+      "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+      "src/paranoia_local/engines.py": "55b92a347d8493fcebae6c0670e3d7d8db54b1bd91c572858236589df8a0fbec",
+      "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+      "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+      "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+      "src/paranoia_local/handlers.py": "2b9322e1bdb57e4f5ef81c6cc02b588611e2a2a0cf54d48e15a187d6c60a8e42",
+      "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+      "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+      "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+      "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+      "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+      "src/paranoia_local/plan_claims.py": "9c02eccc0862645f4de3af46ae8034e2943744a5a5bbb9662f66c4d698b3fbf0",
+      "src/paranoia_local/prompts.py": "5a579055d937a0e1260ac7dbbc276a939e46f100325ff4544c91b5ea92a6ae6d",
+      "src/paranoia_local/review_census.py": "32b52988dd5eb6c1ae18405ee10ba2ce1835bbe07cb059dd3a6ade5aa90b84e9",
+      "src/paranoia_local/review_transitions.py": "500d5fa455643a1720f032f89c048a964901f84f36f17c6e2c8e7d6834a9558a",
+      "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+      "src/paranoia_local/server.py": "1e444575592e4ea2b1454b114fef01c9a67c58277c084b3174dbf99363b6f782",
+      "src/paranoia_local/session_routing.py": "da5d9cde3eda31f13a8aab2223fc3dd1607873de152ce8bf66800f78c6091eec",
+      "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+      "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+      "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+      "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+    }
+  },
+  "harness": {
+    "/tmp/paranoia-49-calibrated-source/scripts/benchmark_effectiveness.py": "8572a5667539870a9bf0ccb9877b7f0ffeaba1bffb2d70e79bc24c1c98baa83b",
+    "/tmp/paranoia-49-calibrated-source/scripts/effectiveness_custody.py": "159190e4821c35ff228590bc75d9319346606ccaf24f04e94e69d6af1d8f6f27",
+    "/tmp/paranoia-49-calibrated-source/scripts/effectiveness_corpus.py": "abba73ea0b2fd42cf3b44397c826aee4672acdc1fd8b2e4694ad1687a51e7e9c",
+    "/tmp/paranoia-49-calibrated-source/scripts/effectiveness_calibration.py": "589b53f7b02f05c2f27556c8e09bf88a49cbfac3e28d0c61da915129cd0590e2",
+    "/tmp/paranoia-49-calibrated-source/scripts/score_effectiveness.py": "093da069f1fd545d32d12c5417e9f4a6c3e2cfb821d77e8167b171dd359adbe1",
+    "/tmp/paranoia-49-calibrated-source/scripts/benchmark_review_modes.py": "9d8ad059b3af821e2ed7226946ea97a92a1a13f848c0e60ffd6b83b5b2f1433b",
+    "/tmp/paranoia-49-calibrated-source/scripts/benchmark_bootstrap.py": "bcc0a63de463b8f091f792ebdef5df75077e0e3f4fe48de30ea5dd03bb5e8fe2"
+  },
+  "models": {
+    "codex": "gpt-6-astra",
+    "claude": "claude-fable-5-1"
+  },
+  "versions": {
+    "codex": "codex-cli 0.153.3",
+    "claude": "2.1.258 (Claude Code)"
+  },
+  "stakes": "One trusted operator and OS, static untrusted fixture code/specification and provider data. Caller-enforced input domains, one local caller, no concurrency inside fixture functions. Reviewers read but do not execute repository-selected code. Ordinary edits invalidate the review. Existing provider CLI boundary; no web research. Tens to hundreds of lines, evidence useful within minutes. False clear and wrong binding have high impact; recoverable blocking acceptable. Exclude hostile local races, OS compromise, corrupted-state recovery, multi-tenancy, external source verification and optional enhancements.",
+  "question": "Review app.py against SPEC.md and the supplied helpers.py context. Identify every concrete reachable contract violation with severity, file:line, trigger and consequence. Distinguish optional advice from required repairs. If none, explicitly say there are no actionable contract defects. Read only; do not execute repository code or tests.",
+  "cases": [
+    {
+      "id": "c-1fdc94a4fcbe",
+      "provider": "codex",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": "def overlap(a, b):\n    return max(a[0], b[0]) <= min(a[1], b[1])\n",
+        "helpers.py": ""
+      }
+    },
+    {
+      "id": "c-0b717e074104",
+      "provider": "codex",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": "def overlap(a, b):\n    return max(a[0], b[0]) < min(a[1], b[1])\n",
+        "helpers.py": ""
+      }
+    },
+    {
+      "id": "c-1427f572fa60",
+      "provider": "claude",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": "def reserve(state, amount):\n    state['available'] -= amount\n    if state['available'] < 0:\n        return False\n    return True\n",
+        "helpers.py": ""
+      }
+    },
+    {
+      "id": "c-1405065186d9",
+      "provider": "claude",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": "def reserve(state, amount):\n    if amount > state['available']:\n        return False\n    state['available'] -= amount\n    return True\n",
+        "helpers.py": ""
+      }
+    },
+    {
+      "id": "c-1c9e7eed4363",
+      "provider": "codex",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": "from helpers import (\n    json, hashlib, re, Path, Any, deepcopy, urlparse, Audit, AuditError,\n    AUDIT_MARKER, MAX_ACTIVE_CLAIMS, DIAGNOSTIC_CHARS, _excerpt,\n    _validate_claim, _validate_dispositions, _validate_assessments, _one_line,\n)\n\ndef parse_audit(\n    text: str, plan_text: str, *, allow_partial: bool = False,\n    repo: Path | None = None, plan_repo_path: str | None = None,\n    require_capture_provenance: bool = False,\n) -> Audit:\n    \"\"\"Parse and validate the single JSON object following ``AUDIT_MARKER``.\"\"\"\n    if text.count(AUDIT_MARKER) != 1:\n        raise AuditError(\n            f\"expected exactly one {AUDIT_MARKER!r} marker, found {text.count(AUDIT_MARKER)}\",\n            text,\n        )\n    tail = text.split(AUDIT_MARKER, 1)[1].strip()\n    fenced = tail.startswith(\"```\")\n    if tail.startswith(\"```json\"):\n        tail = tail[7:].lstrip()\n    elif tail.startswith(\"```\"):\n        tail = tail[3:].lstrip()\n    try:\n        value, end = json.JSONDecoder().raw_decode(tail)\n    except json.JSONDecodeError as exc:\n        raise AuditError(f\"claim audit JSON did not parse: {exc}\", text) from exc\n    remainder = tail[end:].strip()\n    if remainder == \"```\" and fenced:\n        remainder = \"\"\n    elif fenced and not remainder:\n        remainder = \"missing closing fence\"\n    if remainder:\n        raise AuditError(\"unexpected text after claim audit JSON\", text)\n    if not isinstance(value, dict) or set(value) != {\"claims\", \"coverage\"}:\n        raise AuditError(\"audit must be an object with exactly claims and coverage\", text)\n    claims, coverage = value[\"claims\"], value[\"coverage\"]\n    if not isinstance(claims, list):\n        raise AuditError(\"claims must be an array\", text)\n    if len(claims) > MAX_ACTIVE_CLAIMS:\n        raise AuditError(\n            f\"audit returned {len(claims)} active claims; safety ceiling is {MAX_ACTIVE_CLAIMS}\",\n            text,\n        )\n    if not isinstance(coverage, dict):\n        raise AuditError(\"coverage must be an object\", text)\n\n    validated: list[dict[str, Any]] = []\n    issues: list[str] = []\n    seen: set[tuple[str, str]] = set()\n    for index, item in enumerate(claims):\n        try:\n            claim = _validate_claim(\n                item, plan_text, repo=repo, plan_repo_path=plan_repo_path,\n                require_capture_provenance=require_capture_provenance,\n            )\n        except ValueError as exc:\n            reason = f\"claim {index}: {exc}\"\n            if not allow_partial:\n                raise AuditError(reason, text) from exc\n            issues.append(f\"{reason} [/claims/{index}]\")\n            continue\n        identity = (claim[\"anchor\"], claim[\"proposition\"])\n        if identity in seen:\n            reason = f\"claim {index}: duplicate anchor and proposition\"\n            if not allow_partial:\n                raise AuditError(reason, text)\n            issues.append(f\"{reason} [/claims/{index}]\")\n            continue\n        seen.add(identity)\n        validated.append(claim)\n    for field in (\"prior_dispositions\", \"prior_assessments\"):\n        if field not in coverage:\n            raise AuditError(f\"coverage.{field} is required\", text)\n    dispositions = _validate_dispositions(coverage[\"prior_dispositions\"], text)\n    assessments = _validate_assessments(coverage[\"prior_assessments\"], text)\n    return Audit(\n        tuple(validated), deepcopy(coverage), dispositions, assessments, tuple(issues),\n        hashlib.sha256(text.encode(\"utf-8\", \"replace\")).hexdigest(),\n        _excerpt(\"\\n\".join(issues)),\n    )\n",
+        "helpers.py": "import json\nimport hashlib\nimport re\nfrom pathlib import Path\nfrom typing import Any\nfrom copy import deepcopy\nfrom urllib.parse import urlparse\nfrom dataclasses import dataclass\n\nAUDIT_MARKER = \"=== CLAIM AUDIT JSON ===\"\nMAX_ACTIVE_CLAIMS = 100\nDIAGNOSTIC_CHARS = 8000\n\nclass AuditError(ValueError):\n    def __init__(self, reason, raw):\n        self.reason = reason\n        self.raw = raw\n        super().__init__(reason)\n\n@dataclass\nclass Audit:\n    claims: tuple\n    coverage: dict\n    prior_dispositions: tuple\n    prior_assessments: tuple\n    issues: tuple\n    digest: str\n    excerpt: str\n\ndef _excerpt(text):\n    return text[:2000]\n\ndef _validate_claim(item, plan_text, **kwargs):\n    if not isinstance(item, dict) or set(item) != {\"anchor\", \"proposition\"}:\n        raise ValueError(\"claim fields invalid\")\n    if not all(isinstance(v, str) and v.strip() for v in item.values()):\n        raise ValueError(\"claim text invalid\")\n    if \"whole\" in item[\"proposition\"].lower().split() and \"whole\" not in plan_text.lower().split():\n        raise ValueError(\"proposition introduces whole absent from plan wording\")\n    return dict(item)\n\ndef _validate_dispositions(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_dispositions must be an array\", raw)\n    return tuple(value)\n\ndef _validate_assessments(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_assessments must be an array\", raw)\n    return tuple(value)\n\ndef _one_line(value, name):\n    if not isinstance(value, str) or not value.strip() or \"\\n\" in value or \"\\r\" in value:\n        raise ValueError(name + \" must be nonempty one-line text\")\n    return value\n"
+      }
+    },
+    {
+      "id": "c-4325c23d6702",
+      "provider": "codex",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": "from helpers import (\n    json, hashlib, re, Path, Any, deepcopy, urlparse, Audit, AuditError,\n    AUDIT_MARKER, MAX_ACTIVE_CLAIMS, DIAGNOSTIC_CHARS, _excerpt,\n    _validate_claim, _validate_dispositions, _validate_assessments, _one_line,\n)\n\ndef parse_audit(\n    text: str, plan_text: str, *, allow_partial: bool = False,\n    repo: Path | None = None, plan_repo_path: str | None = None,\n    require_capture_provenance: bool = False,\n) -> Audit:\n    \"\"\"Parse and validate the single JSON object following ``AUDIT_MARKER``.\"\"\"\n    if text.count(AUDIT_MARKER) != 1:\n        raise AuditError(\n            f\"expected exactly one {AUDIT_MARKER!r} marker, found {text.count(AUDIT_MARKER)}\",\n            text,\n        )\n    tail = text.split(AUDIT_MARKER, 1)[1].strip()\n    fenced = tail.startswith(\"```\")\n    if tail.startswith(\"```json\"):\n        tail = tail[7:].lstrip()\n    elif tail.startswith(\"```\"):\n        tail = tail[3:].lstrip()\n    try:\n        value, end = json.JSONDecoder().raw_decode(tail)\n    except json.JSONDecodeError as exc:\n        raise AuditError(f\"claim audit JSON did not parse: {exc}\", text) from exc\n    remainder = tail[end:].strip()\n    if remainder == \"```\" and fenced:\n        remainder = \"\"\n    elif fenced and not remainder:\n        remainder = \"missing closing fence\"\n    fatal = [\"unexpected text after claim audit JSON\"] if remainder else []\n    if not isinstance(value, dict) or set(value) != {\"claims\", \"coverage\"}:\n        raise AuditError(\"audit must be an object with exactly claims and coverage\", text)\n    claims, coverage = value[\"claims\"], value[\"coverage\"]\n    if not isinstance(claims, list):\n        raise AuditError(\"claims must be an array\", text)\n    if len(claims) > MAX_ACTIVE_CLAIMS:\n        raise AuditError(\n            f\"audit returned {len(claims)} active claims; safety ceiling is {MAX_ACTIVE_CLAIMS}\",\n            text,\n        )\n    if not isinstance(coverage, dict):\n        raise AuditError(\"coverage must be an object\", text)\n\n    validated: list[dict[str, Any]] = []\n    issues: list[str] = []\n    seen: set[tuple[str, str]] = set()\n    for index, item in enumerate(claims):\n        try:\n            claim = _validate_claim(\n                item, plan_text, repo=repo, plan_repo_path=plan_repo_path,\n                require_capture_provenance=require_capture_provenance,\n            )\n        except ValueError as exc:\n            reason = f\"claim {index}: {exc}\"\n            issues.append(\n                f\"{reason} [/claims/{index}]\"\n            )\n            continue\n        identity = (claim[\"anchor\"], claim[\"proposition\"])\n        if identity in seen:\n            reason = f\"claim {index}: duplicate anchor and proposition\"\n            issues.append(\n                f\"{reason} [/claims/{index}]\"\n            )\n            continue\n        seen.add(identity)\n        validated.append(claim)\n    coverage_rows = {}\n    for field, validate in (\n        (\"prior_dispositions\", _validate_dispositions),\n        (\"prior_assessments\", _validate_assessments),\n    ):\n        if field not in coverage:\n            fatal.append(f\"coverage.{field} is required [/coverage/{field}]\")\n            continue\n        try:\n            coverage_rows[field] = validate(coverage[field], text)\n        except AuditError as exc:\n            fatal.append(f\"{exc.reason} [/coverage/{field}]\")\n    # A decodable object can have independent wire and semantic defects. Give the\n    # one correction both, without accepting a suffix or a partial full audit.\n    if fatal or (issues and not allow_partial):\n        raise AuditError(\"\\n\".join(fatal + issues)[:DIAGNOSTIC_CHARS], text)\n    dispositions = coverage_rows[\"prior_dispositions\"]\n    assessments = coverage_rows[\"prior_assessments\"]\n    return Audit(\n        tuple(validated), deepcopy(coverage), dispositions, assessments, tuple(issues),\n        hashlib.sha256(text.encode(\"utf-8\", \"replace\")).hexdigest(),\n        _excerpt(\"\\n\".join(issues)),\n    )\n",
+        "helpers.py": "import json\nimport hashlib\nimport re\nfrom pathlib import Path\nfrom typing import Any\nfrom copy import deepcopy\nfrom urllib.parse import urlparse\nfrom dataclasses import dataclass\n\nAUDIT_MARKER = \"=== CLAIM AUDIT JSON ===\"\nMAX_ACTIVE_CLAIMS = 100\nDIAGNOSTIC_CHARS = 8000\n\nclass AuditError(ValueError):\n    def __init__(self, reason, raw):\n        self.reason = reason\n        self.raw = raw\n        super().__init__(reason)\n\n@dataclass\nclass Audit:\n    claims: tuple\n    coverage: dict\n    prior_dispositions: tuple\n    prior_assessments: tuple\n    issues: tuple\n    digest: str\n    excerpt: str\n\ndef _excerpt(text):\n    return text[:2000]\n\ndef _validate_claim(item, plan_text, **kwargs):\n    if not isinstance(item, dict) or set(item) != {\"anchor\", \"proposition\"}:\n        raise ValueError(\"claim fields invalid\")\n    if not all(isinstance(v, str) and v.strip() for v in item.values()):\n        raise ValueError(\"claim text invalid\")\n    if \"whole\" in item[\"proposition\"].lower().split() and \"whole\" not in plan_text.lower().split():\n        raise ValueError(\"proposition introduces whole absent from plan wording\")\n    return dict(item)\n\ndef _validate_dispositions(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_dispositions must be an array\", raw)\n    return tuple(value)\n\ndef _validate_assessments(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_assessments must be an array\", raw)\n    return tuple(value)\n\ndef _one_line(value, name):\n    if not isinstance(value, str) or not value.strip() or \"\\n\" in value or \"\\r\" in value:\n        raise ValueError(name + \" must be nonempty one-line text\")\n    return value\n"
+      }
+    },
+    {
+      "id": "c-05b1b8ed3445",
+      "provider": "claude",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": "from helpers import (\n    json, hashlib, re, Path, Any, deepcopy, urlparse, Audit, AuditError,\n    AUDIT_MARKER, MAX_ACTIVE_CLAIMS, DIAGNOSTIC_CHARS, _excerpt,\n    _validate_claim, _validate_dispositions, _validate_assessments, _one_line,\n)\n\ndef _validate_capture_attestations(\n    value: Any, evidence: list[dict[str, str]],\n) -> list[dict[str, Any]]:\n    if not isinstance(value, list) or len(value) > len(evidence):\n        raise ValueError(\"capture_attestations must contain at most one row per evidence item\")\n    required = {\n        \"evidence_index\", \"final_url\", \"text_sha256\", \"relation\",\n        \"publisher_authority\", \"authority_reason\", \"passage_entailment\",\n        \"entailment_reason\",\n    }\n    rows: list[dict[str, Any]] = []\n    seen: set[int] = set()\n    for row in value:\n        if not isinstance(row, dict) or set(row) != required:\n            raise ValueError(\"capture_attestation fields are invalid\")\n        index = row[\"evidence_index\"]\n        if not isinstance(index, int) or not 0 <= index < len(evidence) or index in seen:\n            raise ValueError(\"capture_attestation evidence_index is invalid or duplicated\")\n        seen.add(index)\n        final_url = _one_line(row[\"final_url\"], \"capture_attestation.final_url\")\n        parsed = urlparse(final_url)\n        if parsed.scheme not in {\"http\", \"https\"} or not parsed.hostname:\n            raise ValueError(\"capture_attestation final_url must be absolute HTTP(S)\")\n        text_sha256 = _one_line(\n            row[\"text_sha256\"], \"capture_attestation.text_sha256\",\n        )\n        if not re.fullmatch(r\"[0-9a-f]{64}\", text_sha256):\n            raise ValueError(\"capture_attestation text_sha256 must be lowercase SHA-256\")\n        relation = _one_line(row[\"relation\"], \"capture_attestation.relation\")\n        if relation != evidence[index][\"relation\"]:\n            raise ValueError(\"capture_attestation relation differs from its evidence item\")\n        if final_url != evidence[index][\"url\"]:\n            raise ValueError(\"capture_attestation final_url differs from its evidence URL\")\n        for field in (\"publisher_authority\", \"passage_entailment\"):\n            if type(row[field]) is not bool:\n                raise ValueError(f\"capture_attestation {field} must be boolean\")\n        rows.append({\n            \"evidence_index\": index,\n            \"final_url\": final_url,\n            \"text_sha256\": text_sha256,\n            \"relation\": relation,\n            \"publisher_authority\": row[\"publisher_authority\"],\n            \"authority_reason\": _one_line(\n                row[\"authority_reason\"], \"capture_attestation.authority_reason\",\n            ),\n            \"passage_entailment\": row[\"passage_entailment\"],\n            \"entailment_reason\": _one_line(\n                row[\"entailment_reason\"], \"capture_attestation.entailment_reason\",\n            ),\n        })\n    return rows\n",
+        "helpers.py": "import json\nimport hashlib\nimport re\nfrom pathlib import Path\nfrom typing import Any\nfrom copy import deepcopy\nfrom urllib.parse import urlparse\nfrom dataclasses import dataclass\n\nAUDIT_MARKER = \"=== CLAIM AUDIT JSON ===\"\nMAX_ACTIVE_CLAIMS = 100\nDIAGNOSTIC_CHARS = 8000\n\nclass AuditError(ValueError):\n    def __init__(self, reason, raw):\n        self.reason = reason\n        self.raw = raw\n        super().__init__(reason)\n\n@dataclass\nclass Audit:\n    claims: tuple\n    coverage: dict\n    prior_dispositions: tuple\n    prior_assessments: tuple\n    issues: tuple\n    digest: str\n    excerpt: str\n\ndef _excerpt(text):\n    return text[:2000]\n\ndef _validate_claim(item, plan_text, **kwargs):\n    if not isinstance(item, dict) or set(item) != {\"anchor\", \"proposition\"}:\n        raise ValueError(\"claim fields invalid\")\n    if not all(isinstance(v, str) and v.strip() for v in item.values()):\n        raise ValueError(\"claim text invalid\")\n    if \"whole\" in item[\"proposition\"].lower().split() and \"whole\" not in plan_text.lower().split():\n        raise ValueError(\"proposition introduces whole absent from plan wording\")\n    return dict(item)\n\ndef _validate_dispositions(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_dispositions must be an array\", raw)\n    return tuple(value)\n\ndef _validate_assessments(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_assessments must be an array\", raw)\n    return tuple(value)\n\ndef _one_line(value, name):\n    if not isinstance(value, str) or not value.strip() or \"\\n\" in value or \"\\r\" in value:\n        raise ValueError(name + \" must be nonempty one-line text\")\n    return value\n"
+      }
+    },
+    {
+      "id": "c-46c111c20c32",
+      "provider": "claude",
+      "files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": "from helpers import (\n    json, hashlib, re, Path, Any, deepcopy, urlparse, Audit, AuditError,\n    AUDIT_MARKER, MAX_ACTIVE_CLAIMS, DIAGNOSTIC_CHARS, _excerpt,\n    _validate_claim, _validate_dispositions, _validate_assessments, _one_line,\n)\n\ndef _validate_capture_attestations(\n    value: Any, evidence: list[dict[str, str]],\n) -> list[dict[str, Any]]:\n    if not isinstance(value, list) or len(value) > len(evidence):\n        raise ValueError(\"capture_attestations must contain at most one row per evidence item\")\n    required = {\n        \"evidence_index\", \"final_url\", \"text_sha256\", \"relation\",\n        \"publisher_authority\", \"authority_reason\", \"passage_entailment\",\n        \"entailment_reason\",\n    }\n    rows: list[dict[str, Any]] = []\n    seen: set[int] = set()\n    for row in value:\n        if not isinstance(row, dict) or set(row) != required:\n            raise ValueError(\"capture_attestation fields are invalid\")\n        index = row[\"evidence_index\"]\n        if type(index) is not int or not 0 <= index < len(evidence) or index in seen:\n            raise ValueError(\"capture_attestation evidence_index is invalid or duplicated\")\n        seen.add(index)\n        final_url = _one_line(row[\"final_url\"], \"capture_attestation.final_url\")\n        parsed = urlparse(final_url)\n        if parsed.scheme not in {\"http\", \"https\"} or not parsed.hostname:\n            raise ValueError(\"capture_attestation final_url must be absolute HTTP(S)\")\n        text_sha256 = _one_line(\n            row[\"text_sha256\"], \"capture_attestation.text_sha256\",\n        )\n        if not re.fullmatch(r\"[0-9a-f]{64}\", text_sha256):\n            raise ValueError(\"capture_attestation text_sha256 must be lowercase SHA-256\")\n        relation = _one_line(row[\"relation\"], \"capture_attestation.relation\")\n        if relation != evidence[index][\"relation\"]:\n            raise ValueError(\"capture_attestation relation differs from its evidence item\")\n        if final_url != evidence[index][\"url\"]:\n            raise ValueError(\"capture_attestation final_url differs from its evidence URL\")\n        for field in (\"publisher_authority\", \"passage_entailment\"):\n            if type(row[field]) is not bool:\n                raise ValueError(f\"capture_attestation {field} must be boolean\")\n        rows.append({\n            \"evidence_index\": index,\n            \"final_url\": final_url,\n            \"text_sha256\": text_sha256,\n            \"relation\": relation,\n            \"publisher_authority\": row[\"publisher_authority\"],\n            \"authority_reason\": _one_line(\n                row[\"authority_reason\"], \"capture_attestation.authority_reason\",\n            ),\n            \"passage_entailment\": row[\"passage_entailment\"],\n            \"entailment_reason\": _one_line(\n                row[\"entailment_reason\"], \"capture_attestation.entailment_reason\",\n            ),\n        })\n    return rows\n",
+        "helpers.py": "import json\nimport hashlib\nimport re\nfrom pathlib import Path\nfrom typing import Any\nfrom copy import deepcopy\nfrom urllib.parse import urlparse\nfrom dataclasses import dataclass\n\nAUDIT_MARKER = \"=== CLAIM AUDIT JSON ===\"\nMAX_ACTIVE_CLAIMS = 100\nDIAGNOSTIC_CHARS = 8000\n\nclass AuditError(ValueError):\n    def __init__(self, reason, raw):\n        self.reason = reason\n        self.raw = raw\n        super().__init__(reason)\n\n@dataclass\nclass Audit:\n    claims: tuple\n    coverage: dict\n    prior_dispositions: tuple\n    prior_assessments: tuple\n    issues: tuple\n    digest: str\n    excerpt: str\n\ndef _excerpt(text):\n    return text[:2000]\n\ndef _validate_claim(item, plan_text, **kwargs):\n    if not isinstance(item, dict) or set(item) != {\"anchor\", \"proposition\"}:\n        raise ValueError(\"claim fields invalid\")\n    if not all(isinstance(v, str) and v.strip() for v in item.values()):\n        raise ValueError(\"claim text invalid\")\n    if \"whole\" in item[\"proposition\"].lower().split() and \"whole\" not in plan_text.lower().split():\n        raise ValueError(\"proposition introduces whole absent from plan wording\")\n    return dict(item)\n\ndef _validate_dispositions(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_dispositions must be an array\", raw)\n    return tuple(value)\n\ndef _validate_assessments(value, raw):\n    if not isinstance(value, list):\n        raise AuditError(\"prior_assessments must be an array\", raw)\n    return tuple(value)\n\ndef _one_line(value, name):\n    if not isinstance(value, str) or not value.strip() or \"\\n\" in value or \"\\r\" in value:\n        raise ValueError(name + \" must be nonempty one-line text\")\n    return value\n"
+      }
+    }
+  ],
+  "order": [
+    {
+      "id": "t001",
+      "case": "c-1fdc94a4fcbe",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t002",
+      "case": "c-1fdc94a4fcbe",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t003",
+      "case": "c-0b717e074104",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t004",
+      "case": "c-0b717e074104",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t005",
+      "case": "c-1427f572fa60",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t006",
+      "case": "c-1427f572fa60",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t007",
+      "case": "c-1405065186d9",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t008",
+      "case": "c-1405065186d9",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t009",
+      "case": "c-1c9e7eed4363",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t010",
+      "case": "c-1c9e7eed4363",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t011",
+      "case": "c-4325c23d6702",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t012",
+      "case": "c-4325c23d6702",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t013",
+      "case": "c-05b1b8ed3445",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t014",
+      "case": "c-05b1b8ed3445",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t015",
+      "case": "c-46c111c20c32",
+      "arm": "staged",
+      "repetition": 0
+    },
+    {
+      "id": "t016",
+      "case": "c-46c111c20c32",
+      "arm": "single",
+      "repetition": 0
+    },
+    {
+      "id": "t017",
+      "case": "c-1fdc94a4fcbe",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t018",
+      "case": "c-1fdc94a4fcbe",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t019",
+      "case": "c-0b717e074104",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t020",
+      "case": "c-0b717e074104",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t021",
+      "case": "c-1427f572fa60",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t022",
+      "case": "c-1427f572fa60",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t023",
+      "case": "c-1405065186d9",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t024",
+      "case": "c-1405065186d9",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t025",
+      "case": "c-1c9e7eed4363",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t026",
+      "case": "c-1c9e7eed4363",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t027",
+      "case": "c-4325c23d6702",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t028",
+      "case": "c-4325c23d6702",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t029",
+      "case": "c-05b1b8ed3445",
+      "arm": "staged",
+      "repetition": 1
+    },
+    {
+      "id": "t030",
+      "case": "c-05b1b8ed3445",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t031",
+      "case": "c-46c111c20c32",
+      "arm": "single",
+      "repetition": 1
+    },
+    {
+      "id": "t032",
+      "case": "c-46c111c20c32",
+      "arm": "staged",
+      "repetition": 1
+    }
+  ],
+  "fixtures": {
+    "t001": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "a08892b9e8febf3d2819e9e3cec5b46907ab1460",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "7b58aaf42e659139d1c297a030c16effe422cbcb",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "a08892b9e8febf3d2819e9e3cec5b46907ab1460\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ec0bc9eb01c3b8ec330abb7f4a43d49f25c3a1ec66fdee7f1e5c09a6f9073931"
+    },
+    "t002": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "a08892b9e8febf3d2819e9e3cec5b46907ab1460",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "7b58aaf42e659139d1c297a030c16effe422cbcb",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "a08892b9e8febf3d2819e9e3cec5b46907ab1460\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ec0bc9eb01c3b8ec330abb7f4a43d49f25c3a1ec66fdee7f1e5c09a6f9073931"
+    },
+    "t003": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "b0033d913af71a3fa6b29efa02667c4841a9a833",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "c864129352ef18b8265a7db3a87da473956c2031",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "b0033d913af71a3fa6b29efa02667c4841a9a833\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "befec0a44268b66e94c98c145c1ae34c83613913cbd8eadda83c2c0c46ebdfc1"
+    },
+    "t004": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "b0033d913af71a3fa6b29efa02667c4841a9a833",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "c864129352ef18b8265a7db3a87da473956c2031",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "b0033d913af71a3fa6b29efa02667c4841a9a833\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "befec0a44268b66e94c98c145c1ae34c83613913cbd8eadda83c2c0c46ebdfc1"
+    },
+    "t005": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "5699e7e298944e457bb67afdf49fd862e9cafd70",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "48c3894d6bd37d3fe4e7434149c9b3fcceeac5e0",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "5699e7e298944e457bb67afdf49fd862e9cafd70\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "b3e2ca1a08596be848b42a1568000dbfa75f5fae71338bddd8efdfb7a0df7e38"
+    },
+    "t006": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "5699e7e298944e457bb67afdf49fd862e9cafd70",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "48c3894d6bd37d3fe4e7434149c9b3fcceeac5e0",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "5699e7e298944e457bb67afdf49fd862e9cafd70\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "b3e2ca1a08596be848b42a1568000dbfa75f5fae71338bddd8efdfb7a0df7e38"
+    },
+    "t007": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "d9ea2372bfbfc5adf341c597b36132ce83270265",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "7881fe462c910452c53bc34333caf2b62837be66",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "d9ea2372bfbfc5adf341c597b36132ce83270265\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "00e7c5151851efb8d96cfbc15533e418d4d9424666914f46e4726b42603e8244"
+    },
+    "t008": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "d9ea2372bfbfc5adf341c597b36132ce83270265",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "7881fe462c910452c53bc34333caf2b62837be66",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "d9ea2372bfbfc5adf341c597b36132ce83270265\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "00e7c5151851efb8d96cfbc15533e418d4d9424666914f46e4726b42603e8244"
+    },
+    "t009": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "450f344d994cb3ac9c77b934684377e634655941",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "5249c931e7c786e78aeb6cc9ef6427d87f9641b7",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "450f344d994cb3ac9c77b934684377e634655941\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "d76776ec917832addd7016f066eaac98ab4546d3fbe72c117a5fd9d23a543c57"
+    },
+    "t010": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "450f344d994cb3ac9c77b934684377e634655941",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "5249c931e7c786e78aeb6cc9ef6427d87f9641b7",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "450f344d994cb3ac9c77b934684377e634655941\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "d76776ec917832addd7016f066eaac98ab4546d3fbe72c117a5fd9d23a543c57"
+    },
+    "t011": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "097c38f1a00f04ee8f83b7d29981ef515deb3d80",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "dd5d55242e973d07a60518f61dfd441f388ece4d",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "097c38f1a00f04ee8f83b7d29981ef515deb3d80\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "391e4a3d073e5146843655d0dd118309bd6ef1905da870b9b8e7a7af7b2cfdfc"
+    },
+    "t012": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "097c38f1a00f04ee8f83b7d29981ef515deb3d80",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "dd5d55242e973d07a60518f61dfd441f388ece4d",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "097c38f1a00f04ee8f83b7d29981ef515deb3d80\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "391e4a3d073e5146843655d0dd118309bd6ef1905da870b9b8e7a7af7b2cfdfc"
+    },
+    "t013": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "b31e422342ffe67e7e754a3b3dbc1bce096a3d8f",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ea281b228526357b375263ff0ea4effe24816581ce113c0fbb6701e152ea0b1a"
+    },
+    "t014": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "b31e422342ffe67e7e754a3b3dbc1bce096a3d8f",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ea281b228526357b375263ff0ea4effe24816581ce113c0fbb6701e152ea0b1a"
+    },
+    "t015": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "e81e8bcb08a58b7dcb057b29091d5801fed3d704",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "4d48e1d95437e7014c21943130204b1f757f7705",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "e81e8bcb08a58b7dcb057b29091d5801fed3d704\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "6e5a828ab13664dc6cdab0418d41587f8225cdd99c2e5c9f93cc2cc0ec3343bd"
+    },
+    "t016": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "e81e8bcb08a58b7dcb057b29091d5801fed3d704",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "4d48e1d95437e7014c21943130204b1f757f7705",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "e81e8bcb08a58b7dcb057b29091d5801fed3d704\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "6e5a828ab13664dc6cdab0418d41587f8225cdd99c2e5c9f93cc2cc0ec3343bd"
+    },
+    "t017": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "a08892b9e8febf3d2819e9e3cec5b46907ab1460",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "7b58aaf42e659139d1c297a030c16effe422cbcb",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "a08892b9e8febf3d2819e9e3cec5b46907ab1460\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ec0bc9eb01c3b8ec330abb7f4a43d49f25c3a1ec66fdee7f1e5c09a6f9073931"
+    },
+    "t018": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "a08892b9e8febf3d2819e9e3cec5b46907ab1460",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "7b58aaf42e659139d1c297a030c16effe422cbcb",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "a08892b9e8febf3d2819e9e3cec5b46907ab1460\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ec0bc9eb01c3b8ec330abb7f4a43d49f25c3a1ec66fdee7f1e5c09a6f9073931"
+    },
+    "t019": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "b0033d913af71a3fa6b29efa02667c4841a9a833",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "c864129352ef18b8265a7db3a87da473956c2031",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "b0033d913af71a3fa6b29efa02667c4841a9a833\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "befec0a44268b66e94c98c145c1ae34c83613913cbd8eadda83c2c0c46ebdfc1"
+    },
+    "t020": {
+      "base": "198ff1e7e3f1a8c709d117ed6351124d339b97e2",
+      "head": "b0033d913af71a3fa6b29efa02667c4841a9a833",
+      "base_tree": "93d2810e75c376263d7f7511fadf5ccb50938d5f",
+      "head_tree": "c864129352ef18b8265a7db3a87da473956c2031",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\noverlap(a,b) returns whether two half-open integer intervals share any point. Each interval is a pair (start,end) with start <= end. Empty intervals share no points.\n",
+        "app.py": ""
+      },
+      "history": "b0033d913af71a3fa6b29efa02667c4841a9a833\t2020-01-01T00:00:00Z\tfixture\tImplementation\n198ff1e7e3f1a8c709d117ed6351124d339b97e2\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "befec0a44268b66e94c98c145c1ae34c83613913cbd8eadda83c2c0c46ebdfc1"
+    },
+    "t021": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "5699e7e298944e457bb67afdf49fd862e9cafd70",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "48c3894d6bd37d3fe4e7434149c9b3fcceeac5e0",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "5699e7e298944e457bb67afdf49fd862e9cafd70\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "b3e2ca1a08596be848b42a1568000dbfa75f5fae71338bddd8efdfb7a0df7e38"
+    },
+    "t022": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "5699e7e298944e457bb67afdf49fd862e9cafd70",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "48c3894d6bd37d3fe4e7434149c9b3fcceeac5e0",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "5699e7e298944e457bb67afdf49fd862e9cafd70\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "b3e2ca1a08596be848b42a1568000dbfa75f5fae71338bddd8efdfb7a0df7e38"
+    },
+    "t023": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "d9ea2372bfbfc5adf341c597b36132ce83270265",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "7881fe462c910452c53bc34333caf2b62837be66",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "d9ea2372bfbfc5adf341c597b36132ce83270265\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "00e7c5151851efb8d96cfbc15533e418d4d9424666914f46e4726b42603e8244"
+    },
+    "t024": {
+      "base": "a99704b3d864374c44fa1c3d8a436892bdfb2163",
+      "head": "d9ea2372bfbfc5adf341c597b36132ce83270265",
+      "base_tree": "c8a6131d7e1ed5a6486fdb3dd03054241e1f783c",
+      "head_tree": "7881fe462c910452c53bc34333caf2b62837be66",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nreserve(state,amount) returns True and deducts amount from state['available'] when sufficient units exist. On insufficient units it returns False and leaves state byte-for-byte equivalent. Inputs are nonnegative integers; state has only the available key. There is one caller and no concurrent access.\n",
+        "app.py": ""
+      },
+      "history": "d9ea2372bfbfc5adf341c597b36132ce83270265\t2020-01-01T00:00:00Z\tfixture\tImplementation\na99704b3d864374c44fa1c3d8a436892bdfb2163\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "00e7c5151851efb8d96cfbc15533e418d4d9424666914f46e4726b42603e8244"
+    },
+    "t025": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "450f344d994cb3ac9c77b934684377e634655941",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "5249c931e7c786e78aeb6cc9ef6427d87f9641b7",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "450f344d994cb3ac9c77b934684377e634655941\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "d76776ec917832addd7016f066eaac98ab4546d3fbe72c117a5fd9d23a543c57"
+    },
+    "t026": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "450f344d994cb3ac9c77b934684377e634655941",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "5249c931e7c786e78aeb6cc9ef6427d87f9641b7",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "450f344d994cb3ac9c77b934684377e634655941\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "d76776ec917832addd7016f066eaac98ab4546d3fbe72c117a5fd9d23a543c57"
+    },
+    "t027": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "097c38f1a00f04ee8f83b7d29981ef515deb3d80",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "dd5d55242e973d07a60518f61dfd441f388ece4d",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "097c38f1a00f04ee8f83b7d29981ef515deb3d80\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "391e4a3d073e5146843655d0dd118309bd6ef1905da870b9b8e7a7af7b2cfdfc"
+    },
+    "t028": {
+      "base": "55e65978237b85885064e5113b2810a216f8f1ad",
+      "head": "097c38f1a00f04ee8f83b7d29981ef515deb3d80",
+      "base_tree": "00b923ec958596c83a7e9803721b119082a2223c",
+      "head_tree": "dd5d55242e973d07a60518f61dfd441f388ece4d",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nparse_audit uses the supplied helper validators and requires exactly one occurrence of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one complete pair of triple-backtick fences (opening plain or followed by json). Reject either missing mate and any other suffix, in both modes. Reject malformed JSON or structural admission failures: the decoded object must have exactly claims and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage must be an object. Only after that admission, report all independently detectable suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, retaining every erroneous row index and coverage field. Reject duplicate anchor/proposition pairs. Strict mode rejects any row error; partial mode retains valid rows in order with compact indexed issues only when no fatal envelope/suffix/coverage error exists. Both prior_dispositions and prior_assessments are required and use the supplied helpers; extra coverage metadata is retained. Successful results preserve the input coverage, expose those validated coverage arrays, and bind the original text digest. Errors use AuditError. No broader external claim semantics are implied.\n",
+        "app.py": ""
+      },
+      "history": "097c38f1a00f04ee8f83b7d29981ef515deb3d80\t2020-01-01T00:00:00Z\tfixture\tImplementation\n55e65978237b85885064e5113b2810a216f8f1ad\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "391e4a3d073e5146843655d0dd118309bd6ef1905da870b9b8e7a7af7b2cfdfc"
+    },
+    "t029": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "b31e422342ffe67e7e754a3b3dbc1bce096a3d8f",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ea281b228526357b375263ff0ea4effe24816581ce113c0fbb6701e152ea0b1a"
+    },
+    "t030": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "b31e422342ffe67e7e754a3b3dbc1bce096a3d8f",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "c80e672f1ce51cecb289a4a7b109f4474b15b2d0\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "ea281b228526357b375263ff0ea4effe24816581ce113c0fbb6701e152ea0b1a"
+    },
+    "t031": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "e81e8bcb08a58b7dcb057b29091d5801fed3d704",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "4d48e1d95437e7014c21943130204b1f757f7705",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "e81e8bcb08a58b7dcb057b29091d5801fed3d704\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "6e5a828ab13664dc6cdab0418d41587f8225cdd99c2e5c9f93cc2cc0ec3343bd"
+    },
+    "t032": {
+      "base": "f616c27bb1db9fb875e0561f3cdb57cd0cc02686",
+      "head": "e81e8bcb08a58b7dcb057b29091d5801fed3d704",
+      "base_tree": "fdf2727f84775697339e93458c638e644437b23a",
+      "head_tree": "4d48e1d95437e7014c21943130204b1f757f7705",
+      "base_files": {
+        "SPEC.md": "Review app.py against this specification. helpers.py supplies the documented fixture context and is not a proposed change. Callers enforce the stated input domain. Do not execute repository code. Missing tests alone are not a contract defect. Identify concrete reachable violations, not optional enhancements.\n\nThe caller supplies JSON-compatible values and an evidence list of dictionaries. Nonblank text means a string whose str.strip() is nonempty and which contains neither CR nor LF; preserve the original text, without trimming. Every evidence url is nonblank text that urlparse accepts with scheme http or https and a truthy hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is outside this caller-enforced domain. _validate_capture_attestations accepts a list with at most one row per evidence item. Each row has exactly the listed fields and an exact integer evidence_index within range, not another JSON scalar. Identity, URL and relation must agree with the referenced evidence item. Duplicate identities reject; the digest is lowercase 64-digit hex, decision flags are exact booleans and reason fields are nonblank text under the same definition. Other Unicode within nonblank text is permitted. Return valid rows in encounter order with their field values unchanged. Reject invalid reviewed values with ValueError. No network access is required.\n",
+        "app.py": ""
+      },
+      "history": "e81e8bcb08a58b7dcb057b29091d5801fed3d704\t2020-01-01T00:00:00Z\tfixture\tImplementation\nf616c27bb1db9fb875e0561f3cdb57cd0cc02686\t2020-01-01T00:00:00Z\tfixture\tSpecification",
+      "packet_sha256": "6e5a828ab13664dc6cdab0418d41587f8225cdd99c2e5c9f93cc2cc0ec3343bd"
+    }
+  },
+  "oracle_sha256": "f9ac9c1bc58dbf1e5d4474ed4a087371f660cf83642d5eef92afbc3b395be035",
+  "call_limit": 192,
+  "plan_sha256": "2525736dbe1bf299209bd83bb173435ad0eb6d4552ea00f45f94a940efbcd101"
+}

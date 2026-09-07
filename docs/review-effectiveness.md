@@ -40,8 +40,8 @@ post-state leaves the nonnegative caller domain. No production source changed.
 The first full run passed 2,140 tests. The
 [post-repair full-suite receipt](effectiveness-calibration-validation-2026-09-07.json)
 records 2,151 passing tests and hashes the tested calibration inputs and unchanged
-production package. The new complete campaign and CODE cold final remain delivery
-gates.
+production package. The complete native campaign is recorded below. CODE
+cold-final acceptance is required before merge.
 This is post-pilot calibration, not a held-out evaluation. A new unexpected valid
 defect or ambiguity still blocks comparative qualification and requires a corpus
 checkpoint; this card does not permit another patch-and-rerun cycle after freeze.
@@ -55,6 +55,94 @@ and 32 assume an HTTP(S) evidence restriction missing from the old specification
 C5 supplies that domain for the new corpus; all six old rejections and the 81.25%
 acceptance result remain unchanged. The three consequence errors remain review
 quality concerns to measure under the unchanged rubric, not fixture exemptions.
+
+
+## Completed calibrated pilot: 7 September 2026
+
+The [sealed calibrated report](effectiveness-calibrated-2026-09-07/report.json)
+binds all 32 completed slots to source
+b2d00313cbe9901fd79a275aecbf5e7845d5faab. Custody qualifies with no errors;
+comparative qualification is withheld. All 86 calls are retained against the
+fresh 192-call ceiling; the earlier 92 pilot calls and 131 supplementary rating
+calls remain separate historical totals.
+
+| Observed workload | Single query | Native staged branch |
+| --- | ---: | ---: |
+| Completed slots | 16 | 16 |
+| Provider calls | 16 | 70 |
+| Intended target detections | 8 / 8 | 7 / 8 |
+| Median slot time | 59.1 s | 125.9 s |
+| Total slot time | 1,059.5 s | 2,195.4 s |
+| Slots with unscored fixture problems | 3 | 2 |
+| Failed native reviews | 0 | 1 |
+
+The staged identity review t014 remained blocked after a failed consolidation
+validation retry; rejected prose earns no target credit. Six validation-retry
+calls are included. The five unscored slots are t011, t012, t026, t027 and t028.
+Their [executable witnesses](effectiveness-calibrated-2026-09-07/fixture-problems.json)
+confirm additional parser defects: non-JSON constants admitted, input-processing
+exceptions escaping AuditError, and lossy original-text digest binding.
+The frozen corpus and specifications were not changed after these discoveries.
+The [corpus-design checkpoint](effectiveness-corpus-checkpoint-2026-09-07.md)
+prohibits another patch-and-rerun campaign under this card.
+
+Zero adjudicated unsupported blocking clusters and zero oracle-target false
+clears do not mean every sentence is accurate or that the parser controls are
+clean. The original scorer's cluster metrics remain distinct from full review
+accuracy. [Exact-output quality observations](effectiveness-calibrated-2026-09-07/review-quality-observations.json)
+retain overstated consequences, a scope premise absent from the specification,
+a disclosed Git-history permission limitation, and an overly restrictive class
+predicate. These are implementer observations, not independent acceptance ratings.
+The staged arm's observed target recall is lower on this schedule because of
+t014; no superiority, non-inferiority or quality acceptance is claimed.
+
+The t029 class predicate still matches an alternate repair that explicitly
+rejects booleans and passes all 100 finite identity calibration checks. Its
+recommendation requires a particular implementation form to satisfy the
+predicate rather than preserving the semantic invariant. This is a demonstrated
+predicate limitation and a potential convergence cost; no extra live correction
+round or full fix-to-final timing was measured. The fixture and durable lineage
+were never edited for this in-memory witness.
+
+The [timing breakdown](effectiveness-calibrated-2026-09-07/bottlenecks.json)
+separates slot/dispatch wall time from concurrent model durations. Outside-dispatch
+work was 6.0% of query time and 2.9% of staged time; it includes benchmark custody
+and preflight rather than solely production context preparation. An idealized
+retry-free critical-path proxy removes 141.2 seconds, or 6.4% of staged slot time.
+Six retries are 8.6% of staged provider calls, not 8.6% of token or dollar cost.
+Even eliminating both measured staged outside-dispatch work and that estimated
+retry delay amounts to about 9.3%, below the user's 20% threshold. These are
+opportunity bounds/proxies, not demonstrated optimizations. Subscription dollar
+cost remains unknown. Current evidence does not justify a latency-only refactor
+of those components. Context preparation within provider sessions remains a
+hypothesis needing its own measurement; preserve roles, calls and review depth.
+
+All [1,517 finite calibration checks](effectiveness-calibrated-2026-09-07/calibration-summary.json),
+the source/configuration [manifest](effectiveness-calibrated-2026-09-07/manifest.json),
+original oracle, raw process channels, native audits, repositories, annotations
+and score seal are retained in the
+[complete campaign archive](effectiveness-calibrated-2026-09-07/campaigns.tar.gz).
+Its SHA-256 is
+0f3f1c4651899e11d813d02f03c5684e4c76395d07b11bd3f302964fe9c6ef1b.
+The [publication receipt](effectiveness-calibrated-2026-09-07/publication-receipt.json)
+records byte-for-byte archive verification of all 1,647 original files.
+
+For replay on a separate machine, extract the archive under /tmp without
+overwriting an existing campaign, and create an immutable source checkout at
+/tmp/paranoia-49-calibrated-source at b2d00313cbe9901fd79a275aecbf5e7845d5faab.
+Use that source's scripts and the recorded CLI versions. Run qualification and
+reporting only; do not rerun --freeze, --run or --seal. Absolute custody bindings
+are intentionally retained.
+
+The [new human packet](effectiveness-calibrated-2026-09-07/human-packet.json)
+contains exactly 32 native projections; its
+[ratings template](effectiveness-calibrated-2026-09-07/human-ratings-template.json)
+is pending. Prior user approval applies only to the earlier model-assisted
+ratings. No additional arbitration campaign was run. Issue 49 retains two named
+residuals: the benchmark maintainer owns the prospective corpus/quality design,
+and Andy owns independent acceptance. The accepted quality and 20% performance
+gates remain unchanged. Issue 50's prior typed lifecycle extraction is unchanged;
+this follow-up has no production-source or production-prompt changes.
 
 ## Scope and contract resolution
 

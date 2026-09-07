@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "oracle_sha256": "f9ac9c1bc58dbf1e5d4474ed4a087371f660cf83642d5eef92afbc3b395be035",
+  "cases": [
+    {
+      "case": "c-1fdc94a4fcbe",
+      "defective": true,
+      "family": "overlap",
+      "checks": 225,
+      "target_failures": 85,
+      "checks_sha256": "20335a06b3cec4863d9d7cf8f782e9fc2a32640214965a6da59fb42697e9ee72",
+      "files_sha256": {
+        "SPEC.md": "bfae93054fb4e6be1b9dbae1f97b19bb8e8a1a2522d1df8530736624d8392f02",
+        "app.py": "4f5a50e4113743b502a37eb03be2f873e43e80b64add7b1bf22ee59c6c021df3",
+        "helpers.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "c-0b717e074104",
+      "defective": false,
+      "family": "overlap",
+      "checks": 225,
+      "target_failures": 0,
+      "checks_sha256": "1ed2f876360ca6e3f60cc0f630d55f41afcd118b245a22b0cbcda8ad97fbadb5",
+      "files_sha256": {
+        "SPEC.md": "bfae93054fb4e6be1b9dbae1f97b19bb8e8a1a2522d1df8530736624d8392f02",
+        "app.py": "1ccd59aaae35e1436941a4ab4a3d807c352ceec7e15a361bb1f3424ad896ce55",
+        "helpers.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "c-1427f572fa60",
+      "defective": true,
+      "family": "reserve",
+      "checks": 105,
+      "target_failures": 48,
+      "checks_sha256": "f365fb051f7092b48e6c283baa9fe25e4d7fca96e4d7f1d885231b1a6b07894f",
+      "files_sha256": {
+        "SPEC.md": "c5ca7c4b8eda4dbcb4250a952ced424567e80da8703eaa4ea716327a188c18cc",
+        "app.py": "76eeb464f8daeecf5d692c34bae0e9e1522ee5c3acec1abd31a8dfb61ec6decb",
+        "helpers.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "c-1405065186d9",
+      "defective": false,
+      "family": "reserve",
+      "checks": 240,
+      "target_failures": 0,
+      "checks_sha256": "0b2b9cacabcdd08389f6167cf0ec45116837c7207aed22a63cb7fadb079894bf",
+      "files_sha256": {
+        "SPEC.md": "c5ca7c4b8eda4dbcb4250a952ced424567e80da8703eaa4ea716327a188c18cc",
+        "app.py": "331b5ef9d9eff6a6b40084e99a8bab15a09e3e926aca7b83d60b32ee28eb4deb",
+        "helpers.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "case": "c-1c9e7eed4363",
+      "defective": true,
+      "family": "diagnostic",
+      "checks": 261,
+      "target_failures": 187,
+      "checks_sha256": "a6b7208286bc5a0376016220304d328b45d7187746aae6ef4af7fecd3884c33b",
+      "files_sha256": {
+        "SPEC.md": "6c1f627753bc4c07f9368eef08b538619c8f04c62737d2f26fba2ef454804965",
+        "app.py": "58b7a45b33909f4b68f07d47fe55bb8e71694ea7b71bf9ed2b35b38c9fed425c",
+        "helpers.py": "b0145b43c63cdc336027568536bae5e1be469d49c2c9b68b005ef9cced587442"
+      }
+    },
+    {
+      "case": "c-4325c23d6702",
+      "defective": false,
+      "family": "diagnostic",
+      "checks": 261,
+      "target_failures": 0,
+      "checks_sha256": "1754d54ed62d5c2dd519387934a8ba846413d1152b21b947254486915540b58c",
+      "files_sha256": {
+        "SPEC.md": "6c1f627753bc4c07f9368eef08b538619c8f04c62737d2f26fba2ef454804965",
+        "app.py": "f1d35afda18eae947a0fd5fd9b0784ed7a6adbab15da07e5a724b68b3b8bd38d",
+        "helpers.py": "b0145b43c63cdc336027568536bae5e1be469d49c2c9b68b005ef9cced587442"
+      }
+    },
+    {
+      "case": "c-05b1b8ed3445",
+      "defective": true,
+      "family": "identity",
+      "checks": 100,
+      "target_failures": 2,
+      "checks_sha256": "103b3c543b47ef7eaa11fb9f48b47f2285289c65362fd2fe3cd396db7e6e2a07",
+      "files_sha256": {
+        "SPEC.md": "70401c2e91971f117c693305416ca83d3df5b4c361780ef8140d3953e399afc5",
+        "app.py": "721b813b4d932978fba09a5f84fd7c4a091ed50bf100b96711cc8b893f3a6646",
+        "helpers.py": "b0145b43c63cdc336027568536bae5e1be469d49c2c9b68b005ef9cced587442"
+      }
+    },
+    {
+      "case": "c-46c111c20c32",
+      "defective": false,
+      "family": "identity",
+      "checks": 100,
+      "target_failures": 0,
+      "checks_sha256": "8c6614213f557143cfb2131c5029a4ce8ca3903dbcca5edfdfb2cfda87e80b96",
+      "files_sha256": {
+        "SPEC.md": "70401c2e91971f117c693305416ca83d3df5b4c361780ef8140d3953e399afc5",
+        "app.py": "d8a7226dadc0056c9cdf09841f3464bd53205d764e06fd1cfd43547c24992a89",
+        "helpers.py": "b0145b43c63cdc336027568536bae5e1be469d49c2c9b68b005ef9cced587442"
+      }
+    }
+  ],
+  "full_observations": "Original oracle.json in campaigns.tar.gz; all original manifest and calibration bindings retained."
+}
