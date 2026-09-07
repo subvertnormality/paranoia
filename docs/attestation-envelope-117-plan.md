@@ -108,3 +108,16 @@ test_entry_bootstrap_ignores_stale_imported_harness_bytecode establish the reuse
 add test_issue117.py subprocess controls through this actual entry script proving usable
 adjacent stale production bytecode is ignored and a preloaded owned module is rejected before
 native admission. Either control or provenance failure blocks qualification and delivery.
+
+User-approved native fixture continuation: preserve the original eight-call campaign and
+failed qualification byte-for-byte. One continuation may copy its exact lineage/repository
+and use docs/attestation-envelope-117-fixture-repair.md for round 2 correction, then round 3
+cold final only if the canonical phase requires final and evidence is clear. Count original
+and continuation attempts together against twelve; retain native role timeouts and retries.
+Require identical complete production source inventories across both source checkpoints;
+the updated acceptance helper and fixed fixture receive their own committed hashes. Bind
+the parent to the immutable retained archive and retain both source identities, copied-state
+hash, all new prompts/channels/ledgers and reloaded state. Reject an edited parent or changed
+production before provider admission. Preserve the structural-clear gate and all evidence
+gates. Prove parent-contamination rejection and the global call ceiling deterministically.
+This is a bounded repair continuation, not an unchanged rerun or new claim of first-run success.

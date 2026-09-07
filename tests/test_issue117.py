@@ -272,6 +272,38 @@ def test_issue117_exact_historical_exception_and_outside_mutation(name):
         with pytest.raises(AssertionError):
             check_historical_boundary(original, changed, name)
 
+def test_continuation_parent_binding(tmp_path):
+    import tarfile
+    root = Path(__file__).resolve().parents[1]
+    parent = tmp_path / "parent"
+    with tarfile.open(root / "docs/attestation-envelope-117-native-evidence.tar.gz") as archive:
+        for member in archive.getmembers():
+            assert member.isfile() and not Path(member.name).is_absolute()
+            assert ".." not in Path(member.name).parts
+            target = parent / member.name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.extractfile(member).read())
+    source = json.loads((parent / "source.json").read_text())["production"]
+    program = "import runpy,json,sys; from pathlib import Path; s=runpy.run_path(sys.argv[1]); s['_load_parent'](Path(sys.argv[2]),json.loads(sys.argv[3]))"
+    def check(value):
+        return subprocess.run([sys.executable, "-c", program,
+            str(root / "scripts/run_issue117_acceptance.py"), str(parent), json.dumps(value)],
+            capture_output=True, text=True)
+    result = check(source)
+    assert result.returncode == 0, result.stderr
+    changed = copy.deepcopy(source)
+    changed["files"]["src/paranoia_local/handlers.py"] = "0" * 64
+    assert check(changed).returncode != 0
+    for name in ("qualification.json", "attempt-01-input.json", "state/lineages/issue117-native.json"):
+        target = parent / name
+        original = target.read_bytes()
+        target.write_bytes(original + b" ")
+        assert check(source).returncode != 0
+        target.write_bytes(original)
+    (parent / "extra.txt").write_text("unrecorded")
+    assert check(source).returncode != 0
+
+
 def test_native_phase_qualification_accepts_recorded_discovery_repair(tmp_path):
     import tarfile
     root = Path(__file__).resolve().parents[1]
