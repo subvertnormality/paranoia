@@ -1,5 +1,7 @@
 # Repository agent instructions
 
+For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
+
 These instructions govern work in paranoia-local. User instructions take precedence but do
 not silently expand scope.
 

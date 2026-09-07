@@ -18,6 +18,8 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "src" / "paranoia_local" / "staged_protocol.py"
+LIFECYCLE_SOURCE = SOURCE.with_name("lifecycle_decisions.py")
+LIFECYCLE_MUTATIONS = {"mechanized-replacement", "standalone-action", "derived-close"}
 TEST = "tests/test_staged_protocol.py"
 DIFFERENTIAL_TESTS = (
     "test_frozen_historical_v1_census_projection_is_preserved",
@@ -68,7 +70,7 @@ MUTATIONS = (
     ),
     (
         "derived-close",
-        'derived_actions.append((\n                    {"kind": "close", "class_id": cid}, outcome_pointer,\n                ))',
+        'derived_actions.append((\n                {"kind": "close", "class_id": cid}, outcome_pointer,\n            ))',
         'pass',
         "test_satisfied_open_unmechanized_class_derives_close",
     ),
@@ -152,8 +154,8 @@ MUTATIONS = (
     ),
     (
         "null-action-slot-pointer",
-        '_class_slot_pointer(value, "class_actions", cid)\n                    if action is None',
-        '"/class_actions"\n                    if action is None',
+        '_class_slot_pointer(value, "class_actions", cid)',
+        '"/class_actions"',
         "test_census_closed_violation_derives_only_unmechanized_reopen",
     ),
     (
@@ -319,7 +321,8 @@ def main() -> int:
         f"{len(DIFFERENTIAL_TESTS)} role/shape groups."
     )
     mutations = [
-        (SOURCE, TEST, name, before, after, test_name)
+        (LIFECYCLE_SOURCE if name in LIFECYCLE_MUTATIONS else SOURCE,
+         TEST, name, before, after, test_name)
         for name, before, after, test_name in MUTATIONS
     ] + list(CROSS_MODULE_MUTATIONS)
     failures: list[str] = []

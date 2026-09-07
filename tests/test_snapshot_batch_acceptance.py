@@ -1,6 +1,7 @@
 """The published qualification must remain attributable to exact source and observations."""
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,8 +14,15 @@ def test_retained_batch_qualification_binds_source_artifacts_and_every_slot():
     for name, row in receipt["artifacts"].items():
         assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == row["sha256"]
     assert hashlib.sha256((ROOT / receipt["plan_path"]).read_bytes()).hexdigest() == receipt["plan_sha256"]
-    actual = {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-              for p in (ROOT / "src/paranoia_local").rglob("*.py")}
+    # Later independent changes do not turn historical runs into current acceptance.
+    revision = receipt["candidate_revision"]
+    names = subprocess.check_output(
+        ["git", "ls-tree", "-r", "--name-only", revision, "src/paranoia_local"],
+        cwd=ROOT, text=True,
+    ).splitlines()
+    actual = {name: hashlib.sha256(subprocess.check_output(
+        ["git", "show", f"{revision}:{name}"], cwd=ROOT,
+    )).hexdigest() for name in names if name.endswith(".py")}
     assert actual == receipt["production_source_sha256"]
     local = read("snapshot_batch_corrected_local_results_2026-09-07.json")
     live = read("snapshot_batch_corrected_live_results_2026-09-07.json")

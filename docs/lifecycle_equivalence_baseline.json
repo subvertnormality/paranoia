@@ -1,0 +1,9 @@
+{
+  "baseline": "cc1afef87c1386379fc2da97b72b733815013ca0",
+  "cases": 3024,
+  "accepted": 622,
+  "fingerprints_sha256": "431c6ba049ab4352bfa764def4acf4813c46440a6f9dfe124e8cd2f5b903dacf",
+  "matrix_sha256": "1f85d975af33e5646fc6ece9316323fc17c38a4053ff0704a17011bf1706e749",
+  "fixture_helpers_sha256": "499c0153f3c95d5917bcb323eb649b348bf87b0055c02fe44850c2c6d020e163",
+  "comparison": "Exact materialized output, canonical register/state/trailer, or exact exception type and diagnostic; caller input unchanged."
+}

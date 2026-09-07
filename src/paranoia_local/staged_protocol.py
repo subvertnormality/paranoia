@@ -15,7 +15,8 @@ from typing import Any, Iterable, Sequence
 
 from jsonschema import Draft202012Validator
 
-from . import class_closure as cc
+from . import class_closure as cc, lifecycle_decisions as lifecycle
+from .lifecycle_decisions import _rank
 from .external_sources import numbered_lines
 
 CHECKLIST = (
@@ -1176,10 +1177,6 @@ def decode_decision(
     return value
 
 
-def _rank(severity: str) -> int:
-    return {cc.OUT_OF_SCOPE: 0, cc.MINOR: 1, cc.MAJOR: 2,
-            cc.BLOCKER: 3, cc.FATAL: 4}[severity]
-
 
 def _fresh_debt_ids(count: int, reserved: set[str]) -> list[str]:
     result: list[str] = []
@@ -1279,6 +1276,100 @@ def class_record_candidates(
     return records, pointers
 
 
+def _finding_dispositions(
+    findings: Sequence[dict[str, Any]], finding_class: dict[str, str | None],
+) -> list[dict[str, Any]]:
+    """Project already-bound classifications without changing encounter order."""
+    return [
+        (
+            {
+                "finding_id": finding["id"], "kind":"new_class",
+                "record_index": int(str(finding_class[finding["id"]]).split(":", 1)[1]),
+            }
+            if finding["classification"]["kind"] == "new_class"
+            else {
+                "finding_id":finding["id"],
+                **{
+                    key:finding["classification"][key]
+                    for key in ("kind", "reason", "class_id")
+                    if key in finding["classification"]
+                },
+            }
+        )
+        for finding in findings
+    ]
+
+
+def _validate_finding_references(
+    value: dict[str, Any], by_finding: dict[str, dict[str, Any]],
+    role: str, issues: list[str],
+) -> None:
+    """Check authored references before fresh finding IDs can be rekeyed."""
+    if role == "final":
+        _validate_coverage(value["coverage"], by_finding, issues)
+    early_outcome_pointers = _class_row_pointers(value, "class_outcomes")
+    for outcome in value.get("class_outcomes", []):
+        basis = outcome.get("basis")
+        if (
+            basis and basis["kind"] == "new_finding"
+            and basis["finding_id"] not in by_finding
+        ):
+            issues.append(
+                f"{early_outcome_pointers[outcome['class_id']]}/basis/finding_id: "
+                "must name a governing finding"
+            )
+
+
+def _materialize_fresh_debt(
+    findings: Sequence[dict[str, Any]], finding_class: dict[str, str | None],
+    violated: set[str], debt_by_id: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Allocate debt only after validation; preserve historical IDs and row order."""
+    debt_bearing = [
+        finding for finding in findings
+        if finding["severity"] in BLOCKING
+        or (
+            isinstance(finding_class.get(finding["id"]), str)
+            and not str(finding_class[finding["id"]]).startswith("record:")
+            and finding_class[finding["id"]] in violated
+        )
+    ]
+    fresh_ids = _fresh_debt_ids(len(debt_bearing), set(debt_by_id))
+    fresh_debt: list[dict[str, Any]] = []
+    for debt_id, finding in zip(fresh_ids, debt_bearing, strict=True):
+        fresh_debt.append({
+            "id": debt_id, "finding_id": finding["id"], "status": "open",
+            "severity": finding["severity"], "summary": finding["summary"],
+            "evidence": list(finding["evidence"]), "remedy": finding["remedy"],
+        })
+    return fresh_debt
+
+
+def _bind_debt_updates(
+    value: dict[str, Any], open_debt: dict[str, dict[str, Any]], issues: list[str],
+) -> tuple[dict[str, str], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """Bind every supplied open debt once, retaining original repair pointers."""
+    debt_outcome_pointers = {
+        row["debt_id"]: f"/debt_outcomes/{index}"
+        for index, row in reversed(list(enumerate(value["debt_outcomes"])))
+    }
+    debt_outcomes = _unique(
+        value["debt_outcomes"], "debt_id", "debt_outcomes", issues,
+    )
+    if set(debt_outcomes) != set(open_debt):
+        missing = sorted(set(open_debt) - set(debt_outcomes))
+        unknown = sorted(set(debt_outcomes) - set(open_debt))
+        issues.append(
+            f"/debt_outcomes: must update every supplied open debt exactly once; "
+            f"missing={missing}, unknown={unknown}"
+        )
+    debt_updates = [
+        {"id": row["debt_id"], **{key: item for key, item in row.items() if key != "debt_id"}}
+        for row in value["debt_outcomes"]
+    ]
+    return debt_outcome_pointers, debt_outcomes, debt_updates
+
+
 def materialize_decision_value(
     value: dict[str, Any], *, mode: str, role: str,
     source_ids: Sequence[str] = (), source_severities: dict[str, str] | None = None,
@@ -1299,19 +1390,7 @@ def materialize_decision_value(
     issues: list[str] = []
     findings = value["governing_findings"]
     by_finding = _unique(findings, "id", "governing_findings", issues)
-    if role == "final":
-        _validate_coverage(value["coverage"], by_finding, issues)
-    early_outcome_pointers = _class_row_pointers(value, "class_outcomes")
-    for outcome in value.get("class_outcomes", []):
-        basis = outcome.get("basis")
-        if (
-            basis and basis["kind"] == "new_finding"
-            and basis["finding_id"] not in by_finding
-        ):
-            issues.append(
-                f"{early_outcome_pointers[outcome['class_id']]}/basis/finding_id: "
-                "must name a governing finding"
-            )
+    _validate_finding_references(value, by_finding, role, issues)
     classes = {row["class_id"]: row for row in active_classes}
     if len(classes) != len(active_classes):
         issues.append("/active_classes: duplicate class_id")
@@ -1443,24 +1522,9 @@ def materialize_decision_value(
                 existing_findings[cid] = finding["id"]
             finding_class[finding["id"]] = cid
 
-    debt_outcome_pointers = {
-        row["debt_id"]: f"/debt_outcomes/{index}"
-        for index, row in reversed(list(enumerate(value["debt_outcomes"])))
-    }
-    debt_outcomes = _unique(
-        value["debt_outcomes"], "debt_id", "debt_outcomes", issues,
+    debt_outcome_pointers, debt_outcomes, debt_updates = _bind_debt_updates(
+        value, open_debt, issues,
     )
-    if set(debt_outcomes) != set(open_debt):
-        missing = sorted(set(open_debt) - set(debt_outcomes))
-        unknown = sorted(set(debt_outcomes) - set(open_debt))
-        issues.append(
-            f"/debt_outcomes: must update every supplied open debt exactly once; "
-            f"missing={missing}, unknown={unknown}"
-        )
-    debt_updates = [
-        {"id": row["debt_id"], **{key: item for key, item in row.items() if key != "debt_id"}}
-        for row in value["debt_outcomes"]
-    ]
 
     if role == "census":
         outcomes: dict[str, dict[str, Any]] = {}
@@ -1692,105 +1756,34 @@ def materialize_decision_value(
         if action.get("kind") in {"reopen", "replace"}
     }
     for cid, row in challenges.items():
-        pointer = challenge_pointers.get(cid, "/concession_challenges")
-        challenge = row["challenge"]
-        targeted = cid in challenge_targets
-        if targeted and challenge is None:
-            issues.append(
-                f"{pointer}: newly targeting a conceded class requires an "
-                "evidence-backed concession challenge"
-            )
-            continue
-        if not targeted and challenge is not None:
-            issues.append(
-                f"{pointer}: challenge must be null when this response does not "
-                "newly target the conceded class"
-            )
-            continue
-        if challenge is not None:
-            expected_debt = concessions.get(cid, {}).get("debt_id")
-            if challenge.get("debt_id") != expected_debt:
-                issues.append(f"{pointer}/challenge/debt_id: must name {expected_debt!r}")
+        issues.extend(lifecycle.concession_issues(
+            row["challenge"], targeted=cid in challenge_targets,
+            expected_debt=concessions.get(cid, {}).get("debt_id"),
+            pointer=challenge_pointers.get(cid, "/concession_challenges"),
+        ))
     derived_actions: list[tuple[dict[str, Any], str]] = []
     for cid, action in actions.items():
         action_pointer = action_pointers[cid]
         if cid not in classes:
             issues.append(f"{action_pointer}/class_id: unknown active class")
             continue
-        status = classes[cid]["status"]
-        if action["kind"] == "close" and (
-            cid not in outcomes or outcomes[cid]["verdict"] != "satisfied"
-        ):
-            issues.append(
-                f"{action_pointer}: close requires an authored satisfied class outcome "
-                "with evidence"
-            )
-        if action["kind"] == "reopen" and status != cc.CLOSED:
-            issues.append(f"{action_pointer}: reopen requires closed class")
-        if (
-            action["kind"] == "reopen" and cid in outcomes
-            and outcomes[cid]["verdict"] != "violated"
-        ):
-            issues.append(f"{action_pointer}: reopen requires violated outcome")
-        if action["kind"] in {"reclassify", "replace"}:
-            severity = (
-                action["severity"] if action["kind"] == "reclassify"
-                else action["definition"]["severity"]
-            )
-            if _rank(severity) < _rank(classes[cid]["severity"]):
-                issues.append(f"{action_pointer}: cannot downgrade active class")
-        if (
-            action["kind"] == "replace" and classes[cid]["mechanized"]
-            and "pattern" not in action["definition"]
-        ):
-            issues.append(
-                f"{action_pointer}/definition: mechanized class replacement "
-                "requires pattern and pathspec"
-            )
+        issues.extend(lifecycle.action_issues(
+            lifecycle.ClassState.capture(classes[cid]), action,
+            outcomes.get(cid), action_pointer,
+        ))
 
     for cid, outcome in outcomes.items():
         outcome_pointer = outcome_pointers.get(cid, "/class_actions")
         cls = classes.get(cid)
         if cls is None:
             continue
-        action = actions.get(cid)
-        if outcome["verdict"] == "satisfied" and cls["status"] in cc.UNPROVEN_STATUSES:
-            if cls["mechanized"]:
-                issues.append(
-                    f"{outcome_pointer}: mechanized open class cannot be model-closed"
-                )
-            if action is None or action["kind"] == "reclassify":
-                derived_actions.append((
-                    {"kind": "close", "class_id": cid}, outcome_pointer,
-                ))
-            elif action["kind"] not in {"close", "replace"}:
-                issues.append(
-                    f"{action_pointers.get(cid, outcome_pointer)}: "
-                    "open satisfied class must close"
-                )
-        if outcome["verdict"] == "violated" and cls["status"] == cc.CLOSED:
-            if cls["mechanized"]:
-                allowed = {"replace"}
-            else:
-                allowed = {"reopen", "reclassify", "replace"}
-                if action is None or action["kind"] == "reclassify":
-                    derived_actions.append((
-                        {"kind": "reopen", "class_id": cid}, outcome_pointer,
-                    ))
-            if cls["mechanized"] and (action is None or action["kind"] not in allowed):
-                repair_pointer = (
-                    _class_slot_pointer(value, "class_actions", cid)
-                    if action is None else action_pointers[cid]
-                )
-                issues.append(
-                    f"{repair_pointer}: "
-                    f"closed violated class requires {sorted(allowed)}"
-                )
-            elif not cls["mechanized"] and action is not None and action["kind"] not in allowed:
-                issues.append(
-                    f"{action_pointers[cid]}: closed violated class requires "
-                    "reopen, reclassify with derived reopen, or replace"
-                )
+        transition = lifecycle.derive(
+            lifecycle.ClassState.capture(cls), outcome, actions.get(cid),
+            outcome_pointer=outcome_pointer, action_pointer=action_pointers.get(cid),
+            missing_action_pointer=_class_slot_pointer(value, "class_actions", cid),
+        )
+        issues.extend(transition.issues)
+        derived_actions.extend(transition.actions)
 
     _raise_semantic_issues(issues)
 
@@ -1805,23 +1798,7 @@ def materialize_decision_value(
         class_records.extend(class_records_from_actions([action]))
         class_record_pointers.append(pointer)
 
-    debt_bearing = [
-        finding for finding in findings
-        if finding["severity"] in BLOCKING
-        or (
-            isinstance(finding_class.get(finding["id"]), str)
-            and not str(finding_class[finding["id"]]).startswith("record:")
-            and finding_class[finding["id"]] in violated
-        )
-    ]
-    fresh_ids = _fresh_debt_ids(len(debt_bearing), set(debt_by_id))
-    fresh_debt: list[dict[str, Any]] = []
-    for debt_id, finding in zip(fresh_ids, debt_bearing, strict=True):
-        fresh_debt.append({
-            "id": debt_id, "finding_id": finding["id"], "status": "open",
-            "severity": finding["severity"], "summary": finding["summary"],
-            "evidence": list(finding["evidence"]), "remedy": finding["remedy"],
-        })
+    fresh_debt = _materialize_fresh_debt(findings, finding_class, violated, debt_by_id)
 
     result: dict[str, Any] = {
         "role": role,
@@ -1833,24 +1810,7 @@ def materialize_decision_value(
         ],
         "debt": fresh_debt,
         "debt_updates": debt_updates,
-        "class_dispositions": [
-            (
-                {
-                    "finding_id": finding["id"], "kind":"new_class",
-                    "record_index": int(str(finding_class[finding["id"]]).split(":", 1)[1]),
-                }
-                if finding["classification"]["kind"] == "new_class"
-                else {
-                    "finding_id":finding["id"],
-                    **{
-                        key:finding["classification"][key]
-                        for key in ("kind", "reason", "class_id")
-                        if key in finding["classification"]
-                    },
-                }
-            )
-            for finding in findings
-        ],
+        "class_dispositions": _finding_dispositions(findings, finding_class),
         "class_records": class_records,
         "class_assessments": materialized_assessments,
         "_finding_class_refs": finding_class,

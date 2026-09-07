@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -29,11 +30,12 @@ def inventory(root: Path, revision: str | None = None) -> dict:
     else:
         sources = {
             str(path.relative_to(root)): path.read_text(encoding="utf-8")
-            for path in sorted((root / "src/paranoia_local").glob("*.py"))
+            for path in sorted((root / "src/paranoia_local").rglob("*.py"))
         }
     modules, functions = [], []
     for name, source in sources.items():
-        modules.append({"path": name, "lines": len(source.splitlines())})
+        modules.append({"path": name, "lines": len(source.splitlines()),
+                        "sha256": hashlib.sha256(source.encode("utf-8")).hexdigest()})
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
