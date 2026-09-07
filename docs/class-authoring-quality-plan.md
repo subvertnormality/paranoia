@@ -174,6 +174,16 @@ schema on the consolidation retry. Empty/missing/extra/mismatched schema records
 Cut the campaign manifest schema version so historical task-only campaigns cannot silently
 be interpreted as required-authoring campaigns. Original archives remain immutable.
 
+Before fork admission and during complete replay, validate the exact native-bound accepted
+parent consolidation response against its expected narrowed schema as well as the existing
+production validator. This extends Q4a's qualification boundary; sending the schema alone
+does not establish response conformance. Retain rejected initial attempts as legitimate
+same-session retry evidence, validating the accepted initial or corrected response only.
+Add initial-success and retry-success controls with a faithful target class plus a
+production-valid one-off finding. Bind and reseal their native records correctly; require
+rejection, retained attempt cost and zero dependent calls. Reuse existing schema validation
+in the harness without changing runtime validators or adding a model call.
+
 Extend the existing production-handler graph/retry smoke, forwarded-argument identity check,
 and resealed negative controls: missing schema record, changed restriction, restriction on
 a lane, restriction on a continuation, and original schema restored only on consolidation

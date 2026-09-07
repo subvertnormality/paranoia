@@ -4,6 +4,11 @@ Status: user approved. The executable obligations are now Q4f of
 docs/class-authoring-quality-plan.md. PLAN review precedes implementation and the single
 fresh campaign. The earlier task-only and ownership campaigns remain nonqualifying.
 
+Q4f also requires the exact native-bound accepted consolidation response to validate against
+the expected narrowed schema before fork admission and during complete replay. A faithful
+class alongside a one-off finding cannot qualify. Initial-success and retry-success controls
+prove this boundary while retaining rejected initial attempts and all incurred costs.
+
 The current experiment asks for a reusable class, but still permits a one-off response.
 Four retained campaigns cannot establish whether the candidate's authored classes accept
 valid alternative repairs, because Codex has not authored a class. Its latest native

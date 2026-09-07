@@ -17,6 +17,8 @@ and its existing retry to a nonempty finding list using the existing new-class a
 Keep runtime schemas and class policy unchanged. Seal and join original, expected and actual
 provider schemas for every role and retry; preserve both repair continuations, unchanged
 authored class inventories, cold finals, custody checks and the existing attempt ceiling.
+Validate the native-bound accepted parent response against that narrowed schema before fork
+admission and complete replay; rejected initial replies remain legitimate retry evidence.
 
 For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
 
