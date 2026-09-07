@@ -1,5 +1,9 @@
 # Paranoia
 
+The #49 [corpus calibration follow-up](docs/effectiveness-calibration-plan.md)
+preserves the published pilot while validating controls for a fresh complete
+evaluation. It changes benchmark evidence, not production reviewer behavior.
+
 Get a cold, adversarial review of your code, plans, and technical decisions from
 the other frontier coding agent.
 

@@ -680,3 +680,9 @@ Human ratings bind an exact regenerated projection and never stand in for missin
 independent acceptance. Follow docs/review-effectiveness.md for the Q3 correction:
 preserve native clean-census settlement and never add a cold-final call solely
 for benchmarking. Keep the accepted plan bytes unchanged and convergence on CODE.
+
+The follow-up #49 corpus calibration uses docs/effectiveness-calibration-plan.md
+as its new bounded contract. Preserve the original pilot and approved ratings;
+calibrate controls before a newly frozen full campaign. Historical fixture patches
+must be explicit, target defects must remain detectable, and a failed calibration
+blocks provider admission. No production review behavior changes in this card.

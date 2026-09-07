@@ -122,6 +122,14 @@ handler tests, not live effectiveness observations.
 
 ## Completed pilot: 7 September 2026
 
+The follow-up [calibration card](effectiveness-calibration-plan.md) addresses the
+invalid controls and underspecified domains before a new complete freeze. It keeps
+this pilot immutable and does not change production review behavior or qualify
+historical outcomes retrospectively. The operator approved supplementary model
+ratings with a Codex tie-break: 26 accepted and 6 rejected (81.25%), below the 90%
+criterion. That approval is model-assisted evidence, not independent blinded
+human adjudication, and cannot transfer to new review outputs.
+
 The [sealed report](effectiveness-pilot-2026-09-07/report.json) contains all 32
 completed slots at source 52f71d900e0057a98d8c7196d377a66f35313527. Custody
 qualifies with no errors; comparative quality does not qualify. Both arms found
