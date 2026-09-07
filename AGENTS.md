@@ -12,6 +12,12 @@ IDs from the invariant and validated evidence. Existing-class assessments retain
 server-supplied inventory; reference IDs for existing debt, classes and lane sources cannot be
 invented. This ownership distinction does not alter class policy or canonical closure checks.
 
+The approved Q4f class-authoring acceptance harness may narrow only parent consolidation
+and its existing retry to a nonempty finding list using the existing new-class alternative.
+Keep runtime schemas and class policy unchanged. Seal and join original, expected and actual
+provider schemas for every role and retry; preserve both repair continuations, unchanged
+authored class inventories, cold finals, custody checks and the existing attempt ceiling.
+
 For the issue 49/50 card, docs/effectiveness-lifecycle-plan.md is the bounded contract. Keep the typed lifecycle extraction semantics-preserving and the blinded pilot oracle outside reviewer workspaces. Human acceptance requires human ratings; retain unknowns and failed trials. Production reviewer roles and calls remain unchanged.
 
 These instructions govern work in paranoia-local. User instructions take precedence but do
