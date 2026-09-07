@@ -9,8 +9,14 @@ from contextlib import contextmanager
 from copy import deepcopy
 import hashlib
 import json
+import re
 import sys
 import types
+
+# Independent acceptance authority from the immutable calibration card C4.
+# Never derive these expectations from the fixture being checked.
+CLAIM_LIMIT = 100
+DIAGNOSTIC_BOUND = 8000
 
 
 def digest(value):
@@ -116,6 +122,11 @@ def _reserve(ns, helper, checks):
                            {"initial": available, "amount": requested, "before": before},
                            expected, actual, failures, allowed)
                 prior_failure |= not sufficient
+                # A defective reservation can leave the next caller input outside
+                # its nonnegative domain. Record that failure, but do not grade
+                # further calls made with an inadmissible corrupted state.
+                if checks.defective and state["available"] < 0:
+                    break
 
 
 def _parse_case(ns, helper, checks, name, value, *, partial=False, wrapper="none",
@@ -144,8 +155,9 @@ def _parse_case(ns, helper, checks, name, value, *, partial=False, wrapper="none
     fragments = ([] if structural else
                  (["unexpected text after"] if suffix or wrapper in {"opening", "closing"} else []) +
                  list(issues) + list(coverage_errors))
+    compact = [f"{issue} [/claims/{re.match(r'claim ([0-9]+):', issue)[1]}]" for issue in issues]
     expected = {"kind": "error" if error else "return", "error_fragments": fragments,
-                "claims": list(rows), "issues": list(issues)}
+                "claims": list(rows), "issues": compact}
     failures, allowed = [], []
     if actual["kind"] != expected["kind"]:
         failures.append("result-kind")
@@ -153,8 +165,13 @@ def _parse_case(ns, helper, checks, name, value, *, partial=False, wrapper="none
         if actual["type"] != "AuditError":
             failures.append("exception-type")
         reason = actual["reason"]
-        if len(reason) > helper.DIAGNOSTIC_CHARS:
+        if len(reason) > DIAGNOSTIC_BOUND:
             failures.append("diagnostic-bound")
+        allowed_row_lines = set(issues) | set(compact)
+        if "; item=" in reason or any(
+                re.match(r"claim [0-9]+:", line) and line not in allowed_row_lines
+                for line in reason.splitlines()):
+            failures.append("noncompact-row-diagnostic")
         if any(fragment not in reason for fragment in fragments):
             failures.append("diagnostic-omission")
         # Only incomplete aggregation is an allowed target failure, never an
@@ -169,8 +186,7 @@ def _parse_case(ns, helper, checks, name, value, *, partial=False, wrapper="none
         if (digest(result["prior_dispositions"]) != digest(coverage["prior_dispositions"]) or
                 digest(result["prior_assessments"]) != digest(coverage["prior_assessments"])):
             failures.append("coverage-projection")
-        if len(result["issues"]) != len(issues) or any(
-                fragment not in message for fragment, message in zip(issues, result["issues"])):
+        if result["issues"] != compact:
             failures.append("partial-row-diagnostics")
         if result["digest"] != hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest():
             failures.append("input-digest")
@@ -179,17 +195,22 @@ def _parse_case(ns, helper, checks, name, value, *, partial=False, wrapper="none
 
 
 def _diagnostic(ns, helper, checks):
+    if (type(helper.MAX_ACTIVE_CLAIMS) is not int or helper.MAX_ACTIVE_CLAIMS != CLAIM_LIMIT
+            or type(helper.DIAGNOSTIC_CHARS) is not int or helper.DIAGNOSTIC_CHARS != DIAGNOSTIC_BOUND):
+        raise ValueError("corpus calibration disagrees with fixed C4 limits")
     valid = {"anchor": "a", "proposition": "project"}
     second = {"anchor": "b", "proposition": "project"}
     coverage = {"prior_dispositions": [], "prior_assessments": []}
     row_cases = [
         ("empty", [], [], []),
         ("valid", [valid, second], [valid, second], []),
-        ("fields", [{}], [], ["claim 0:"]),
-        ("blank", [{"anchor": " ", "proposition": "project"}], [], ["claim 0:"]),
-        ("whole", [{"anchor": "a", "proposition": "whole project"}], [], ["claim 0:"]),
-        ("duplicate", [valid, valid], [valid], ["claim 1:"]),
-        ("mixed", [valid, {}, second, None], [valid, second], ["claim 1:", "claim 3:"]),
+        ("fields", [{}], [], ["claim 0: claim fields invalid"]),
+        ("blank", [{"anchor": " ", "proposition": "project"}], [], ["claim 0: claim text invalid"]),
+        ("whole", [{"anchor": "a", "proposition": "whole project"}], [],
+         ["claim 0: proposition introduces whole absent from plan wording"]),
+        ("duplicate", [valid, valid], [valid], ["claim 1: duplicate anchor and proposition"]),
+        ("mixed", [valid, {}, second, None], [valid, second],
+         ["claim 1: claim fields invalid", "claim 3: claim fields invalid"]),
     ]
     coverage_cases = [
         ("valid", coverage, []),
@@ -216,14 +237,15 @@ def _diagnostic(ns, helper, checks):
                         wrapper=wrapper, rows=[valid])
             _parse_case(ns, helper, checks, f"combined-envelope-{wrapper}-{partial}",
                         {"claims": [{}], "coverage": {}}, partial=partial, wrapper=wrapper,
-                        issues=["claim 0:"], coverage_errors=["prior_dispositions", "prior_assessments"])
+                        issues=["claim 0: claim fields invalid"],
+                        coverage_errors=["prior_dispositions", "prior_assessments"])
     malformed = ["", "not JSON", helper.AUDIT_MARKER + "\n{", helper.AUDIT_MARKER * 2]
     for i, raw in enumerate(malformed):
         _parse_case(ns, helper, checks, f"malformed-{i}", None, structural=True, raw_override=raw)
     for i, value in enumerate([[], {}, {"claims": [], "coverage": {}, "extra": 1},
                                {"claims": {}, "coverage": {}}, {"claims": [], "coverage": []}]):
         _parse_case(ns, helper, checks, f"shape-{i}", value, structural=True)
-    limit = helper.MAX_ACTIVE_CLAIMS
+    limit = CLAIM_LIMIT
     for count in (0, 1, limit, limit + 1):
         claims = [{"anchor": str(i), "proposition": "project"} for i in range(count)]
         _parse_case(ns, helper, checks, f"count-{count}", {"claims": claims, "coverage": coverage},
@@ -236,7 +258,8 @@ def _diagnostic(ns, helper, checks):
             _parse_case(ns, helper, checks, f"maximum-diagnostic-{partial}-{fatal}",
                         {"claims": claims, "coverage": {} if fatal else coverage},
                         partial=partial, suffix="\nextra" if fatal else "",
-                        issues=[f"claim {i}:" for i in range(limit)],
+                        issues=[f"claim {i}: proposition introduces whole absent from plan wording"
+                                for i in range(limit)],
                         coverage_errors=["prior_dispositions", "prior_assessments"] if fatal else [])
 
 
@@ -255,7 +278,9 @@ def _identity(ns, helper, checks):
         value["evidence_index"] = index
         cases.append(("index-" + json.dumps(index), [value], True, type(index) is bool))
     cases += [("duplicate", [row(), row()], True, False),
-              ("too-many", [row(), row(1), row()], True, False)]
+              ("too-many", [row(), row(1), row()], True, False),
+              ("true-shadow-raises-before-return", [{**row(1), "evidence_index": True}, row(1)], True, False),
+              ("false-shadow-raises-before-return", [{**row(), "evidence_index": False}, row()], True, False)]
     for value in (None, {}, "rows", 1, True):
         cases.append(("outer-" + json.dumps(value), value, True, False))
         cases.append(("row-" + json.dumps(value), [value], True, False))

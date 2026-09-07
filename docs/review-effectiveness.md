@@ -12,7 +12,7 @@ continue to use their recorded source checkouts and original card. No production
 source, prompt, role, call topology, schema or timeout changed in this follow-up.
 
 Before freeze, effectiveness_corpus.build runs the oracle-owned
-effectiveness_calibration matrix. Its 1,648 checks cover all eight cases; all four
+effectiveness_calibration matrix. Its 1,517 checks cover all eight cases; all four
 controls pass, and defective variants fail only their named target family checks.
 The oracle retains every input, expected/actual outcome and observation digest.
 Calibration failure aborts the freeze before CLI version reads or provider work.
@@ -29,13 +29,32 @@ and exact strip-based nonblank-text rule. The old FTP observation remains in the
 calibration evidence as an outside-domain example for this new specification,
 not a retrospective dismissal of the earlier review disagreement.
 
-The initial focused run passed 54 tests, including reintroduced fence/excerpt/
+The corrected focused run passed 64 tests, including reintroduced fence/excerpt/
 identity defects, lost target defects, malformed scalar results, exact historical
 patch provenance, and calibration/card/control tampering before provider calls.
-Full tests, the new complete campaign and CODE cold final remain delivery gates.
+CODE round 1 exposed self-derived limit expectations and a partial-result excerpt
+gap. The repair asserts C4's fixed limits independently of the fixture, checks
+complete expected compact reasons on both variants, and tests failed build/freeze
+admission for each regression. Defective reservation sequences stop when their
+post-state leaves the nonnegative caller domain. No production source changed.
+The first full run passed 2,140 tests. The
+[post-repair full-suite receipt](effectiveness-calibration-validation-2026-09-07.json)
+records 2,151 passing tests and hashes the tested calibration inputs and unchanged
+production package. The new complete campaign and CODE cold final remain delivery
+gates.
 This is post-pilot calibration, not a held-out evaluation. A new unexpected valid
 defect or ambiguity still blocks comparative qualification and requires a corpus
 checkpoint; this card does not permit another patch-and-rerun cycle after freeze.
+
+The [six-review rejection analysis](effectiveness-rejections-analysis-2026-09-07.json)
+binds every approved rejection to the original packet digest, item, exact disputed
+quotation and executable counterexample. Items 01, 18 and 29 overstate consequences:
+caller-owned state can be inspected/restored, not every later refusal is wrong,
+and a duplicate exception prevents returning accumulated bindings. Items 28, 31
+and 32 assume an HTTP(S) evidence restriction missing from the old specification.
+C5 supplies that domain for the new corpus; all six old rejections and the 81.25%
+acceptance result remain unchanged. The three consequence errors remain review
+quality concerns to measure under the unchanged rubric, not fixture exemptions.
 
 ## Scope and contract resolution
 

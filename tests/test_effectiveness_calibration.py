@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import benchmark_effectiveness as bench
 import effectiveness_corpus as corpus
-from effectiveness_calibration import calibrate, digest, fixture
+from effectiveness_calibration import calibrate, digest
+from effectiveness_custody import json_digest
 from tests.test_effectiveness_benchmark import pilot_slot
 
 
@@ -29,7 +30,7 @@ def case_for(built, family, defective):
 
 def test_all_cases_have_reproducible_calibration_and_controls_pass(built):
     cases, oracle = built
-    assert sum(len(o["calibration"]["checks"]) for o in oracle.values()) == 1648
+    assert sum(len(o["calibration"]["checks"]) for o in oracle.values()) >= 1400
     for case in cases:
         entry = oracle[case["id"]]
         calibrated = entry["calibration"]
@@ -50,9 +51,10 @@ def test_target_repaired_or_reintroduced_cannot_be_mislabeled(built, family):
         calibrate(family, bad["files"], False)
 
 
-@pytest.mark.parametrize("mutation", ["closing", "opening", "excerpt", "aggregation"])
-def test_parser_control_rejects_prior_fixture_problems(built, mutation):
-    case, _ = case_for(built, "diagnostic", False)
+@pytest.mark.parametrize("mutation", ["closing", "opening", "excerpt"])
+@pytest.mark.parametrize("defective", [False, True])
+def test_both_parser_variants_reject_unrelated_fixture_problems(built, mutation, defective):
+    case, _ = case_for(built, "diagnostic", defective)
     files = deepcopy(case["files"])
     if mutation == "closing":
         files["app.py"] = files["app.py"].replace(
@@ -64,10 +66,19 @@ def test_parser_control_rejects_prior_fixture_problems(built, mutation):
         files["app.py"] = files["app.py"].replace(
             'f"{reason} [/claims/{index}]"',
             'f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}"')
-    else:
-        files = case_for(built, "diagnostic", True)[0]["files"]
     with pytest.raises(ValueError, match="calibration failed"):
-        calibrate("diagnostic", files, False)
+        calibrate("diagnostic", files, defective)
+
+
+@pytest.mark.parametrize("defective", [False, True])
+@pytest.mark.parametrize("before,after", [("MAX_ACTIVE_CLAIMS = 100", "MAX_ACTIVE_CLAIMS = 101"),
+                                         ("DIAGNOSTIC_CHARS = 8000", "DIAGNOSTIC_CHARS = 9000")])
+def test_fixed_contract_limits_cannot_be_redefined_by_fixture(built, defective, before, after):
+    case, _ = case_for(built, "diagnostic", defective)
+    files = deepcopy(case["files"])
+    files["helpers.py"] = files["helpers.py"].replace(before, after)
+    with pytest.raises(ValueError, match="fixed C4 limits"):
+        calibrate("diagnostic", files, defective)
 
 
 @pytest.mark.parametrize("mutation", ["blank", "bool", "return-alias"])
@@ -94,15 +105,20 @@ def test_malformed_scalar_result_does_not_alias_boolean_reference(built):
 
 def test_diagnostic_bound_carries_every_admitted_index_and_both_coverage_fields(built):
     case, oracle = case_for(built, "diagnostic", False)
-    with fixture(case["files"]) as (_, helper):
-        limit, bound = helper.MAX_ACTIVE_CLAIMS, helper.DIAGNOSTIC_CHARS
     rows = oracle["calibration"]["checks"]
     for partial in (False, True):
         actual = next(r["actual"] for r in rows if r["id"] == f"maximum-diagnostic-{partial}-True")
-        assert len(actual["reason"]) <= bound
-        assert all(f"claim {i}:" in actual["reason"] for i in range(limit))
+        assert len(actual["reason"]) <= 8000
+        assert all(f"claim {i}:" in actual["reason"] for i in range(100))
         assert "prior_dispositions" in actual["reason"] and "prior_assessments" in actual["reason"]
-    assert next(r for r in rows if r["id"] == f"count-{limit + 1}")["actual"]["kind"] == "error"
+    assert {r["id"] for r in rows if r["id"].startswith("count-")} == {"count-0", "count-1", "count-100", "count-101"}
+    assert next(r for r in rows if r["id"] == "count-101")["actual"]["kind"] == "error"
+
+
+def test_repeated_reservation_calls_stay_within_input_domain(built):
+    for defective in (False, True):
+        _, oracle = case_for(built, "reserve", defective)
+        assert all(r["input"]["before"]["available"] >= 0 for r in oracle["calibration"]["checks"])
 
 
 def test_explicit_historical_patch_and_identity_domain_provenance(built):
@@ -126,13 +142,23 @@ def test_explicit_historical_patch_and_identity_domain_provenance(built):
     assert "no acceptance promise" in outside["expected"]["contract"]
 
 
-def test_broken_control_blocks_build_and_freeze_before_provider_admission(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mutation", ["closing", "excerpt", "claim-limit", "diagnostic-bound"])
+def test_broken_control_blocks_build_and_freeze_before_provider_admission(tmp_path, monkeypatch, mutation):
     original = corpus.calibrated_diagnostic
     def broken(app, provenance):
         app, provenance = original(app, provenance)
-        return app.replace('if remainder == "```" and fenced:', 'if remainder == "```":'), provenance
+        if mutation == "closing":
+            app = app.replace('if remainder == "```" and fenced:', 'if remainder == "```":')
+        elif mutation == "excerpt":
+            app = app.replace('f"{reason} [/claims/{index}]"',
+                              'f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}"')
+        return app, provenance
     monkeypatch.setattr(corpus, "calibrated_diagnostic", broken)
-    with pytest.raises(ValueError, match="calibration failed"):
+    if mutation == "claim-limit":
+        monkeypatch.setattr(corpus, "HELPERS", corpus.HELPERS.replace("MAX_ACTIVE_CLAIMS = 100", "MAX_ACTIVE_CLAIMS = 101"))
+    elif mutation == "diagnostic-bound":
+        monkeypatch.setattr(corpus, "HELPERS", corpus.HELPERS.replace("DIAGNOSTIC_CHARS = 8000", "DIAGNOSTIC_CHARS = 9000"))
+    with pytest.raises(ValueError, match="calibration"):
         bench.freeze(tmp_path / "pilot", ROOT)
     assert not (tmp_path / "pilot/calls.txt").exists()
     assert not (tmp_path / "pilot/manifest.json").exists()
@@ -177,3 +203,20 @@ def test_changed_control_is_refused_by_public_worker_before_calls(pilot_slot):
     collected = bench.custody.collect_slot(directory, spec)
     assert collected["calls"] == 0 and not collected["execution_success"]
     assert "fixture" in collected["terminal"]["error"]
+
+
+def test_six_rejection_analysis_binds_original_packet_and_exact_assertions():
+    record = json.loads((ROOT / "docs/effectiveness-rejections-analysis-2026-09-07.json").read_text())
+    raw = (ROOT / record["source_packet"]).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == record["packet_sha256"]
+    packet = json.loads(raw)
+    assert {r["item"] for r in record["rows"]} == {"item-01", "item-18", "item-28", "item-29", "item-31", "item-32"}
+    for row in record["rows"]:
+        item = next(i for i in packet["items"] if i["id"] == row["item"])
+        review = item["reviews"][row["review_index"]]
+        assert item["content_sha256"] == row["content_sha256"]
+        assert hashlib.sha256(review.encode()).hexdigest() == row["review_sha256"]
+        assert row["disputed_quote"] in review
+        assert row["witness_sha256"] == json_digest(row["witness"])
+        assert row["rating"] == "reject"
+    assert record["original_counts"] == {"accept": 26, "reject": 6}

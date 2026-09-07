@@ -1,0 +1,237 @@
+{
+  "schema": 1,
+  "source_packet": "docs/effectiveness-pilot-2026-09-07/human-packet.json",
+  "packet_sha256": "736cc941c7ba9963d7f721fb7660364c5c924cb66bf27e8ec87285b4a5df4e5f",
+  "approved_ratings_sha256": "3156368b9b4c37d91d4b819a065bf828d43a22674b3579f7375afe7d8b0fb884",
+  "approval_kind": "User approval of model-assisted ratings with a Codex tie-break; not independent blinded adjudication.",
+  "original_counts": {
+    "accept": 26,
+    "reject": 6
+  },
+  "original_acceptance_rate": 0.8125,
+  "scope": "Post-pilot analysis only. No original review, oracle, score, rating or specification is revised.",
+  "rows": [
+    {
+      "item": "item-01",
+      "rating": "reject",
+      "content_sha256": "ca055a8bdab57453853f2ae8c8cb79c247098e4c9a233f8e7302363a2a497e61",
+      "review_sha256": "70c5a793e9d8a2a849fefa7cd75724d41edd2f769bd0fa680eeea397aede1873",
+      "review_index": 0,
+      "disputed_quote": "With one caller and no concurrency, the caller has no way to detect or undo this, so a single rejected request permanently wedges the pool.",
+      "category": "consequence overstatement",
+      "analysis": "The caller owns the mutable state dictionary and can inspect and restore its balance. The mutation defect is real; inability to detect or recover is not established.",
+      "disposition": "Keep the original rejection and unchanged rating rubric. No fixture-domain amendment excuses this consequence claim. New reviews must support consequences as well as core findings.",
+      "witness": {
+        "code": "state = {'available': 3}; failed = reserve(state, 5); observed = dict(state); state['available'] = 3; recovered = reserve(state, 0)",
+        "actual": {
+          "failed_return": false,
+          "observable_state": {
+            "available": -2
+          },
+          "restored_state": {
+            "available": 3
+          },
+          "recovered_return": true
+        }
+      },
+      "witness_sha256": "f38eeb8831b5957d10a7c97942c5ae47ce6639bd1f82dc0ba4edaca9e47de934"
+    },
+    {
+      "item": "item-18",
+      "rating": "reject",
+      "content_sha256": "ff95383d98fd9cce00abe7431647555a88f4089b2516a9d034ffdd41517654b6",
+      "review_sha256": "a0351551bb4735a7558580266be22f365ab7b725c92eb86391a887d69797ce23",
+      "review_index": 0,
+      "disputed_quote": "every subsequent call operates on the corrupted balance and is wrongly refused.",
+      "category": "consequence overstatement",
+      "analysis": "A request of 4 is correctly refused against an intended preserved balance of 3. Not every later refusal is wrong. Calls using a negative balance also leave the stated nonnegative input domain.",
+      "disposition": "Keep the original rejection. Calibration now stops a defective sequence after the negative-state violation; control sequences continue within the domain. Do not promise outcomes for invalid subsequent inputs.",
+      "witness": {
+        "code": "state = {'available': 3}; failed = reserve(state, 5); expected_next_return_with_preserved_balance = (4 <= 3)",
+        "actual": {
+          "failed_return": false,
+          "state_after_failure": {
+            "available": -2
+          },
+          "next_amount": 4,
+          "expected_return_with_preserved_balance": false
+        }
+      },
+      "witness_sha256": "59ac268e808aa58cf63e09a8162665b637eacf7b9359196b92edb7b22e65ae1c"
+    },
+    {
+      "item": "item-28",
+      "rating": "reject",
+      "content_sha256": "f596fe38e75c66e0acc5fc3460d6dd47b35272f6dfbd5ec40c77a6da919b169c",
+      "review_sha256": "9ed4781a4267ef8e7f1974567420bd18eee728f6455eba871cddd62530732405",
+      "review_index": 0,
+      "disputed_quote": "It is unreachable as a false-reject because `final_url` must also equal the caller-supplied evidence URL",
+      "category": "missing evidence-domain assumption",
+      "analysis": "URL equality alone does not imply HTTP(S). A matching FTP URL satisfies that equality but is rejected by the scheme guard; the earlier specification did not exclude it.",
+      "disposition": "C5 explicitly defines the HTTP(S) evidence domain before the new freeze. This changes the new corpus contract, not the earlier rating or specification.",
+      "witness": {
+        "code": "_validate_capture_attestations(value, evidence)",
+        "input": {
+          "value": [
+            {
+              "evidence_index": 0,
+              "final_url": "ftp://example.test/a",
+              "relation": "supports",
+              "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "publisher_authority": true,
+              "passage_entailment": true,
+              "authority_reason": "authority",
+              "entailment_reason": "passage"
+            }
+          ],
+          "evidence": [
+            {
+              "url": "ftp://example.test/a",
+              "relation": "supports"
+            }
+          ]
+        },
+        "actual": {
+          "kind": "error",
+          "type": "ValueError",
+          "reason": "capture_attestation final_url must be absolute HTTP(S)"
+        }
+      },
+      "witness_sha256": "170e16e69a98e5154f264d4fdd00105e07438c0e543a170639daa2e1511868a1"
+    },
+    {
+      "item": "item-29",
+      "rating": "reject",
+      "content_sha256": "4a0a700ac839c30d71df05a427ecb90b6a6a7f0fb4a8d80a4829e560964a99b8",
+      "review_sha256": "5d296da8ecaa53328cf2753d234947b155a1551b399ffd763524f67562ed56e4",
+      "review_index": 0,
+      "disputed_quote": "a later legitimate row with the same integer index is rejected as a duplicate while the mistyped row is emitted as the binding for that item.",
+      "category": "consequence overstatement",
+      "analysis": "The duplicate raises ValueError before the function returns. A singleton boolean binding is wrongly accepted, but the mixed duplicate invocation returns no binding.",
+      "disposition": "Keep the original rejection. Calibration records both singleton-boolean target failures and boolean/integer duplicate invocations that raise before return. Do not weaken the rating rubric.",
+      "witness": {
+        "code": "_validate_capture_attestations(value, evidence)",
+        "input": {
+          "value": [
+            {
+              "evidence_index": true,
+              "final_url": "https://example.test/a",
+              "relation": "supports",
+              "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "publisher_authority": true,
+              "passage_entailment": true,
+              "authority_reason": "authority",
+              "entailment_reason": "passage"
+            },
+            {
+              "evidence_index": 1,
+              "final_url": "https://example.test/a",
+              "relation": "supports",
+              "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "publisher_authority": true,
+              "passage_entailment": true,
+              "authority_reason": "authority",
+              "entailment_reason": "passage"
+            }
+          ],
+          "evidence": [
+            {
+              "url": "https://example.test/a",
+              "relation": "supports"
+            },
+            {
+              "url": "https://example.test/a",
+              "relation": "supports"
+            }
+          ]
+        },
+        "actual": {
+          "kind": "error",
+          "type": "ValueError",
+          "reason": "capture_attestation evidence_index is invalid or duplicated"
+        }
+      },
+      "witness_sha256": "d02012d92b95e662e869aea1c1c88d4cb16d45c1e012c93b8b27a44e8ebec8bb"
+    },
+    {
+      "item": "item-31",
+      "rating": "reject",
+      "content_sha256": "d7a58a36ddc8382f7740299ed622068af602f8b9d8e95f0547cae615a185b3b3",
+      "review_sha256": "cb03b8383912ad3dd8df0beaede0969dd5117b0575f8d7d149f2d59e44fd7532",
+      "review_index": 0,
+      "disputed_quote": "Evidence domain is caller-enforced, so this is not reachable as specified.",
+      "category": "missing evidence-domain assumption",
+      "analysis": "Caller enforcement supplies no missing HTTP(S) restriction. The old specification leaves matching FTP evidence possible, so this exclusion was unsupported.",
+      "disposition": "C5 supplies the missing domain for the new corpus only; the original rejection remains unchanged.",
+      "witness": {
+        "code": "_validate_capture_attestations(value, evidence)",
+        "input": {
+          "value": [
+            {
+              "evidence_index": 0,
+              "final_url": "ftp://example.test/a",
+              "relation": "supports",
+              "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "publisher_authority": true,
+              "passage_entailment": true,
+              "authority_reason": "authority",
+              "entailment_reason": "passage"
+            }
+          ],
+          "evidence": [
+            {
+              "url": "ftp://example.test/a",
+              "relation": "supports"
+            }
+          ]
+        },
+        "actual": {
+          "kind": "error",
+          "type": "ValueError",
+          "reason": "capture_attestation final_url must be absolute HTTP(S)"
+        }
+      },
+      "witness_sha256": "170e16e69a98e5154f264d4fdd00105e07438c0e543a170639daa2e1511868a1"
+    },
+    {
+      "item": "item-32",
+      "rating": "reject",
+      "content_sha256": "e8430923c8861757f3a166cfbc7d6fd6087056a56fb4cbfd14969a0da04b8cf5",
+      "review_sha256": "2a5f108c6769f9d6e7555684856dcc40082b925a5cc8b34520f832059502f0f6",
+      "review_index": 0,
+      "disputed_quote": "Everything else in app.py conforms to SPEC.md.",
+      "category": "missing evidence-domain assumption",
+      "analysis": "The review itself notes the undocumented URL domain, but its unconditional conformance claim does not follow. Matching FTP evidence is rejected independently of the correctly identified boolean bug.",
+      "disposition": "C5 resolves the domain omission for the new corpus only. Retain the original rejection and check new consequence/conformance claims without a blanket exemption.",
+      "witness": {
+        "code": "_validate_capture_attestations(value, evidence)",
+        "input": {
+          "value": [
+            {
+              "evidence_index": 0,
+              "final_url": "ftp://example.test/a",
+              "relation": "supports",
+              "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "publisher_authority": true,
+              "passage_entailment": true,
+              "authority_reason": "authority",
+              "entailment_reason": "passage"
+            }
+          ],
+          "evidence": [
+            {
+              "url": "ftp://example.test/a",
+              "relation": "supports"
+            }
+          ]
+        },
+        "actual": {
+          "kind": "error",
+          "type": "ValueError",
+          "reason": "capture_attestation final_url must be absolute HTTP(S)"
+        }
+      },
+      "witness_sha256": "170e16e69a98e5154f264d4fdd00105e07438c0e543a170639daa2e1511868a1"
+    }
+  ]
+}
