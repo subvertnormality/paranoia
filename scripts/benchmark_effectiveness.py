@@ -21,6 +21,7 @@ import benchmark_review_modes as shared
 import effectiveness_custody as custody
 
 ROOT = Path(__file__).resolve().parents[1]
+PLAN_FILE = ROOT / "docs/effectiveness-calibration-plan.md"
 ARMS = ("single", "staged")
 REPETITIONS = 2
 CALL_LIMIT = 192
@@ -41,6 +42,7 @@ QUESTION = (
 )
 HARNESS_NAMES = (
     "benchmark_effectiveness.py", "effectiveness_custody.py", "effectiveness_corpus.py",
+    "effectiveness_calibration.py",
     "score_effectiveness.py", "benchmark_review_modes.py",
     "benchmark_bootstrap.py",
 )
@@ -143,8 +145,10 @@ def load_manifest(root):
     if shared.sha((root / "oracle.json").read_bytes()) != m["oracle_sha256"]:
         raise ValueError("oracle changed")
     shared.validate_source(m["source"])
+    if set(m["harness"]) != {str(ROOT / "scripts" / name) for name in HARNESS_NAMES}:
+        raise ValueError("complete calibrated harness binding required")
     shared.validate_harness(m["harness"])
-    if shared.sha((ROOT / "docs/effectiveness-lifecycle-plan.md").read_bytes()) != m["plan_sha256"]:
+    if shared.sha(PLAN_FILE.read_bytes()) != m["plan_sha256"]:
         raise ValueError("contract changed")
     return m
 
@@ -177,7 +181,7 @@ def freeze(root, source, call_limit=CALL_LIMIT):
         "stakes": STAKES, "question": QUESTION, "cases": cases, "order": schedule(cases),
         "fixtures": {}, "oracle_sha256": shared.sha((root / "oracle.json").read_bytes()),
         "call_limit": call_limit,
-        "plan_sha256": shared.sha((ROOT / "docs/effectiveness-lifecycle-plan.md").read_bytes()),
+        "plan_sha256": shared.sha(PLAN_FILE.read_bytes()),
     }
     for row in manifest["order"]:
         case = next(c for c in cases if c["id"] == row["case"])

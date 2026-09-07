@@ -4,6 +4,39 @@ This measurement implements issue #49's bounded pilot alongside the
 [typed lifecycle extraction](typed-lifecycle.md) for #50. The immutable
 [accepted card](effectiveness-lifecycle-plan.md) governs acceptance.
 
+## Calibrated follow-up
+
+The current launcher binds the separately accepted
+[calibration card](effectiveness-calibration-plan.md). Historical campaigns must
+continue to use their recorded source checkouts and original card. No production
+source, prompt, role, call topology, schema or timeout changed in this follow-up.
+
+Before freeze, effectiveness_corpus.build runs the oracle-owned
+effectiveness_calibration matrix. Its 1,648 checks cover all eight cases; all four
+controls pass, and defective variants fail only their named target family checks.
+The oracle retains every input, expected/actual outcome and observation digest.
+Calibration failure aborts the freeze before CLI version reads or provider work.
+The calibration module is part of the required complete harness hash inventory.
+
+The parser variants carry explicit patches to their exact historical spans:
+unfenced input or complete permitted fence pairs are accepted, missing mates
+reject, and compact indexed row diagnostics keep all admitted errors within the
+fixture's existing bound. The defective variant retains early-exit aggregation;
+the control retains combined diagnostics. Source/span hashes and the full patch
+are oracle-owned, never shown to reviewers. The identity implementations are
+unchanged; their new shared specification declares the HTTP(S) evidence domain
+and exact strip-based nonblank-text rule. The old FTP observation remains in the
+calibration evidence as an outside-domain example for this new specification,
+not a retrospective dismissal of the earlier review disagreement.
+
+The initial focused run passed 54 tests, including reintroduced fence/excerpt/
+identity defects, lost target defects, malformed scalar results, exact historical
+patch provenance, and calibration/card/control tampering before provider calls.
+Full tests, the new complete campaign and CODE cold final remain delivery gates.
+This is post-pilot calibration, not a held-out evaluation. A new unexpected valid
+defect or ambiguity still blocks comparative qualification and requires a corpus
+checkpoint; this card does not permit another patch-and-rerun cycle after freeze.
+
 ## Scope and contract resolution
 
 Preserve production reviewer roles and calls. A clean initial census already

@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import ast
+import difflib
 import hashlib
 import json
 import subprocess
 from pathlib import Path
+
+from effectiveness_calibration import calibrate
 
 COMMON = (
     "Review app.py against this specification. helpers.py supplies the documented "
@@ -97,6 +100,39 @@ def historical(root: Path, revision: str, function: str):
     }
 
 
+def calibrated_diagnostic(app, provenance):
+    """Explicit shared repairs; retain the historical aggregation difference."""
+    original = app
+    changes = [
+        ('    if tail.startswith("```json"):',
+         '    fenced = tail.startswith("```")\n    if tail.startswith("```json"):'),
+        ('    if remainder == "```":\n        remainder = ""',
+         '    if remainder == "```" and fenced:\n        remainder = ""\n'
+         '    elif fenced and not remainder:\n        remainder = "missing closing fence"'),
+        ('f"{reason}; item={_excerpt(json.dumps(item, ensure_ascii=False))}"',
+         'f"{reason} [/claims/{index}]"'),
+    ]
+    for before, after in changes:
+        expected_count = 2 if before.startswith('f"{reason}') else 1
+        if app.count(before) != expected_count:
+            raise ValueError("historical calibration patch no longer matches")
+        app = app.replace(before, after)
+    # The corrected version selected between identical compact forms after the
+    # shared replacement. Collapse that redundant conditional explicitly.
+    before = ('f"{reason} [/claims/{index}]" if not allow_partial else\n'
+              '                f"{reason} [/claims/{index}]"')
+    app = app.replace(before, 'f"{reason} [/claims/{index}]"')
+    patch = "".join(difflib.unified_diff(original.splitlines(keepends=True),
+                                        app.splitlines(keepends=True),
+                                        fromfile="historical-app.py", tofile="calibrated-app.py"))
+    return app, {**provenance, "kind": "calibrated-historical-extracted",
+                 "transformation": "Exact recorded historical span plus import prefix, then the recorded shared fence/compact-diagnostic patch; aggregation behavior is preserved.",
+                 "historical_app_sha256": hashlib.sha256(original.encode()).hexdigest(),
+                 "calibration_patch": patch,
+                 "calibration_patch_sha256": hashlib.sha256(patch.encode()).hexdigest(),
+                 "calibrated_app_sha256": hashlib.sha256(app.encode()).hexdigest()}
+
+
 def build(root: Path):
     families = [
         ("overlap", "codex",
@@ -114,24 +150,44 @@ def build(root: Path):
     ]
     for family, provider, spec, function, revision in [
         ("diagnostic", "codex",
-         "parse_audit parses one marked JSON object using the supplied helper validators. "
-         "For a decodable correctly shaped object, the bounded error must report all "
-         "independent suffix, claim-row and coverage errors so one correction can repair "
-         "them together. A suffix always rejects, even in partial mode. Partial mode may "
-         "retain valid rows with row issues when there is no fatal suffix/coverage error. "
-         "Helpers implement the fixture row domain exactly as supplied; no broader external "
-         "claim semantics are implied.\n", "parse_audit", "1ca55d9"),
+         "parse_audit uses the supplied helper validators and requires exactly one occurrence "
+         "of AUDIT_MARKER in its input text. After the marker accept unfenced JSON or one "
+         "complete pair of triple-backtick fences (opening plain or followed by json). "
+         "Reject either missing mate and any other suffix, in both modes. Reject malformed "
+         "JSON or structural admission failures: the decoded object must have exactly claims "
+         "and coverage, claims must be a list of at most MAX_ACTIVE_CLAIMS entries, and coverage "
+         "must be an object. Only after that admission, report all independently detectable "
+         "suffix, claim-row and coverage errors together within DIAGNOSTIC_CHARS characters, "
+         "retaining every erroneous row index and coverage field. Reject duplicate anchor/"
+         "proposition pairs. Strict mode rejects any row error; partial mode retains valid "
+         "rows in order with compact indexed issues only when no fatal envelope/suffix/"
+         "coverage error exists. Both prior_dispositions and prior_assessments are required "
+         "and use the supplied helpers; extra coverage metadata is retained. Successful "
+         "results preserve the input coverage, expose those validated coverage arrays, and "
+         "bind the original text digest. Errors use AuditError. No broader external claim "
+         "semantics are implied.\n", "parse_audit", "1ca55d9"),
         ("identity", "claude",
-         "_validate_capture_attestations accepts a list with at most one row per evidence "
+         "The caller supplies JSON-compatible values and an evidence list of dictionaries. "
+         "Nonblank text means a string whose str.strip() is nonempty and which contains "
+         "neither CR nor LF; preserve the original text, without trimming. Every evidence url "
+         "is nonblank text that urlparse accepts with scheme http or https and a truthy "
+         "hostname, and every evidence relation is nonblank text. Non-HTTP(S) evidence is "
+         "outside this caller-enforced domain. _validate_capture_attestations accepts a list "
+         "with at most one row per evidence "
          "item. Each row has exactly the listed fields and an exact integer evidence_index "
          "within range, not another JSON scalar. Identity, URL and relation must agree with "
          "the referenced evidence item. Duplicate identities reject; the digest is lowercase "
-         "64-digit hex, decision flags are booleans and reason fields are nonempty single "
-         "lines. Reject invalid inputs with ValueError. No network access is required.\n",
+         "64-digit hex, decision flags are exact booleans and reason fields are nonblank "
+         "text under the same definition. Other Unicode within nonblank text is permitted. "
+         "Return valid rows in encounter order with their field values unchanged. "
+         "Reject invalid reviewed values with ValueError. No network access is required.\n",
          "_validate_capture_attestations", "ac50c47"),
     ]:
         bad, bad_source = historical(root, revision + "^", function)
         good, good_source = historical(root, revision, function)
+        if family == "diagnostic":
+            bad, bad_source = calibrated_diagnostic(bad, bad_source)
+            good, good_source = calibrated_diagnostic(good, good_source)
         families.append((family, provider, spec, bad, good, bad_source, good_source))
     cases, oracle = [], {}
     for row in families:
@@ -145,6 +201,7 @@ def build(root: Path):
                 "specification": files["SPEC.md"],
                 "provenance": row[5 if defect else 6] if len(row) > 5 else {"kind": "seeded"},
                 "witness": witness(family, files),
+                "calibration": calibrate(family, files, defect),
             }
             assert oracle[case_id]["witness"]["violates"] is defect
     return cases, oracle
