@@ -283,7 +283,7 @@ def test_authoritative_capture_acceptance_record() -> None:
         cwd=root, check=True, stdout=subprocess.PIPE,
     ).stdout
     assert hashlib.sha256(handler_diff).hexdigest() == allowed["sha256"]
-    assert "does not alter capture, binding, cold-attestation" in allowed["scope"]
+    assert "Issue 117 later changes cold-attestation authoring and exact prompt sizes" in allowed["scope"]
     census_allowed = snapshot["allowed_later_review_census_diff"]
     census_diff = subprocess.run(
         ["git", "diff", "--no-ext-diff", source_commit, "--",

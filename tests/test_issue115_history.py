@@ -18,8 +18,6 @@ RECORDS = {
         ("allowed_later_source_diffs",), ("validation", "allowed_later_source_diffs")],
     "authoritative_capture_acceptance_2026-08-20.json": [
         ("reviewed_snapshot", "allowed_later_plan_claims_diff"),
-        # Separately approved class-authoring metadata; the original evidence
-        # remains immutable when the two delivered source changes are combined.
         ("reviewed_snapshot", "allowed_later_handlers_diff")],
 }
 
@@ -52,6 +50,11 @@ def test_original_acceptance_is_immutable_except_existing_allowance_metadata(nam
             for key in original:
                 assert type(updated[key]) is type(original[key])
                 updated[key] = original[key]
+    if name.startswith("authoritative"):
+        original_sentence = "The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here."
+        qualification = "This historical run used its recorded prompts. Issue 117 later changes cold-attestation authoring and exact prompt sizes, requiring separate current-source acceptance."
+        assert current["scope"] == old["scope"].replace(original_sentence, qualification)
+        current["scope"] = old["scope"]
     assert current == old
 
 

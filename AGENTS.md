@@ -1,5 +1,12 @@
 # Repository agent instructions
 
+Cold plan attestation initial and correction prompts share one complete output contract:
+one marker/envelope, only the permitted fields, one row per supplied integer identity pair,
+independent Boolean judgments and bounded reason fields. A correction replaces the entire
+reply. Preserve strict rejection and the single same-session retry; never choose a later
+envelope or recover competing attestations. Ordinary and expanded preflight use the actual
+renderers. Historical prompt measurements remain historical after authoring changes.
+
 For new or replacement unmechanized class definitions, reviewers author specific stable member
 IDs from the invariant and validated evidence. Existing-class assessments retain the exact
 server-supplied inventory; reference IDs for existing debt, classes and lane sources cannot be
