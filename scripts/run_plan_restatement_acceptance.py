@@ -222,6 +222,8 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
+    # Historical replay only: retain the original prompt and its full comparison.
+    prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
     prompt = prompt.replace(
         "For a satisfied unmechanized class, omit flat evidence and\n"
         "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"
