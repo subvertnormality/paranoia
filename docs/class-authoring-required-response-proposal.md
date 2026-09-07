@@ -1,8 +1,8 @@
 # Proposed acceptance change: test authoring independently of selection
 
-Status: proposal only. The current frozen Q4d/Q4e authorizes a direct task and ownership
-wording, not a different provider schema. No new campaign or implementation is authorized
-by this document alone; the existing quality plan remains unchanged.
+Status: user approved. The executable obligations are now Q4f of
+docs/class-authoring-quality-plan.md. PLAN review precedes implementation and the single
+fresh campaign. The earlier task-only and ownership campaigns remain nonqualifying.
 
 The current experiment asks for a reusable class, but still permits a one-off response.
 Four retained campaigns cannot establish whether the candidate's authored classes accept

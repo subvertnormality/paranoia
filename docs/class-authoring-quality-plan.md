@@ -145,6 +145,46 @@ operator assertion alone, must prove task scope. Report this as direct class-aut
 acceptance, never evidence that an unprompted census will choose a reusable class. The
 prior one-off outcomes remain legitimate defect detection and nonqualifying class evidence.
 
+Q4f. User-approved required-authoring acceptance reopening: retain the fourth ownership
+campaign as nonqualifying evidence. For one fresh campaign, the test-only wrapper may also
+narrow the parent consolidation's response_schema, including its existing same-session
+retry. This supersedes Q4e's unchanged-schema rule only at these two schema locations:
+properties.governing_findings.minItems becomes 1, and the finding classification.anyOf
+retains only its existing new_class alternative. Reject an unexpected source shape before
+spend. Keep the complete retained definition alternative(s), every other field and bound,
+all ordinary local parsers/validators, and the entire production runtime unchanged.
+No class content, IDs, severity, evidence, predicate, procedure or repair syntax is injected.
+This is required-authoring acceptance, not evidence of ordinary class-selection reliability.
+
+scripts/run_class_authoring_acceptance.py:required_authoring_schema must deepcopy the
+production provider schema, change only those two locations, and leave its argument intact.
+tests/test_class_authoring_acceptance.py must restore the two changed locations and obtain
+exact original equality; validate concrete mechanized and unmechanized new-class decisions
+against both schemas; prove empty/one-off decisions remain legal in the original but reject
+in the narrowed schema. Missing or duplicate new_class alternatives must reject pre-spend.
+
+direct_authoring_scope captures a separate sealed original/expected schema record for each
+staged role before invoking it. Only parent consolidation may differ; every lane, correction
+and final forwards its exact original schema. Record actual canonical schema bytes at the
+Engine._execute boundary alongside existing prompt capture. qualify_authoring_prompts joins
+each role's original/expected schema, actual captured schema, and native trace schema digest
+for every initial/retry attempt; verify exactly the required projection for parent
+consolidation and equality elsewhere. Keep prompt/task joins and require the same narrowed
+schema on the consolidation retry. Empty/missing/extra/mismatched schema records reject.
+Cut the campaign manifest schema version so historical task-only campaigns cannot silently
+be interpreted as required-authoring campaigns. Original archives remain immutable.
+
+Extend the existing production-handler graph/retry smoke, forwarded-argument identity check,
+and resealed negative controls: missing schema record, changed restriction, restriction on
+a lane, restriction on a continuation, and original schema restored only on consolidation
+retry must reject. Reseal the changed actual schema and corresponding trace digest so the
+role/expected-schema join, not only outer hashes, must reject. Parent failures block fork
+admission with zero dependent calls; continuation failures withhold complete acceptance.
+Keep all 18 existing negative controls and every Q4a-Q4d native/source/fixture/repair gate,
+the 32-call ceiling and serial nodes. Run these deterministic controls and the full suite
+before native spend. Review this reopened plan once to convergence; after implementation,
+return to CODE only. Another terminal nonqualification returns to the architecture checkpoint.
+
 Q5. Update public guidance and AGENTS.md before review. After PLAN review, convergence
 stays on CODE bound to this exact contract. Before merge/push require relevant tests,
 qualified native acceptance and clear CODE convergence. Record source identity, production
