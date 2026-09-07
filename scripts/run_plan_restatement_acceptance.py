@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from paranoia_local import class_closure as cc
 from paranoia_local import engines, handlers, orientation, prompts, review_census as rc
 from paranoia_local import staged_protocol as sp
+from paranoia_local import plan_claims as pc
 
 OUTPUT = ROOT / "docs" / "plan_restatement_acceptance_2026-09-01.json"
 DISCOVERY_LINEAGE = "plan-restatement-discovery-acceptance-20260901"
@@ -224,6 +225,9 @@ def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
     # Historical replay only: retain the original prompt and its full comparison.
     prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
+    # Exact inverse of issue 115's added instruction; retained bytes still
+    # require complete equality, and every other historical projection is unchanged.
+    prompt = prompt.replace(pc.PRIOR_DISPOSITION_INSTRUCTIONS + "\n", "")
     prompt = prompt.replace(
         "For a satisfied unmechanized class, omit flat evidence and\n"
         "emit member_coverage containing every server-supplied stable member ID exactly once with its own\n"

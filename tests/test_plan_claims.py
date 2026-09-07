@@ -4743,6 +4743,130 @@ def test_combined_diagnostics_preserve_row_only_partial_boundary():
     assert len(caught.value.reason) <= pc.DIAGNOSTIC_CHARS
 
 
+
+@pytest.mark.parametrize("id_key", ["claim_id", "prior_claim_id"])
+@pytest.mark.parametrize("reason_key", ["reason", "rationale"])
+def test_issue_115_preserves_single_name_wire_pairs(id_key, reason_key):
+    row = {id_key: "C-example", "disposition": "removed", reason_key: "Absent."}
+    assert pc._validate_dispositions([row], json.dumps(row)) == (
+        {"claim_id": "C-example", "disposition": "removed", "reason": "Absent."},
+    )
+
+
+@pytest.mark.parametrize("pair", ["id", "reason", "both"])
+@pytest.mark.parametrize("equal", [False, True])
+def test_issue_115_collision_diagnostic_names_pairs_without_echoing_values(pair, equal):
+    row = {"claim_id": "C-example", "disposition": "removed", "reason": "Absent."}
+    if pair in {"id", "both"}:
+        row["prior_claim_id"] = row["claim_id"] if equal else "private-value-" * 1000
+    if pair in {"reason", "both"}:
+        row["rationale"] = row["reason"] if equal else "private-value-" * 1000
+    with pytest.raises(pc.AuditError) as caught:
+        pc._validate_dispositions([row], json.dumps(row))
+    reason = caught.value.reason
+    assert "/coverage/prior_dispositions/0" in reason
+    assert pc.PRIOR_DISPOSITION_EXAMPLE in reason
+    assert "private-value-" not in reason and len(reason) <= pc.DIAGNOSTIC_CHARS
+    if pair in {"id", "both"}:
+        assert "Observed ID fields: claim_id, prior_claim_id." in reason
+    if pair in {"reason", "both"}:
+        assert "Observed reason fields: rationale, reason." in reason
+
+
+def test_issue_115_shared_contract_reaches_all_claim_prompts():
+    error = pc.AuditError("synthetic rejection", "{}")
+    for prompt in (
+        pc.audit_instructions(PLAN, {}, "trusted local tool"),
+        pc.targeted_audit_instructions(PLAN, {}, "trusted local tool", []),
+        pc.retry_instructions(error, PLAN, {}),
+    ):
+        assert pc.PRIOR_DISPOSITION_INSTRUCTIONS in prompt
+    example = json.loads(pc.PRIOR_DISPOSITION_EXAMPLE)
+    assert pc._validate_dispositions([example], json.dumps(example))[0] == example
+
+
+@pytest.mark.parametrize("repaired", [False, True])
+def test_issue_115_claude_public_adapter_retry_and_durable_retirement(repo, tmp_path, monkeypatch, repaired):
+    lineage_id = "alias-collision-115"
+    prior = pc.reconcile(
+        {}, pc.parse_audit(_audit(_claim(verdict="unverified", evidence=[])), PLAN),
+        lineage_id=lineage_id, round_no=1, plan_text=PLAN,
+    )
+    claim_id = next(iter(prior["claims"]))
+    cc.save_lineage(cc.default_state_root(), cc.Lineage(
+        lineage_id, mode=cc.PLAN_MODE, rounds=1, claim_state=prior,
+    ))
+    row = {"claim_id": claim_id, "prior_claim_id": claim_id, "disposition": "removed",
+           "reason": "The old anchor is absent.", "rationale": "The old anchor is absent."}
+    invalid = _audit(dispositions=[row])
+    canonical = _audit(dispositions=[{k: row[k] for k in ("claim_id", "disposition", "reason")}])
+    replies = [invalid, canonical if repaired else invalid]
+    discovery = []
+    captured = []
+
+    def capture(candidates, **kwargs):
+        captured.extend(candidates)
+        return []
+
+    def execute(self, argv, prompt, cwd, runner, timeout, on_progress=None, response_schema=None):
+        assert self.name == "claude"
+        if self.role == handlers.eng.ROLE_DISCOVERY:
+            discovery.append((list(argv), prompt))
+            assert len(discovery) <= 2, "a third discovery attempt was admitted"
+            text = replies.pop(0)
+            return Review(text=text, raw=text, session_ref="issue-115-discovery",
+                          returncode=0, error=False, duration_ms=1, stderr="", failure_detail="")
+        assert self.role == handlers.eng.ROLE_REPOSITORY, "removed claim reached evidence binding"
+        if "ROLE: census lane " in prompt:
+            lane = next(line.split()[-1] for line in prompt.splitlines()
+                        if line.startswith("ROLE: census lane "))
+            value = {"lane": lane, "findings": [], "class_assessments": [],
+                     "coverage": [{"id": key, "status": "covered", "summary": "checked",
+                                   "evidence": [{"anchor": "repository/README.md:1",
+                                                 "rationale": "fixture scope"}], "finding_ids": []}
+                                  for key in sp.CHECKLIST]}
+        else:
+            value = {"role": "census", "governing_findings": [], "debt_outcomes": [],
+                     "class_actions": {}, "concession_challenges": {}}
+        text = json.dumps(value)
+        return Review(text=text, raw=text, session_ref="issue-115-structure",
+                      returncode=0, error=False, duration_ms=1, stderr="", failure_detail="")
+
+    # Only provider subprocess results/version probing are scripted. The exact
+    # ClaudeEngine, role dispatch, captured adapter and native retry remain real.
+    monkeypatch.setattr(handlers.eng.ClaudeEngine, "_execute", execute)
+    monkeypatch.setattr(handlers.eng, "_cli_version", lambda binary: handlers.eng.MIN_CLAUDE_VERSION)
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture)
+    result = handlers.critique_plan(
+        {"plan_text": "# Local plan\nKeep the local label unchanged.\n",
+         "repo_path": str(repo), "lineage": lineage_id, "round": 2,
+         "model": "opus", "claim_verification": True, "stakes": "trusted local tool"},
+        engine=handlers.eng.ClaudeEngine(), log_dir=tmp_path / "logs", now=lambda: "T115",
+    )
+    assert len(discovery) == 2 and not replies and not captured
+    assert "--resume" in discovery[1][0]
+    assert discovery[1][0][discovery[1][0].index("--resume") + 1] == "issue-115-discovery"
+    correction = discovery[1][1]
+    for expected in ("/coverage/prior_dispositions/0",
+                     "Observed ID fields: claim_id, prior_claim_id.",
+                     "Observed reason fields: rationale, reason.", pc.PRIOR_DISPOSITION_EXAMPLE):
+        assert expected in correction
+    state = cc.load_lineage(cc.default_state_root(), lineage_id, stamp="T116", mode=cc.PLAN_MODE).claim_state
+    audit = json.loads(next((tmp_path / "logs").glob("*-critique_plan-*.json")).read_text())
+    attempts = [row for row in audit["attempt_ledger"] if row["role"].startswith("claim-discovery")]
+    assert [row["role"] for row in attempts] == ["claim-discovery", "claim-discovery-validation-retry"]
+    assert attempts[0]["outcome"] == "validation-invalid"
+    if repaired:
+        assert not state["claims"] and not pc.is_blocked(state)
+        assert attempts[1]["outcome"] == "completed"
+        assert "CONVERGENCE: NOT-BLOCKED" in result
+    else:
+        assert state["claims"] == prior["claims"] and pc.is_blocked(state)
+        assert attempts[1]["outcome"] == "validation-invalid"
+        assert len(state["debt"]["attempts"]) == 2
+        verdicts = [line for line in result.splitlines() if line.startswith("CONVERGENCE:")]
+        assert len(verdicts) == 1 and verdicts[0].startswith("CONVERGENCE: BLOCKED")
+
 @pytest.mark.parametrize("repaired", [True, False])
 def test_issue_114_combined_error_single_correction_lifecycle(tmp_path, monkeypatch, repaired):
     source = _source()
