@@ -418,8 +418,10 @@ def _research_execution_failure(
     completed["prompt_sha256"] = pending["prompt_sha256"]
     completed["prompt_excerpt"] = pending["prompt_excerpt"]
     attempts[-1] = completed
+    quota = eng.claude_quota_guidance(review, engine.name)
     return _research_failure(
-        engine=engine, model=model, phase=phase, kind="execution", message=detail,
+        engine=engine, model=model, phase=phase, kind="execution",
+        message=(quota + " Provider diagnostic: " if quota else "") + detail,
         attempts=attempts, rejected=rejected, claims=claims, captures=captures,
     )
 

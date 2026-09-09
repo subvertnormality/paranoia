@@ -122,3 +122,28 @@ def test_arbitration_quota_names_override_without_rewriting_failure_audit(tmp_pa
     assert caught.value.record["raw"] == RAW
     assert len(calls) == 1
     assert "Claude model quota exhausted" in handlers._footer(quota_review(), engines.ClaudeEngine())
+
+
+@pytest.mark.parametrize("phase", ["discovery", "discovery-validation-retry", "binding", "binding-validation-retry"])
+def test_arbitration_research_quota_preserves_original_attempt(phase):
+    attempts = [{"prompt_sha256": "a" * 64, "prompt_excerpt": "p", "intended_session_ref": "s"}]
+    failure = ah._research_execution_failure(
+        engine=engines.ClaudeEngine(), model="claude-fable-5-1", phase=phase,
+        attempts=attempts, review=quota_review(), rejected=[],
+    )
+    assert "Claude model quota exhausted" in str(failure)
+    assert "models={'claude':" in str(failure)
+    assert failure.record["attempts"][0]["failure_detail"] == MESSAGE
+
+
+def test_public_plan_claim_audit_quota_names_recovery(repo, tmp_path, monkeypatch):
+    monkeypatch.setattr(engines, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(engines.ClaudeEngine, "run", lambda *a, **k: quota_review())
+    result = handlers.critique_plan({
+        "repo_path": str(repo), "plan_text": "# Plan\nPython supports strings.\n",
+        "lineage": "quota-claims", "round": 1, "stakes": "local test",
+    }, engine=engines.ClaudeEngine(), log_dir=tmp_path / "logs")
+    assert "Claude model quota exhausted" in result
+    assert "CONVERGENCE: NOT-BLOCKED" not in result
+    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    assert audit["attempt_ledger"][0]["failure_detail_excerpt"] == MESSAGE

@@ -113,7 +113,7 @@ def claude_quota_guidance(review: Review, engine_name: str) -> str | None:
                 f"Claude model quota exhausted ({match[1].lower()}). "
                 "No automatic model substitution was made. Wait for quota recovery "
                 "or explicitly select another available Claude model: review/query/rebut "
-                "calls use model='<available-claude-model>'; arbitrate's Claude decider "
+                "calls use model='<available-claude-model>'; arbitrate's Claude research/decider "
                 "uses models={'claude': '<available-claude-model>'}. "
                 "That decider override does not change fixed cleaner/attester models. "
                 "For Fable exhaustion, claude-opus-5 is a possible alternative, "
