@@ -2957,11 +2957,13 @@ def _run_agent(
     # deliberately preserves in-band error text (see tests/test_instrumentation.py),
     # so accepting non-empty output here would let a failed process cast a vote.
     if review.error:
+        quota = eng.claude_quota_guidance(review, engine_name)
         detail = _bounded_research_text(
-            review.failure_detail
+            (quota + " Provider diagnostic: " if quota else "")
+            + (review.failure_detail
             or review.text
             or review.raw
-            or "engine returned no detail"
+            or "engine returned no detail")
         )
         record = {
             "engine": engine_name,

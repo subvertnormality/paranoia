@@ -6,6 +6,16 @@ if this page and an installed version differ.
 
 ## Shared review arguments
 
+Claude model quota exhaustion is a failed provider attempt, not a structural
+finding. Recognized model-limit diagnostics name an explicit recovery route;
+Paranoia never automatically substitutes a model or retries the exhausted one.
+Wait for quota recovery, or choose another available Claude model using the model
+argument on review/query/rebut calls. For arbitrate's Claude decider, use the models
+mapping with its claude key; this does not change fixed cleaner/attester models.
+For Fable exhaustion, claude-opus-5 is a possible alternative, not a promise of
+availability. Model choice remains explicit and audited; no review is cleared by
+quota failure or by changing the model.
+
 `critique_branch`, `critique_plan`, `query`, and `rebut` accept these overrides:
 
 | Argument | Values | Default |

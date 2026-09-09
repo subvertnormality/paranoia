@@ -33,7 +33,7 @@ from . import logs, orientation, plan_claims as pc, prompts, review_census as rc
 from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions
 from .config import load_repo_config, resolve
-from .engines import Engine, Review
+from .engines import Engine, Review, claude_quota_guidance
 from .worktree import worktree_at
 
 
@@ -370,16 +370,20 @@ def _review_failure_projection(review: Review) -> dict[str, Any]:
     }
 
 
-def _engine_failure_error(review: Review, *, role: str) -> rc.CensusError:
+def _engine_failure_error(
+    review: Review, *, role: str, engine_name: str = "",
+) -> rc.CensusError:
+    quota = claude_quota_guidance(review, engine_name)
     kind = (
         "timeout" if review.returncode == 124
         else "unavailable" if review.returncode == 127
         else "cancellation" if review.returncode in {-15, -2, 130, 143}
-        else "provider" if review.returncode == 0
+        else "provider" if review.returncode == 0 or quota
         else "execution"
     )
     detail = rc.bounded_diagnostic(
-        review.failure_detail or review.text or review.raw or "engine failure",
+        (quota + " Provider diagnostic: " if quota else "")
+        + (review.failure_detail or review.text or review.raw or "engine failure"),
         rc.MAX_ENGINE_FAILURE_MESSAGE_CHARS,
     )
     error = rc.CensusError(detail)
@@ -414,7 +418,7 @@ def _staged_call(
         role, engine, review, sequence=sequence, requested_timeout_sec=timeout,
     )]
     if review.error:
-        error = _engine_failure_error(review, role=role)
+        error = _engine_failure_error(review, role=role, engine_name=engine.name)
         error.attempts = attempts  # type: ignore[attr-defined]
         raise error
     try:
@@ -475,7 +479,7 @@ def _staged_call(
         ))
         if retry.error:
             error = _engine_failure_error(
-                retry, role=f"{role}-validation-retry",
+                retry, role=f"{role}-validation-retry", engine_name=engine.name,
             )
             error.attempts = attempts  # type: ignore[attr-defined]
             error.rejected_payloads = rejected  # type: ignore[attr-defined]
@@ -2046,7 +2050,8 @@ def _footer(review: Review, engine: Engine) -> str:
             f"⚠️ REVIEW FAILED (engine={engine.name}, exit={review.returncode}) — treat the "
             f"output below as an error, not a completed review.\n\n"
         )
-    return prefix + (review.text or "[empty review]") + note
+    quota = claude_quota_guidance(review, engine.name)
+    return prefix + (quota + "\n\n" if quota else "") + (review.text or "[empty review]") + note
 
 
 def _progress_kwargs(on_progress: Callable[[str], None] | None) -> dict[str, Any]:
