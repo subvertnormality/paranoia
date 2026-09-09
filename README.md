@@ -208,7 +208,14 @@ counter-evidence:
 ```
 
 The same reviewer session responds `CONCEDE` or `HOLD` with fresh citations.
-The unbound form is non-mutating. For a persistently gated class, optional
+The unbound form is non-mutating. One-off debt with an empty class_ids list has no
+class-bound rebut authority. Dispute it with unbound rebut using session_ref
+and rebuttal, omitting all four binding fields. Carry the counter-evidence and
+any concession into the next critique correction's focus; debt stays open until
+validated settlement. Zero open classes alone never means convergence: blocking
+one-off debt still gates the governing CONVERGENCE verdict.
+
+For a persistently gated class, optional
 `lineage`, `class_id`, `debt_id`, and `lineage_mode` arguments bind the result
 to one current durable target. `HOLD` is audit-only. A validated `CONCEDE`
 closes that debt and closes its class only when no sibling blocker remains; it
