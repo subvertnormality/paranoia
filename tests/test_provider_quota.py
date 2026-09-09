@@ -147,3 +147,28 @@ def test_public_plan_claim_audit_quota_names_recovery(repo, tmp_path, monkeypatc
     assert "CONVERGENCE: NOT-BLOCKED" not in result
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
     assert audit["attempt_ledger"][0]["failure_detail_excerpt"] == MESSAGE
+
+
+def test_public_arbitration_default_research_quota_is_actionable(repo, tmp_path, monkeypatch):
+    from tests.test_arbitrate_handler import ScriptedResearchEngine, BASE
+    monkeypatch.setattr(ah, "_preflight", lambda engines: None)
+    monkeypatch.setattr(engines, "require_evidence_profile", lambda engine: "test")
+    claude = ScriptedResearchEngine("claude", [quota_review()])
+    codex = ScriptedResearchEngine("codex", [engines.Review(
+        "fixture unavailable", None, "fixture unavailable", returncode=1, error=True,
+    )])
+    def no_decider(**kwargs):
+        raise AssertionError("failed research must not admit deciders")
+    arguments = {key: value for key, value in BASE.items() if key != "research"}
+    result = ah.arbitrate(
+        {**arguments, "repo_path": str(repo), "clean": False},
+        engines=[codex, claude], run_agent=no_decider, log_dir=tmp_path / "logs",
+    )
+    assert "ARBITRATION: FAILED" in result
+    assert "Claude model quota exhausted" in result
+    assert "models={'claude':" in result
+    assert not claude.reviews and not codex.reviews
+    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    failure = next(row for row in audit["research"]["failures"] if row["engine"] == "claude")
+    assert failure["attempts"][0]["failure_detail"] == MESSAGE
+    assert failure["calls"] == 1
