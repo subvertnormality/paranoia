@@ -159,6 +159,11 @@ write; plan anchors also require the retained reviewed-plan line bound. Mechaniz
 branch classes are refused before provider spend because
 their canonical predicate sweep, not a model concession, owns closure.
 A conceded debt retains the original finding and a separate durable concession.
+For one-off debt with an empty class_ids list, no class_id can provide that binding.
+Use unbound rebut with session_ref and rebuttal, omitting all four binding arguments.
+Carry the counter-evidence and any concession into the next critique correction's
+focus. This route is audit-only: the debt remains open until validated correction
+settles it. Zero open classes does not clear blocking one-off debt.
 Later staged decisions must submit a keyed, evidence-backed challenge before they
 can target that class again; an unrelated snapshot or stakes change does not erase
 the concession.

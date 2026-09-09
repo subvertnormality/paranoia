@@ -4662,6 +4662,20 @@ def rebut(
                 correction_control_source=lineage.review_state,
             )
             tracked = lineage.classes.get(class_id)
+            unclassed_target = [
+                row for row in review_state["debt"]
+                if row["id"] == debt_id and row["status"] == "open"
+                and row["class_ids"] == []
+            ]
+            if unclassed_target:
+                raise ValueError(
+                    "bound rebut cannot settle unclassed one-off debt (class_ids=[]); "
+                    "no class_id can bind this debt. Use unbound rebut with session_ref "
+                    "and rebuttal, omitting lineage, class_id, debt_id, and lineage_mode. "
+                    "Unbound rebut is audit-only: carry its counter-evidence and any "
+                    "concession into the next critique correction via focus; the debt "
+                    "remains open until a validated correction settles it."
+                )
             if tracked is None or tracked.status == cc.SUPERSEDED:
                 raise ValueError("bound rebut class_id is not an active tracked class")
             if not tracked.blocking:

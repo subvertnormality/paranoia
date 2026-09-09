@@ -365,6 +365,52 @@ class TestRebut:
         assert successful["debt_settled"] is True
         assert successful["class_closed"] is True
 
+    @pytest.mark.parametrize("mode", [cc.PLAN_MODE, cc.BRANCH_MODE])
+    @pytest.mark.parametrize("has_class", [False, True])
+    def test_unclassed_debt_rebut_names_nonmutating_recovery(
+        self, repo, tmp_path, monkeypatch, mode, has_class,
+    ):
+        monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
+        state = rc.normalize_state(None, stakes="s", snapshot=rc.digest("p"))
+        state.update(phase="correction", last_round=3, plan_line_count=1, debt=[{
+            "id":"D1", "finding_id":"F1", "status":"open", "severity":cc.MAJOR,
+            "summary":"one-off misreading", "evidence":["plan:1"],
+            "remedy":"correct finding", "source_ids":[], "class_ids":[],
+            "first_round":1, "last_round":3,
+        }])
+        classes = {}
+        if has_class:
+            classes["class-a"] = cc.TrackedClass(
+                "class-a", "unrelated invariant", cc.MAJOR, 1, cc.OPEN,
+                procedure="inspect", members=("reviewed-path",),
+            )
+        lineage = cc.Lineage("one-off-rebut", mode=mode, classes=classes, review_state=state)
+        state["correction_control"] = rc.normalize_correction_control(state, lineage.active())
+        cc.save_lineage(cc.default_state_root(), lineage)
+        before = cc.load_lineage(cc.default_state_root(), "one-off-rebut", stamp="T", mode=mode)
+        eng = FakeEngine("CONCEDE: The scope already excludes this finding.")
+        with pytest.raises(ValueError, match="unclassed one-off debt") as caught:
+            handlers.rebut({
+                "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+                "lineage":"one-off-rebut", "class_id":"class-a", "debt_id":"D1",
+                "lineage_mode":mode,
+            }, engine=eng, log_dir=tmp_path / "logs", now=fixed_clock)
+        assert "omitting lineage, class_id, debt_id, and lineage_mode" in str(caught.value)
+        assert "audit-only" in str(caught.value)
+        assert "via focus" in str(caught.value)
+        assert eng.calls == []
+        audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+        assert audit["error"] and not audit["debt_settled"]
+        result = handlers.rebut({
+            "repo_path":str(repo), "session_ref":"sess-1", "rebuttal":"counter",
+        }, engine=eng, log_dir=tmp_path / "unbound-logs", now=fixed_clock)
+        assert "REBUTTAL VERDICT" in result
+        assert len(eng.calls) == 1
+        assert eng.calls[0]["kind"] == "resume"
+        after = cc.load_lineage(cc.default_state_root(), "one-off-rebut", stamp="T", mode=mode)
+        assert after.review_state == before.review_state
+        assert after.classes == before.classes
+
     def test_bound_rebut_identity_is_all_or_none(self, repo: Path, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="requires lineage, class_id, debt_id, and lineage_mode"):
             handlers.rebut({
