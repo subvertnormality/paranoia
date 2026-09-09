@@ -95,6 +95,33 @@ class Review:
     provider_duration_ms: int | None = None
 
 
+def claude_quota_guidance(review: Review, engine_name: str) -> str | None:
+    """Recognize a failed CLI model-limit diagnostic, never successful review prose.
+
+    This is presentation only: do not rewrite retained provider channels, retry,
+    substitute a model, or infer whether another subscription pool is available.
+    """
+    if engine_name != "claude" or not review.error or review.returncode not in {0, 1}:
+        return None
+    for value in (review.failure_detail, review.stderr, review.text):
+        match = re.match(
+            r"\s*you['’]ve reached your (fable|opus|sonnet|haiku) limit\b",
+            value or "", re.IGNORECASE,
+        )
+        if match:
+            return (
+                f"Claude model quota exhausted ({match[1].lower()}). "
+                "No automatic model substitution was made. Wait for quota recovery "
+                "or explicitly select another available Claude model: review/query/rebut "
+                "calls use model='<available-claude-model>'; arbitrate's Claude research/decider "
+                "uses models={'claude': '<available-claude-model>'}. "
+                "That decider override does not change fixed cleaner/attester models. "
+                "For Fable exhaustion, claude-opus-5 is a possible alternative, "
+                "not a guarantee of availability."
+            )
+    return None
+
+
 class Engine(ABC):
     name: str
     default_model: str
