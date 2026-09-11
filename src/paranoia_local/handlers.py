@@ -4279,7 +4279,7 @@ class _CapturedClaimEngine:
                     raise ValueError("duplicate attestation object key")
                 return value
 
-            value = json.loads(tail, object_pairs_hook=unique_object)
+            value = json.loads(tail.strip(), object_pairs_hook=unique_object)
             if not isinstance(value, dict) or set(value) != {"attestations"}:
                 raise ValueError("invalid attestation envelope")
             rows = value["attestations"]

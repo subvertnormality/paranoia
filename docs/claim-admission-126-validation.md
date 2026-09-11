@@ -101,3 +101,13 @@ The initial focused RED run recorded 26 failures and 66 passes, including the
 wording and discovery-only acceptance gaps. Implementation verification, CODE
 review and current native qualification are pending; the earlier green suite and
 review apply only to the previous timeout repair.
+
+The first correction candidate passed 363 focused/historical tests in 149.15
+seconds and the complete Linux tree: 2,324 passed in 129.84 seconds. Its first
+Codex CODE review recorded five staged attempts, including one invalid payload
+and its successful correction; structural debt was clear. It identified a minor
+compatibility regression in surrounding Unicode whitespace. Two public-adapter
+regressions reproduced this on both initial and correction replies. Restoring
+the previous `strip()` normalization fixes that gap without relaxing duplicate
+key, prefix or trailing-content rejection. Updated CODE and full-suite results
+remain pending for this subsequent candidate.

@@ -36,16 +36,23 @@ def assert_contract(prompt):
     assert set(example["attestations"][0]) == FIELDS
 
 
-@pytest.mark.parametrize("malformation", ["envelope-note", "row-note", "competing", "conflicting",
-                                           "prefix", "duplicate-envelope", "duplicate-verdict"])
-@pytest.mark.parametrize("repair", ["valid", "invalid", "negative"])
+@pytest.mark.parametrize("malformation,repair", [
+    (malformation, repair)
+    for malformation in ["envelope-note", "row-note", "competing", "conflicting",
+                         "prefix", "duplicate-envelope", "duplicate-verdict"]
+    for repair in ["valid", "invalid", "negative"]
+] + [("valid-whitespace", "valid"), ("repair-whitespace", "valid")])
 def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malformation, repair):
     source = _source()
     good = {"claim_index": 0, "evidence_index": 0, "publisher_authority": True,
             "authority_reason": "Official release owner.", "passage_entailment": True,
             "entailment_reason": "The passage gives this release date."}
     valid = reply([good])
-    if malformation == "envelope-note":
+    if malformation == "valid-whitespace":
+        invalid = "\u00a0" + valid + "\u00a0"
+    elif malformation == "repair-whitespace":
+        invalid = reply([good | {"note": "ignore"}])
+    elif malformation == "envelope-note":
         invalid = MARKER + "\n" + json.dumps({"attestations": [good], "note": "ignore"})
     elif malformation == "row-note":
         invalid = reply([good | {"note": "ignore"}])
@@ -62,7 +69,9 @@ def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malfo
         invalid = reply([good, good | {"publisher_authority": False}])
     corrected = invalid if repair == "invalid" else (
         reply([good | {"passage_entailment": False}]) if repair == "negative" else valid)
-    replies = [invalid, corrected]
+    if malformation == "repair-whitespace":
+        corrected = "\u00a0" + corrected + "\u00a0"
+    replies = [invalid] if malformation == "valid-whitespace" else [invalid, corrected]
     calls = []
 
     def capture(candidates, **kwargs):
@@ -108,6 +117,10 @@ def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malfo
         "round": 1, "model": "opus", "effort": "high", "claim_verification": True,
         "web_search": True, "stakes": "Trusted local operator and OS; one external claim."},
         default_engine_name="claude", log_dir=tmp_path / "logs")
+    if malformation == "valid-whitespace":
+        assert len(calls) == 1 and not replies
+        assert "CONVERGENCE: NOT-BLOCKED" in result
+        return
     assert len(calls) == 2 and not replies
     argv, correction = calls[1]
     assert argv[argv.index("--resume") + 1] == "issue117-attestation"

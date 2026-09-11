@@ -86,6 +86,7 @@ independent judgments and explicitly excludes private internal deliberation.
 The parser rejects non-whitespace prefixes and duplicate object keys, in addition
 to its existing single-envelope, schema, coverage and size checks. Both initial
 and correction replies use that parser and the existing single retry.
+Surrounding whitespace retains the previous Unicode-aware normalization.
 
 Current-wording qualification requires an initial native attestation attempt in
 the current source-bound audit and successful completion, including a legitimate
