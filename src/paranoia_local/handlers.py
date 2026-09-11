@@ -45,10 +45,15 @@ PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC = 900
 PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC = 300
 PLAN_EVIDENCE_SCHEDULING_SLACK_SEC = 60
 PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 8160
-PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 8280
+PLAN_PREPARATION_RESERVE_SEC = 300
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
 PLAN_TEARDOWN_RESERVE_SEC = 120
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = (
+    PLAN_PREPARATION_RESERVE_SEC
+    + PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
+    + PLAN_TEARDOWN_RESERVE_SEC
+)
 STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
 STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
 STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
@@ -79,8 +84,9 @@ before or after it. The sole envelope key is attestations. Each row has exactly 
 illustrated keys; no note, explanation, alternative, correction or other extra keys.
 Return exactly one row per supplied (claim_index,evidence_index) pair, preserving its integer
 indices. Verdicts are JSON booleans, independently judged; the example values are not answers.
-Put all reasoning in authority_reason and entailment_reason, each a nonempty string of at
-most {MAX_ATTESTATION_REASON_CHARS} characters. No prose, fences, appended repairs, duplicate
+Put concise evidence-based justifications in authority_reason and entailment_reason, each
+a nonempty string of at most {MAX_ATTESTATION_REASON_CHARS} characters.
+Do not include private internal reasoning or step-by-step deliberation. No prose, fences, appended repairs, duplicate
 rows, second marker or competing envelope. Finish after the single complete object.
 === EVIDENCE ATTESTATION JSON ===
 {{"attestations":[{{"claim_index":0,"evidence_index":0,"publisher_authority":true,"authority_reason":"specific reason","passage_entailment":true,"entailment_reason":"specific reason"}}]}}"""
@@ -306,6 +312,7 @@ class _EvidencePhaseReview(Review):
 
     evidence_phase: str = ""
     completed_captures: tuple[dict[str, Any], ...] = ()
+    admission_reason: str = ""
 
 
 def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
@@ -315,6 +322,7 @@ def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
         duration_ms=review.duration_ms, failure_detail=review.failure_detail,
         stderr=review.stderr, provider_duration_ms=review.provider_duration_ms,
         evidence_phase=phase,
+        admission_reason=getattr(review, "admission_reason", ""),
     )
 
 
@@ -3187,7 +3195,9 @@ def _verify_plan_claims(
                 and str(candidates[-1].get("role", "")).endswith("validation-retry")
             ) else candidates[-1:]
         error = pc.AuditError(
-            review.validation_detail if validation_invalid else (
+            review.validation_detail if validation_invalid else
+            f"evidence budget exhausted: {review.admission_reason}"
+            if isinstance(review, _EvidencePhaseReview) and review.admission_reason else (
                 f"claim-{evidence_phase or 'audit'} reviewer failed "
                 f"(exit {review.returncode})"
                 + ("; " + quota if (quota := claude_quota_guidance(review, engine.name)) else "")
@@ -3543,9 +3553,11 @@ class _CapturedClaimEngine:
         review = Review(
             text=f"[paranoia-local error] evidence budget exhausted: {error}",
             session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts or []),
-            returncode=124, error=True,
+            returncode=124, error=True, failure_detail=str(error),
         )
-        return _evidence_phase_review(review, phase) if phase else review
+        return replace(
+            _evidence_phase_review(review, phase or ""), admission_reason=str(error),
+        )
 
     def _require_discovery_session(self, review: Review) -> Review:
         """Reject unusable discovery metadata before any audit can leave the adapter."""
@@ -4257,9 +4269,18 @@ class _CapturedClaimEngine:
                     "attestation reply exceeds "
                     f"{MAX_ATTESTATION_REPLY_CHARS} characters"
                 )
-            tail = review.text.split("=== EVIDENCE ATTESTATION JSON ===", 1)[1].strip()
-            value, end = json.JSONDecoder().raw_decode(tail)
-            if tail[end:].strip() or set(value) != {"attestations"}:
+            prefix, marker, tail = review.text.partition("=== EVIDENCE ATTESTATION JSON ===")
+            if prefix.strip() or not marker:
+                raise ValueError("invalid attestation envelope")
+
+            def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+                value = dict(pairs)
+                if len(value) != len(pairs):
+                    raise ValueError("duplicate attestation object key")
+                return value
+
+            value = json.loads(tail.strip(), object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or set(value) != {"attestations"}:
                 raise ValueError("invalid attestation envelope")
             rows = value["attestations"]
             if not isinstance(rows, list) or len(rows) != len(attestation_batch):
