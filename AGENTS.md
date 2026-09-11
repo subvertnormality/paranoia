@@ -1,5 +1,19 @@
 # Repository agent instructions
 
+Issue #126 follows docs/claim-admission-126-plan.md. Account explicitly for
+repository preparation before claim admission, preserve complete model and
+capture reserves, and retain local admission diagnostics without falsely
+attributing an unstarted call to a provider. Historical failed reviews remain
+failed; resume their lineages after repair, never reset them for clearance.
+Bind native acceptance to tracked closure, the selected child state root and exact
+predecessor lineage. Require matching structural tracking and successful discovery
+or its existing validation retry; any failed/nonzero attempt blocks acceptance.
+The full-suite-discovered three-record historical inventory correction is bounded
+in docs/claim-admission-126.md and tests/test_issue126_history.py. Only existing
+handler allowance hash/scope metadata changes; original provider evidence stays fixed.
+Acceptance requires successful same-session repair of each invalid initial reply.
+Use durable last_round ordering, not settlement count, for continuation labels.
+
 For the behavioral class-authoring branch, the user's revised delivery gate is the fixture
 diagnostic-label fix, deterministic validation and broad Codex CODE convergence. Opus
 convergence and another complete native fixture campaign are not required. Preserve failed

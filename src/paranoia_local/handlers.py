@@ -45,10 +45,15 @@ PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC = 900
 PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC = 300
 PLAN_EVIDENCE_SCHEDULING_SLACK_SEC = 60
 PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC = 8160
-PLAN_REVIEW_TOTAL_TIMEOUT_SEC = 8280
+PLAN_PREPARATION_RESERVE_SEC = 300
 PLAN_STRUCTURAL_PHASE_TIMEOUT_SEC = 2400
 PLAN_REGISTER_RETRY_TIMEOUT_SEC = 600
 PLAN_TEARDOWN_RESERVE_SEC = 120
+PLAN_REVIEW_TOTAL_TIMEOUT_SEC = (
+    PLAN_PREPARATION_RESERVE_SEC
+    + PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
+    + PLAN_TEARDOWN_RESERVE_SEC
+)
 STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
 STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
 STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
@@ -306,6 +311,7 @@ class _EvidencePhaseReview(Review):
 
     evidence_phase: str = ""
     completed_captures: tuple[dict[str, Any], ...] = ()
+    admission_reason: str = ""
 
 
 def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
@@ -315,6 +321,7 @@ def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
         duration_ms=review.duration_ms, failure_detail=review.failure_detail,
         stderr=review.stderr, provider_duration_ms=review.provider_duration_ms,
         evidence_phase=phase,
+        admission_reason=getattr(review, "admission_reason", ""),
     )
 
 
@@ -3187,7 +3194,9 @@ def _verify_plan_claims(
                 and str(candidates[-1].get("role", "")).endswith("validation-retry")
             ) else candidates[-1:]
         error = pc.AuditError(
-            review.validation_detail if validation_invalid else (
+            review.validation_detail if validation_invalid else
+            f"evidence budget exhausted: {review.admission_reason}"
+            if isinstance(review, _EvidencePhaseReview) and review.admission_reason else (
                 f"claim-{evidence_phase or 'audit'} reviewer failed "
                 f"(exit {review.returncode})"
                 + ("; " + quota if (quota := claude_quota_guidance(review, engine.name)) else "")
@@ -3543,9 +3552,11 @@ class _CapturedClaimEngine:
         review = Review(
             text=f"[paranoia-local error] evidence budget exhausted: {error}",
             session_ref=session_ref, raw="\n--- phase ---\n".join(raw_parts or []),
-            returncode=124, error=True,
+            returncode=124, error=True, failure_detail=str(error),
         )
-        return _evidence_phase_review(review, phase) if phase else review
+        return replace(
+            _evidence_phase_review(review, phase or ""), admission_reason=str(error),
+        )
 
     def _require_discovery_session(self, review: Review) -> Review:
         """Reject unusable discovery metadata before any audit can leave the adapter."""

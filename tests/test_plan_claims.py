@@ -3080,7 +3080,8 @@ def test_plan_evidence_budget_composes_at_maximum_batch_count() -> None:
         + handlers.PLAN_EVIDENCE_SCHEDULING_SLACK_SEC
     )
     assert handlers.PLAN_REVIEW_TOTAL_TIMEOUT_SEC == (
-        handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
+        handlers.PLAN_PREPARATION_RESERVE_SEC
+        + handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
         + handlers.PLAN_TEARDOWN_RESERVE_SEC
     )
 
@@ -3254,6 +3255,104 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
         assert all(claim["verdict"] == "supported" for claim in audited.claims)
     finally:
         adapter.close()
+
+
+@pytest.mark.parametrize("engine_type", [handlers.eng.CodexEngine, handlers.eng.ClaudeEngine])
+@pytest.mark.parametrize("setup_seconds", [120.0, 360.0, 361.0])
+def test_issue_126_snapshot_preparation_and_admission_diagnostics(
+    repo: Path, tmp_path: Path, monkeypatch, engine_type, setup_seconds: float,
+) -> None:
+    """Exercise public admission without spending real provider time."""
+    now = [10_000.0]
+    calls = []
+    original_snapshot = handlers.orientation.snapshot_tree
+    original_init = handlers._CapturedClaimEngine.__init__
+
+    def snapshot(*args, **kwargs):
+        tree = original_snapshot(*args, **kwargs)
+        now[0] += setup_seconds
+        return tree
+
+    def adapter_init(self, *args, **kwargs):
+        original_init(self, *args, **kwargs, clock=lambda: now[0])
+
+    def provider(self, prompt, *args, **kwargs):
+        calls.append((self.role, kwargs.get("timeout")))
+        if self.role == handlers.eng.ROLE_DISCOVERY:
+            text = _audit()
+        elif prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in prompt:
+            lane = next(
+                line.split()[-1] for line in prompt.splitlines()
+                if line.startswith("ROLE: census lane")
+            )
+            text = json.dumps({
+                "lane": lane, "findings": [], "class_assessments": [],
+                "coverage": [{
+                    "id": key, "status": "covered", "summary": "checked",
+                    "evidence": [{"anchor": "repository/README.md:1",
+                                  "rationale": "fixture coverage"}],
+                    "finding_ids": [],
+                } for key in handlers.sp.CHECKLIST],
+            })
+        else:
+            text = json.dumps({
+                "role": "census", "governing_findings": [],
+                "debt_outcomes": [], "class_actions": {},
+                "concession_challenges": {},
+            })
+        return Review(text=text, session_ref="native-shaped-fixture", raw=text)
+
+    monkeypatch.setattr(handlers.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(handlers.orientation, "snapshot_tree", snapshot)
+    monkeypatch.setattr(handlers._CapturedClaimEngine, "__init__", adapter_init)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    monkeypatch.setattr(engine_type, "run", provider)
+    monkeypatch.setattr(engine_type, "resume", lambda *a, **k: pytest.fail("no retry expected"))
+    lineage_id = "issue-126-admission"
+    prior_claims = {}
+    if setup_seconds == 361.0:
+        prior = pc.reconcile(
+            {}, pc.parse_audit(_audit(_claim()), PLAN),
+            lineage_id=lineage_id, round_no=1, plan_text=PLAN,
+        )
+        prior = pc.with_debt(
+            prior, pc.AuditError("earlier unsuccessful audit"),
+            round_no=1, plan_text=PLAN,
+        )
+        prior_claims = prior["claims"]
+        cc.save_lineage(cc.default_state_root(), cc.Lineage(
+            lineage_id, mode=cc.PLAN_MODE, rounds=1, claim_state=prior,
+        ))
+    result = handlers.critique_plan(
+        {"plan_text": "# Internal design\n\nKeep existing behavior.\n",
+         "repo_path": str(repo), "lineage": lineage_id, "round": 2,
+         "stakes": "trusted single-user local tool"},
+        engine=engine_type(), log_dir=tmp_path / "logs", now=lambda: "T1",
+    )
+    lineage = cc.load_lineage(
+        cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
+    )
+    discovery = [timeout for role, timeout in calls if role == handlers.eng.ROLE_DISCOVERY]
+    assert lineage.review_state["phase"] == "clear"
+    if setup_seconds <= 360.0:
+        assert discovery == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC]
+        assert lineage.claim_state["debt"] is None
+        assert "\nCONVERGENCE: NOT-BLOCKED" in result
+    else:
+        assert discovery == []
+        assert lineage.claim_state["claims"] == prior_claims
+        debt = lineage.claim_state["debt"]
+        reason = "plan evidence deadline cannot admit the complete maximum model-call graph"
+        assert debt["returncode"] == 124
+        assert reason in debt["failure_detail"]
+        assert reason in result
+        assert debt["raw_sha256"] == hashlib.sha256(b"").hexdigest()
+        assert debt["stderr_sha256"] == hashlib.sha256(b"").hexdigest()
+        assert debt["failure_detail_sha256"] == hashlib.sha256(
+            debt["failure_detail"].encode()
+        ).hexdigest()
+        assert "\nCONVERGENCE: BLOCKED" in result
 
 
 def test_evidence_deadline_debt_is_persisted_before_structural_review(

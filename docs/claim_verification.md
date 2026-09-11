@@ -168,8 +168,16 @@ uncaptured outcome rather than inventing a web capture. Dedicated binding or att
 preserves that immutable provenance, records a negative attestation, and continues unrelated
 batches.
 
-The complete verified plan call has an 8,280-second deadline, leaving a 120-second teardown
-reserve within the documented 8,400-second MCP client timeout. After evidence state is persisted,
+The complete verified plan deadline is derived in `handlers.py` from the preparation,
+evidence and teardown reserves. The preparation allowance covers repository snapshot
+work before discovery; it does not consume the evidence phase's scheduling slack.
+The deadline still starts before snapshot construction. Setup that exhausts the
+remaining complete-graph reservation blocks before a model call, retaining the local
+admission reason in both claim debt and its bounded, hashed failure-detail channel.
+An exit 124 with zero discovery attempts is local admission failure, not a provider
+timeout. Use the MCP client timeout documented in README.md, including its client margin.
+Historical accepted plans record the timing in force for their original runs.
+After evidence state is persisted,
 the cold structural review starts only when its current 4,320-second census or 3,120-second
 follow-up reserve still fits. If it does not,
 the round returns blocked and the next invocation reuses frozen supported claims rather than

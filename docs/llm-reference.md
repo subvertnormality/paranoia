@@ -41,7 +41,7 @@ Codex host configuration:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 8400
+tool_timeout_sec = 8700
 startup_timeout_sec = 60
 ```
 
@@ -331,7 +331,7 @@ unless the user explicitly abandons the lineage. Audit logs are not state backup
 
 Recovery:
 
-- Codex MCP timeout: set `tool_timeout_sec=8400`.
+- Codex MCP timeout: set `tool_timeout_sec=8700`.
 - Missing/old CLI: check version, update, and sign in.
 - Failed/rejected tracked call: address the diagnostic and retry the same round.
 - Settled blocked call: edit, increment round, retry the same lineage.
