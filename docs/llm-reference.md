@@ -69,7 +69,8 @@ as a full code review.
 - `focus`: optional narrowing; does not replace intent or stakes.
 - `engine`: `codex` or `claude` single-reviewer override.
 - `model`: provider-specific override.
-- `effort`: `low|medium|high`; review default high, `query` default medium.
+- `effort`: `low|medium|high`; default keyed by model — Fable/Astra medium, Opus/Sol
+  high; any other model: review high, `query` medium.
 - `web_search`: default true. Required by enabled plan claim verification.
 
 ## `critique_branch`
@@ -229,7 +230,8 @@ Bounds: decision 2500 chars; 2–4 options; each statement 1200; context 20000;
 stakes 20000; 32 files; each stripped reason 1200.
 
 Defaults: `clean=true`, `cleaner_model=claude-opus-5`,
-`retain_snapshot=false`, `research=true`, `web_search=true`, `effort=high`.
+`retain_snapshot=false`, `research=true`, `web_search=true`, `effort` keyed per
+decider model (Fable/Astra medium, Opus/Sol high, otherwise medium).
 
 Optional: `subject`, `models`, `cleaner_model`, `order_seed`, `retain_snapshot`,
 `research`, `effort`, `web_search`.

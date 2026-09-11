@@ -21,8 +21,8 @@ quota failure or by changing the model.
 | Argument | Values | Default |
 |---|---|---|
 | `engine` | `codex` or `claude` | Server configuration |
-| `model` | Provider model name | `gpt-5.6-sol` or `claude-fable-5-1` |
-| `effort` | `low`, `medium`, or `high` | `high`; `query` uses `medium` |
+| `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-1` |
+| `effort` | `low`, `medium`, or `high` | By model: Fable/Astra `medium`, Opus/Sol `high`; otherwise `high` (`query` `medium`) |
 | `web_search` | Boolean | `true` |
 
 `engine` names the reviewer. `arbitrate` has no single `engine` or `model`
@@ -198,7 +198,7 @@ the same pinned evidence. Python computes the outcome.
 | `order_seed` | string | Generated | Reproduce labels and ordering from an earlier run |
 | `retain_snapshot` | boolean | `false` | Create `refs/paranoia/arbitrate/<stamp>` to survive Git GC |
 | `research` | boolean | `true` | Discover and server-capture shared authoritative web evidence |
-| `effort` | `low`, `medium`, or `high` | `high` | Both deciders' effort |
+| `effort` | `low`, `medium`, or `high` | Per decider model: Fable/Astra `medium`, Opus/Sol `high`, otherwise `medium` | Both deciders' effort |
 | `web_search` | boolean | `true` | Discovery authorization; required by `research: true` |
 
 Input design is load-bearing:

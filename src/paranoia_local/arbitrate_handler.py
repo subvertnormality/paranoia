@@ -1224,7 +1224,13 @@ def _arbitrate(
     retain = bool(arguments.get("retain_snapshot", False))
     models = dict(arguments.get("models") or {})
     cleaner_model = str(arguments.get("cleaner_model") or eng.CLEANER_MODEL)
-    effort = resolve("effort", arguments.get("effort"), cfg, "medium")
+    explicit_effort = resolve("effort", arguments.get("effort"), cfg, None)
+    efforts = {
+        engine.name: explicit_effort or eng.default_effort(
+            models.get(engine.name) or engine.default_model, fallback="medium",
+        )
+        for engine in deciders
+    }
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
     do_research = bool(arguments.get("research", True))
     if do_research and not web_search:
@@ -1359,7 +1365,7 @@ def _arbitrate(
                     packet=packet,
                     options=orders[engine.name],
                     forbidden=caller_ids,
-                    effort=effort,
+                    effort=efforts[engine.name],
                     deadline=deadline - TEARDOWN_RESERVE_SEC,
                 )
                 for engine in deciders
@@ -1453,7 +1459,7 @@ def _arbitrate(
         casts1 = _fan_out(
             agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
             presentations=presentations, packet=packet, carried={}, models=models,
-            effort=effort, web_search=web_search,
+            efforts=efforts, web_search=web_search,
         )
     except DeciderFanOutError as exc:
         return _failed_decision_report(
@@ -1508,7 +1514,7 @@ def _arbitrate(
                 casts2 = _fan_out(
                     agent=budgeted_agent, repo=repo, snapshot=snapshot, deciders=deciders,
                     presentations=presentations, packet=packet, carried=carried,
-                    models=models, effort=effort, web_search=web_search,
+                    models=models, efforts=efforts, web_search=web_search,
                 )
             except DeciderFanOutError as exc:
                 return _failed_decision_report(
@@ -2723,7 +2729,7 @@ def _fan_out(
     packet: Packet,
     carried: Mapping[str, Sequence[tuple[Region, str]]],
     models: Mapping[str, str],
-    effort: str,
+    efforts: Mapping[str, str],
     web_search: bool,
 ) -> list[Cast]:
     """Both deciders inspect separately materialized views of the same pinned tree."""
@@ -2795,7 +2801,8 @@ def _fan_out(
                         engine_name=engine.name,
                         model=model,
                         instructions=prompts.ARBITRATE_INSTRUCTIONS,
-                        body=attempt_body, cwd=review_cwd, effort=effort, web_search=False,
+                        body=attempt_body, cwd=review_cwd, effort=efforts[engine.name],
+                        web_search=False,
                         timeout=DECIDE_TIMEOUT_SEC, text_only=False, role=eng.ROLE_REPOSITORY,
                         _attempt_lifecycle=lifecycle,
                     )

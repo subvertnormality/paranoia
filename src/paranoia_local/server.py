@@ -37,7 +37,11 @@ _COMMON = {
     "effort": {
         "type": "string",
         "enum": ["low", "medium", "high"],
-        "description": "Reasoning effort. Reviews default to high; query defaults to medium.",
+        "description": (
+            "Reasoning effort. Default is keyed by model: Fable and Astra use medium, "
+            "Opus and Sol use high; any other model uses high for reviews and medium "
+            "for query and arbitrate. An explicit value or .paranoia.toml effort wins."
+        ),
     },
     "web_search": {
         "type": "boolean",

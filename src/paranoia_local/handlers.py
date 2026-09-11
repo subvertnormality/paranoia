@@ -2205,7 +2205,8 @@ def critique_branch(
     focus = arguments.get("focus")
     already = list(arguments.get("already_raised", []))
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
-    effort = resolve("effort", arguments.get("effort"), cfg, "high")
+    effort = resolve("effort", arguments.get("effort"), cfg,
+                     eng.default_effort(model, fallback="high"))
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
     supplied_contract = _load_branch_contract(arguments)
     if _after_contract_load is not None:
@@ -2649,7 +2650,8 @@ def critique_plan(
     cfg = load_repo_config(repo)
 
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
-    effort = resolve("effort", arguments.get("effort"), cfg, "high")
+    effort = resolve("effort", arguments.get("effort"), cfg,
+                     eng.default_effort(model, fallback="high"))
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     # Verification is ON for the bundled engines.  Capability detection keeps injected
@@ -4596,7 +4598,8 @@ def query(
 
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     # query is a quick double-check, not a full review — lower reasoning effort.
-    effort = resolve("effort", arguments.get("effort"), cfg, "medium")
+    effort = resolve("effort", arguments.get("effort"), cfg,
+                     eng.default_effort(model, fallback="medium"))
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     body = _query_body(question, files, focus, repo_grounded=bool(repo))
@@ -4625,7 +4628,8 @@ def rebut(
     repo = _require_repo(arguments)
     cfg = load_repo_config(repo)
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
-    effort = resolve("effort", arguments.get("effort"), cfg, "high")
+    effort = resolve("effort", arguments.get("effort"), cfg,
+                     eng.default_effort(model, fallback="high"))
     web_search = bool(resolve("web_search", arguments.get("web_search"), cfg, True))
 
     binding_keys = ("lineage", "class_id", "debt_id", "lineage_mode")
