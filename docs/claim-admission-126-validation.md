@@ -1,5 +1,10 @@
 # Issue 126 validation
 
+Current repair: CODE review and native Claude qualification passed on
+`196a9a003126be4ca66962c673ece674f9cc31a8`. The complete Linux suite passed
+2,326 tests, with no skips or exclusions, in 121.91 seconds. Earlier failures
+below remain historical evidence, not the current qualification result.
+
 The original reviewed candidate identity is retained in the private validation
 record. Public history was redacted to remove private project identifiers;
 the implementation and tests are unchanged by that documentation redaction.
@@ -54,9 +59,9 @@ A subsequent complete run retained the newly introduced diagnostic-order
 regression (one failure, 2,308 passes), then the corrected candidate passed the
 complete suite above. Failed attempts are not reported as passing evidence.
 
-## Native acceptance
+## Original native acceptance (retained failure)
 
-**Failed; delivery remains blocked.** The fresh source-bound Claude MCP run
+**Failed at this earlier candidate.** The fresh source-bound Claude MCP run
 executed four claim-role attempts and one structural correction in
 617.5967928329483 seconds. Initial discovery required its existing validation
 retry; that retry and evidence binding completed. Cold attestation then returned
@@ -111,3 +116,35 @@ regressions reproduced this on both initial and correction replies. Restoring
 the previous `strip()` normalization fixes that gap without relaxing duplicate
 key, prefix or trailing-content rejection. Updated CODE and full-suite results
 remain pending for this subsequent candidate.
+
+## Final attestation qualification
+
+The reviewed correction changes the production handler by 15 added and five
+removed lines relative to the timeout repair, and adds five acceptance-harness
+lines. Current sizes are 246,516 bytes / 5,351 lines for the handler and
+12,597 bytes / 266 lines for the harness. Other production modules are unchanged.
+
+Codex CODE review converged at round 2 on
+`paranoia~126~attestation-justifications~code`, with no findings or blocking debt.
+The two rounds recorded ten staged attempts, including two invalid payloads
+repaired by existing retries; rejected payload operations were not applied.
+Contract digest: `c1c33376512bfad804af072414022524d5e87b04d1110f18821dc8c95ecd7d97`.
+
+The complete canonical Linux tree passed 2,326 tests in 121.91 seconds. Log SHA-256:
+`18f03b184358d0c66bdf034610c2c416a2bb4bd3e07f0ef2bd80bfb1e9f2a809`.
+
+Fresh source-bound Claude acceptance passed in 556.0509232920595 seconds. It
+retained five attempts: initial discovery was validation-invalid, its same-session
+retry completed, binding completed, attestation completed and structural correction
+completed. All processes returned zero. The claim audit parsed four claims and
+was not failed; the launcher produced `accepted.json` after validating identities,
+predecessor state and current native attestation. Roles and model were unchanged.
+
+Audit SHA-256: `e9a1004ba2e78104e6a1a7ad5673ec42a8a7effff6d34f2d2028c35d55225d25`.
+Response SHA-256: `a0723b08b73ff589320b2a36491ea3aa8419ab528bb9d30617b39785cff36d4b`.
+
+Tool qualification is distinct from approving the reviewed design: that private
+design still needs source-claim closure and its required cold final. The tool
+correctly retained those obligations. No accepted receipt is used to bypass a
+design verdict. Private inputs, receipts and provider channels remain outside
+this public repository; the earlier failed run is unchanged.

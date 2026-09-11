@@ -76,8 +76,9 @@ The design review converged at round 3 on lineage
 `paranoia~126~claim-admission~plan`. CODE and native acceptance outcomes must be
 recorded separately before delivery; this design result does not establish them.
 
-The actual CODE, full-suite and failed native-acceptance outcomes are recorded in
-`claim-admission-126-validation.md`. Native attestation failure still blocks delivery.
+The actual CODE, full-suite and native-acceptance outcomes are recorded in
+`claim-admission-126-validation.md`, including the retained earlier failure and
+the successful qualification of the corrected attestation contract.
 
 ## Attestation correction
 
