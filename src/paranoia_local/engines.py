@@ -670,6 +670,20 @@ ATTESTER_ENGINE = "codex"
 ATTESTER_MODEL = "gpt-6-astra"
 
 
+# Default reasoning effort by model family, used only when neither the call nor
+# `.paranoia.toml` sets `effort`. Fable and Astra review at medium; Opus and Sol,
+# the fallbacks when those are unavailable, run at high. Any other model keeps the
+# tool's own default.
+MODEL_FAMILY_EFFORT = {"fable": "medium", "astra": "medium", "opus": "high", "sol": "high"}
+
+
+def default_effort(model: str, *, fallback: str) -> str:
+    for token in re.split(r"[-._]", model.lower()):
+        if token in MODEL_FAMILY_EFFORT:
+            return MODEL_FAMILY_EFFORT[token]
+    return fallback
+
+
 def get_engine(name: str, *, text_only: bool = False) -> Engine:
     try:
         engine = _ENGINES[name]()

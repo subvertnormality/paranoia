@@ -10,8 +10,9 @@ predecessor lineage. Require matching structural tracking and successful discove
 or its existing validation retry; current-wording qualification also requires current
 nonempty native attestation and a completed initial reply or same-session repair; any failed/nonzero attempt blocks acceptance.
 The full-suite-discovered three-record historical inventory correction is bounded
-in docs/claim-admission-126.md and tests/test_issue126_history.py. Only existing
-handler allowance hash/scope metadata changes; original provider evidence stays fixed.
+in docs/claim-admission-126.md and tests/test_issue126_history.py. Only the hash/scope
+metadata of existing allowance entries changes; no entry is added or removed, and original
+provider evidence stays fixed.
 Acceptance requires successful same-session repair of each invalid initial reply.
 Use durable last_round ordering, not settlement count, for continuation labels.
 

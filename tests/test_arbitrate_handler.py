@@ -167,7 +167,7 @@ class Agent:
         self.calls.append(
             {"engine": engine_name, "model": model, "body": body, "cwd": cwd,
              "text_only": text_only, "timeout": timeout, "instructions": instructions,
-             "web_search": web_search}
+             "web_search": web_search, "effort": effort}
         )
         if "NEUTRALIZER" in instructions:
             return self.cleaner if self.cleaner is not None else cleaner_reply(self.statements)
@@ -240,6 +240,66 @@ def test_converged(repo: Path, tmp_path: Path):
     assert trailer_field(report, "CLEANING") == "attested"
     assert trailer_field(report, "REFS-MOVED") == "no"
     assert trailer_field(report, "ADVISORY") == "none"
+
+
+def _decider_efforts(agent) -> dict[tuple[str, str], set[str]]:
+    efforts: dict[tuple[str, str], set[str]] = {}
+    for call in agent.calls:
+        if "NEUTRALIZER" in call["instructions"] or "TEXT AUDITOR" in call["instructions"]:
+            continue
+        efforts.setdefault((call["engine"], call["model"]), set()).add(call["effort"])
+    return efforts
+
+
+def test_decider_effort_is_keyed_by_each_deciders_model(repo: Path, tmp_path: Path):
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    report = run(repo, agent, tmp_path,
+                 models={"codex": "gpt-6-astra", "claude": "claude-opus-5"})
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert _decider_efforts(agent) == {
+        ("codex", "gpt-6-astra"): {"medium"},
+        ("claude", "claude-opus-5"): {"high"},
+    }
+
+
+def test_explicit_arbitration_effort_applies_to_every_decider(repo: Path, tmp_path: Path):
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    run(repo, agent, tmp_path, effort="low",
+        models={"codex": "gpt-5.6-sol", "claude": "claude-fable-5-1"})
+    assert _decider_efforts(agent) == {
+        ("codex", "gpt-5.6-sol"): {"low"},
+        ("claude", "claude-fable-5-1"): {"low"},
+    }
+
+
+def test_fixed_role_cleaner_and_attester_keep_pinned_efforts(repo: Path, tmp_path: Path):
+    agent = Agent(lambda engine, rnd: "opt-decimal")
+    run(repo, agent, tmp_path, models={"codex": "gpt-5.6-sol", "claude": "claude-opus-5"})
+    cleaner = [c for c in agent.calls if "NEUTRALIZER" in c["instructions"]]
+    attester = [c for c in agent.calls if "TEXT AUDITOR" in c["instructions"]]
+    assert cleaner and attester
+    assert {(c["model"], c["effort"]) for c in cleaner} == {(eng.CLEANER_MODEL, "medium")}
+    assert {(c["model"], c["effort"]) for c in attester} == {(eng.ATTESTER_MODEL, "low")}
+
+
+def test_research_effort_is_keyed_by_each_researchers_model(repo: Path, tmp_path: Path):
+    seen: dict[str, tuple[str, str]] = {}
+
+    def researcher(*, engine, model, effort, **_kwargs):
+        seen[engine.name] = (model, effort)
+        raise ah.ProviderAdmissionError("stop after recording effort")
+
+    ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "research": True,
+         "models": {"codex": "gpt-5.6-sol", "claude": "claude-fable-5-1"}},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        run_agent=Agent(lambda engine, rnd: "opt-decimal"),
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+    assert seen == {
+        "codex": ("gpt-5.6-sol", "high"),
+        "claude": ("claude-fable-5-1", "medium"),
+    }
 
 
 def test_malformed_decider_reply_gets_one_full_correction(

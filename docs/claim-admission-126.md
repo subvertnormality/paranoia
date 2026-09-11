@@ -67,8 +67,9 @@ handler: `branch_plan_fidelity_acceptance_2026-08-22.json`,
 `class_persistence_acceptance_2026-08-22.json`, and
 `mechanized_predicate_acceptance_2026-08-27.json`. This implementation correction
 updates only each existing handler allowance's `sha256` and `scope` fields.
-`tests/test_issue126_history.py` pins every other value to the pre-repair tree
-and exercises the original validators against missing, extra and mismatched
+`tests/test_issue126_history.py` pins every other value to the pre-repair tree,
+except that a later source delta may refresh the `sha256` and `scope` of any
+existing allowance entry (no entry may be added or removed), and exercises the original validators against missing, extra and mismatched
 allowances. The original reviewed plan remains unchanged; CODE review must
 assess this explicit inventory correction together with the implementation.
 

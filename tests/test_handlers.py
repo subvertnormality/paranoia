@@ -32,7 +32,8 @@ class FakeEngine:
     ):
         self.calls.append(
             {"kind": "resume", "session_ref": session_ref, "prompt": prompt,
-             "cwd": cwd, "response_schema": response_schema}
+             "cwd": cwd, "model": model, "effort": effort,
+             "response_schema": response_schema}
         )
         text = self._text if response_schema is not None else "REBUTTAL VERDICT"
         return Review(text=text, session_ref=session_ref, raw=text)
@@ -40,6 +41,90 @@ class FakeEngine:
 
 def fixed_clock() -> str:
     return "20260714T120000"
+
+
+class ModelEngine(FakeEngine):
+    def __init__(self, default_model: str) -> None:
+        super().__init__()
+        self.default_model = default_model
+
+
+class TestModelKeyedEffort:
+    """Fable/Astra default to medium effort; Opus/Sol default to high."""
+
+    @pytest.mark.parametrize("default_model, override, expected", [
+        ("claude-fable-5-1", None, "medium"),
+        ("gpt-6-astra", None, "medium"),
+        ("claude-fable-5-1", "claude-opus-5", "high"),
+        ("gpt-6-astra", "gpt-5.6-sol", "high"),
+    ])
+    def test_critique_branch(
+        self, repo_with_branch: Path, tmp_path: Path, default_model, override, expected,
+    ) -> None:
+        eng = ModelEngine(default_model)
+        args = {"repo_path": str(repo_with_branch), "base_ref": "main",
+                "head_ref": "feature", "round": 1}
+        if override:
+            args["model"] = override
+        handlers.critique_branch(args, engine=eng, log_dir=tmp_path, now=fixed_clock)
+        run = [c for c in eng.calls if c["kind"] == "run"][0]
+        assert run["model"] == (override or default_model)
+        assert run["effort"] == expected
+
+    def test_critique_branch_explicit_effort_wins(
+        self, repo_with_branch: Path, tmp_path: Path,
+    ) -> None:
+        eng = ModelEngine("claude-fable-5-1")
+        handlers.critique_branch(
+            {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
+             "round": 1, "effort": "high"},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
+        )
+        assert [c for c in eng.calls if c["kind"] == "run"][0]["effort"] == "high"
+
+    @pytest.mark.parametrize("model, expected", [
+        ("claude-fable-5-1", "medium"), ("gpt-5.6-sol", "high"),
+    ])
+    def test_critique_plan(self, repo: Path, tmp_path: Path, model, expected) -> None:
+        eng = ModelEngine(model)
+        handlers.critique_plan(
+            {"plan_text": "change greet()", "repo_path": str(repo), "class_closure": False},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
+        )
+        assert eng.calls[0]["effort"] == expected
+
+    @pytest.mark.parametrize("model, expected", [
+        ("gpt-6-astra", "medium"), ("claude-opus-5", "high"),
+    ])
+    def test_query(self, repo: Path, tmp_path: Path, model, expected) -> None:
+        eng = ModelEngine(model)
+        handlers.query(
+            {"question": "Is greet() safe?", "repo_path": str(repo)},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
+        )
+        assert eng.calls[0]["effort"] == expected
+
+    def test_query_repo_config_effort_wins(self, repo: Path, tmp_path: Path) -> None:
+        (repo / ".paranoia.toml").write_text('effort = "low"\n')
+        eng = ModelEngine("claude-opus-5")
+        handlers.query(
+            {"question": "Is greet() safe?", "repo_path": str(repo)},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
+        )
+        assert eng.calls[0]["effort"] == "low"
+
+    @pytest.mark.parametrize("model, expected", [
+        ("claude-fable-5-1", "medium"), ("claude-opus-5", "high"),
+    ])
+    def test_rebut(self, repo: Path, tmp_path: Path, model, expected) -> None:
+        eng = ModelEngine(model)
+        handlers.rebut(
+            {"repo_path": str(repo), "session_ref": "sess-1",
+             "rebuttal": "That line is unreachable because X.", "round": 1},
+            engine=eng, log_dir=tmp_path, now=fixed_clock,
+        )
+        assert eng.calls[0]["kind"] == "resume"
+        assert eng.calls[0]["effort"] == expected
 
 
 class TestCritiqueBranch:

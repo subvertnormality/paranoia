@@ -190,6 +190,21 @@ def test_codex_terminal_error_remains_a_failure() -> None:
     assert review.text == "partial"
     assert review.failure_detail == "terminal"
 
+@pytest.mark.parametrize("model, expected", [
+    ("claude-fable-5-1", "medium"),
+    ("gpt-6-astra", "medium"),
+    ("claude-opus-5", "high"),
+    ("gpt-5.6-sol", "high"),
+])
+def test_default_effort_is_keyed_by_model_family(model: str, expected: str) -> None:
+    assert engines.default_effort(model, fallback="low") == expected
+
+
+@pytest.mark.parametrize("model", ["fake-model", "gpt-console", "claude-opusx-5", ""])
+def test_default_effort_falls_back_for_an_unlisted_model(model: str) -> None:
+    assert engines.default_effort(model, fallback="low") == "low"
+
+
 class TestCodexArgv:
     def test_build_argv_read_only_and_model_and_effort(self) -> None:
         e = engines.get_engine("codex")

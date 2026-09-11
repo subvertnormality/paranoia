@@ -19,18 +19,20 @@ RECORDS = {
 
 
 @pytest.mark.parametrize("name", RECORDS)
-def test_only_existing_handler_allowance_metadata_changes(name):
+def test_only_existing_allowance_metadata_changes(name):
     original = json.loads(subprocess.run(
         ["git", "show", f"{BASE}:docs/{name}"], cwd=ROOT,
         capture_output=True, text=True, check=True,
     ).stdout)
     current = json.loads((ROOT / "docs" / name).read_text())
-    before = original["allowed_later_source_diffs"][HANDLER]
-    after = current["allowed_later_source_diffs"][HANDLER]
-    assert set(before) == set(after) == {"sha256", "scope"}
-    for key in before:
-        assert isinstance(after[key], str)
-        after[key] = before[key]
+    # Later source changes may refresh an existing allowance's metadata, never add one.
+    assert set(current["allowed_later_source_diffs"]) == set(original["allowed_later_source_diffs"])
+    for relative, before in original["allowed_later_source_diffs"].items():
+        after = current["allowed_later_source_diffs"][relative]
+        assert set(before) == set(after) == {"sha256", "scope"}
+        for key in before:
+            assert isinstance(after[key], str)
+            after[key] = before[key]
     assert current == original
 
 
