@@ -84,8 +84,9 @@ before or after it. The sole envelope key is attestations. Each row has exactly 
 illustrated keys; no note, explanation, alternative, correction or other extra keys.
 Return exactly one row per supplied (claim_index,evidence_index) pair, preserving its integer
 indices. Verdicts are JSON booleans, independently judged; the example values are not answers.
-Put all reasoning in authority_reason and entailment_reason, each a nonempty string of at
-most {MAX_ATTESTATION_REASON_CHARS} characters. No prose, fences, appended repairs, duplicate
+Put concise evidence-based justifications in authority_reason and entailment_reason, each
+a nonempty string of at most {MAX_ATTESTATION_REASON_CHARS} characters.
+Do not include private internal reasoning or step-by-step deliberation. No prose, fences, appended repairs, duplicate
 rows, second marker or competing envelope. Finish after the single complete object.
 === EVIDENCE ATTESTATION JSON ===
 {{"attestations":[{{"claim_index":0,"evidence_index":0,"publisher_authority":true,"authority_reason":"specific reason","passage_entailment":true,"entailment_reason":"specific reason"}}]}}"""
@@ -4268,9 +4269,18 @@ class _CapturedClaimEngine:
                     "attestation reply exceeds "
                     f"{MAX_ATTESTATION_REPLY_CHARS} characters"
                 )
-            tail = review.text.split("=== EVIDENCE ATTESTATION JSON ===", 1)[1].strip()
-            value, end = json.JSONDecoder().raw_decode(tail)
-            if tail[end:].strip() or set(value) != {"attestations"}:
+            prefix, marker, tail = review.text.partition("=== EVIDENCE ATTESTATION JSON ===")
+            if prefix.strip() or not marker:
+                raise ValueError("invalid attestation envelope")
+
+            def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+                value = dict(pairs)
+                if len(value) != len(pairs):
+                    raise ValueError("duplicate attestation object key")
+                return value
+
+            value = json.loads(tail, object_pairs_hook=unique_object)
+            if not isinstance(value, dict) or set(value) != {"attestations"}:
                 raise ValueError("invalid attestation envelope")
             rows = value["attestations"]
             if not isinstance(rows, list) or len(rows) != len(attestation_batch):

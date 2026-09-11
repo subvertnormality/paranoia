@@ -74,9 +74,9 @@ Native audit SHA-256:
 Native response SHA-256:
 `5d342369222b7d3694fd65666deaf7b25f974cef690257f7089e2ba60f3e56c4`.
 
-Per the required native-acceptance gate, no PR was opened and no merge occurred.
-The candidate is retained locally pending resolution of this separate provider
-failure and successful native acceptance.
+The operator subsequently authorized a blocked draft PR despite this failed native
+acceptance. It remains a draft pending the separate attestation correction, actual
+CODE convergence, complete tests and successful native qualification. No merge occurred.
 
 ## Size measurements
 
@@ -90,3 +90,14 @@ failure and successful native acceptance.
 Private native inputs, audit channels and source-bound receipts are retained
 outside this public repository. This report records measured outcomes, not
 retroactive acceptance of historical provider runs or universal performance.
+
+## Attestation correction in progress
+
+Codex PLAN review converged at round 5 on
+`paranoia~126~attestation-justifications~plan`, with zero open blocking debt.
+The review found that prefixes and duplicate JSON keys were previously accepted;
+all nine added public-adapter cases reproduced that bug before the parser fix.
+The initial focused RED run recorded 26 failures and 66 passes, including the
+wording and discovery-only acceptance gaps. Implementation verification, CODE
+review and current native qualification are pending; the earlier green suite and
+review apply only to the previous timeout repair.

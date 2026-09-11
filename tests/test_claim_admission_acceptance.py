@@ -63,9 +63,11 @@ def receipt(frozen, tmp_path):
         "returncode": 0, "error": False, "claim_audit_failed": False,
         "engine": "claude", "class_closure": True, "lineage": "fixture-plan", "round": 1,
         "rendered_trailer": "STRUCTURAL-PHASE: clear\nCONVERGENCE: NOT-BLOCKED",
-        "claim_status": "parsed 0 new + 0 targeted retained + 0 frozen",
-        "claim_model_calls": 1, "attempt_ledger": [
-            {"role": "claim-discovery", "outcome": "completed", "returncode": 0}],
+        "claim_status": "parsed 1 new + 0 targeted retained + 0 frozen",
+        "claim_model_calls": 2, "attempt_ledger": [
+            {"role": "claim-discovery", "outcome": "completed", "returncode": 0},
+            {"role": "claim-attestation", "outcome": "completed", "returncode": 0,
+             "session_ref": "attester"}],
     }))
     loaded = {"paranoia_local.server": str(Path(frozen["source"]["path"]) / "src/paranoia_local/server.py")}
     return acceptance.make_receipt(frozen, "review result", audit, loaded)
@@ -154,7 +156,8 @@ def test_successful_discovery_correction_is_accepted(frozen, receipt):
     retry = handlers._attempt("claim-discovery-validation-retry", engines.ClaudeEngine(), engines.Review(
         text="valid audit", session_ref="session", raw="corrected", returncode=0,
     )).json()
-    rewrite_audit(receipt, lambda audit: audit.update(attempt_ledger=[initial, retry], claim_model_calls=2))
+    rewrite_audit(receipt, lambda audit: audit.update(
+        attempt_ledger=[initial, retry, *audit["attempt_ledger"][1:]], claim_model_calls=3))
     acceptance.validate_receipt(frozen, receipt, "review result")
 
 
@@ -280,3 +283,48 @@ def test_native_expanded_sessionless_binding_cannot_credit_receipt(frozen, recei
             acceptance.validate_receipt(frozen, receipt, "review result")
     finally:
         adapter.close()
+
+
+@pytest.mark.parametrize("replacement", [[], [{"role": "claim-attestation-validation-retry",
+    "outcome": "completed", "returncode": 0, "session_ref": "historical"}]])
+def test_current_wording_requires_initial_attestation(frozen, receipt, replacement):
+    rewrite_audit(receipt, lambda audit: audit.update(
+        attempt_ledger=[audit["attempt_ledger"][0], *replacement]))
+    with pytest.raises(ValueError, match="attestation"):
+        acceptance.validate_receipt(frozen, receipt, "review result")
+
+
+@pytest.mark.parametrize("kind", ["valid", "repaired", "terminal-invalid", "empty"])
+def test_actual_attester_qualification(frozen, receipt, tmp_path, kind):
+    from paranoia_local import handlers, plan_claims as pc
+    from tests.test_issue115_history import load_test_module
+    fixture = load_test_module("test_plan_claims")
+    ledger = []
+    if kind == "empty":
+        engine = fixture._RoleScript({})
+        adapter = handlers._CapturedClaimEngine(
+            engine, plan_text=fixture.PLAN, repo=fixture._repo(tmp_path),
+            plan_repo_path=None, attempt_ledger=ledger)
+        try:
+            result = adapter._attest(pc.parse_audit(fixture._audit(), fixture.PLAN), "m", "high")
+            assert isinstance(result, pc.Audit)
+            assert not engine.calls and not ledger
+        finally:
+            adapter.close()
+    else:
+        rows = fixture._valid_attestation_rows()
+        correction = None
+        if kind != "valid":
+            correction = copy.deepcopy(rows) if kind == "repaired" else None
+            rows[0]["note"] = "invalid"
+        result = fixture._run_indexed_attestation_rows(
+            tmp_path, rows, correction_rows=correction, attempt_ledger=ledger)
+        assert bool(isinstance(result, pc.Audit)) == (kind != "terminal-invalid")
+        assert ledger[0]["role"] == "claim-attestation"
+    rewrite_audit(receipt, lambda audit: audit.update(
+        attempt_ledger=[audit["attempt_ledger"][0], *ledger]))
+    if kind in {"valid", "repaired"}:
+        acceptance.validate_receipt(frozen, receipt, "review result")
+    else:
+        with pytest.raises(ValueError, match="attestation|validation"):
+            acceptance.validate_receipt(frozen, receipt, "review result")

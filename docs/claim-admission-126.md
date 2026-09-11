@@ -78,3 +78,19 @@ recorded separately before delivery; this design result does not establish them.
 
 The actual CODE, full-suite and failed native-acceptance outcomes are recorded in
 `claim-admission-126-validation.md`. Native attestation failure still blocks delivery.
+
+## Attestation correction
+
+The shared contract asks for concise evidence-based justifications for the two
+independent judgments and explicitly excludes private internal deliberation.
+The parser rejects non-whitespace prefixes and duplicate object keys, in addition
+to its existing single-envelope, schema, coverage and size checks. Both initial
+and correction replies use that parser and the existing single retry.
+
+Current-wording qualification requires an initial native attestation attempt in
+the current source-bound audit and successful completion, including a legitimate
+same-session repair. Discovery-only or frozen historical evidence cannot qualify
+this change. The real adapter invokes attestation only for a nonempty packet;
+its strict parser remains the sole owner of reply validation. Historical evidence
+and the previous provider refusal remain historical; they do not prove this
+wording or parser. See `attestation-justifications-126-plan.md` for the contract.

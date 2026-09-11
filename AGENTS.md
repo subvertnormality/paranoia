@@ -7,7 +7,8 @@ attributing an unstarted call to a provider. Historical failed reviews remain
 failed; resume their lineages after repair, never reset them for clearance.
 Bind native acceptance to tracked closure, the selected child state root and exact
 predecessor lineage. Require matching structural tracking and successful discovery
-or its existing validation retry; any failed/nonzero attempt blocks acceptance.
+or its existing validation retry; current-wording qualification also requires current
+nonempty native attestation and a completed initial reply or same-session repair; any failed/nonzero attempt blocks acceptance.
 The full-suite-discovered three-record historical inventory correction is bounded
 in docs/claim-admission-126.md and tests/test_issue126_history.py. Only existing
 handler allowance hash/scope metadata changes; original provider evidence stays fixed.
@@ -737,3 +738,10 @@ in Q4e; preserve runtime classification policy, native validation and both repai
 
 Issue #115 follows docs/claim-alias-retry-115-plan.md. Generate canonical prior-disposition
 fields and diagnose alias-pair collisions without accepting equal or conflicting duplicates.
+
+The attestation correction follows docs/attestation-justifications-126-plan.md.
+Request concise evidence-based justifications without private deliberation. The shared
+initial/correction parser rejects prefixes, duplicate object keys at every depth and
+trailing content. Preserve exact fields, independent judgments, bounds and one retry.
+Historical provider records do not qualify this wording or parser. Current native
+attestation must pass the source-bound receipt gate before readiness.

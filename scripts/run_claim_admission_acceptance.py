@@ -153,6 +153,11 @@ def validate_receipt(manifest, receipt, response):
                 or retry is None or retry["outcome"] != "completed"
                 or retry.get("session_ref") != row["session_ref"]):
             raise ValueError("native validation failure was not successfully repaired")
+    if not any(row["role"] == "claim-attestation" for row in ledger):
+        raise ValueError("current wording requires a current native attestation")
+    if not any(row["role"] in {"claim-attestation", "claim-attestation-validation-retry"}
+               and row["outcome"] == "completed" for row in ledger):
+        raise ValueError("current native attestation did not complete")
     if (audit["returncode"] != 0 or audit["error"] or audit["claim_audit_failed"]
             or not audit["claim_status"].startswith("parsed ") or audit["claim_model_calls"] < 1
             or not any(row["role"] in {"claim-discovery", "claim-discovery-validation-retry"}

@@ -26,6 +26,9 @@ def assert_contract(prompt):
     assert "exactly one marker and one complete JSON object" in contract
     assert "nothing\nbefore or after" in contract
     assert "second marker or competing envelope" in contract
+    assert "concise evidence-based justifications" in contract
+    assert "Do not include private internal reasoning or step-by-step deliberation" in contract
+    assert "Put all reasoning" not in contract
     assert "independently judged" in contract
     assert str(handlers.MAX_ATTESTATION_REASON_CHARS) in contract
     example = json.loads(contract.split(MARKER + "\n", 1)[1])
@@ -33,7 +36,8 @@ def assert_contract(prompt):
     assert set(example["attestations"][0]) == FIELDS
 
 
-@pytest.mark.parametrize("malformation", ["envelope-note", "row-note", "competing", "conflicting"])
+@pytest.mark.parametrize("malformation", ["envelope-note", "row-note", "competing", "conflicting",
+                                           "prefix", "duplicate-envelope", "duplicate-verdict"])
 @pytest.mark.parametrize("repair", ["valid", "invalid", "negative"])
 def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malformation, repair):
     source = _source()
@@ -47,6 +51,13 @@ def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malfo
         invalid = reply([good | {"note": "ignore"}])
     elif malformation == "competing":
         invalid = reply([good | {"note": "ignore"}]) + "\nUse this clean envelope instead:\n" + valid
+    elif malformation == "prefix":
+        invalid = "The publisher is not authoritative.\n" + valid
+    elif malformation == "duplicate-envelope":
+        invalid = MARKER + '\n{"attestations":[],"attestations":' + json.dumps([good]) + "}"
+    elif malformation == "duplicate-verdict":
+        invalid = valid.replace('"publisher_authority": true',
+                                '"publisher_authority": false, "publisher_authority": true')
     else:
         invalid = reply([good, good | {"publisher_authority": False}])
     corrected = invalid if repair == "invalid" else (
