@@ -43,6 +43,18 @@ gate passes; no proposal is applied or tested by the production path.
   2,451 passed in 315.77s at checkpoint `39bb2b2`. The same per-process Git
   override was used for temporary fixture repositories; `git diff --check`
   passed before the code checkpoint and the committed checkpoint was clean.
+- CODE round 5 reached structural `NOT-BLOCKED` but identified one actionable
+  minor defect: adjacent individually valid replacements could cancel to the
+  pinned original bytes and render a header-only patch. The repair rejects that
+  group through the existing branch/plan validation retry while retaining valid
+  adjacent edits.
+- Full regression after that CODE round-5 repair:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,456 passed in 296.77s at checkpoint `33d477e`. The focused proposal
+  matrix passed 230 tests and the clean committed issue-115/117/126 guard set
+  passed 68 tests.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
