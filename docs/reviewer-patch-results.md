@@ -29,8 +29,8 @@ gate passes; no proposal is applied or tested by the production path.
   tests/test_engines.py tests/test_census_execution.py` — 135 passed in 6.93s.
 - Full regression:
   `/home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
-  2,417 passed in 265.65s at the recorded revision before the final additional
-  plan-mode G3 fixture; production code was unchanged by that fixture.
+  2,418 passed in 267.59s after the final plan-mode G3 fixture. `git diff
+  --check` passed and the worktree was clean.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
