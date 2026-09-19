@@ -36,6 +36,13 @@ gate passes; no proposal is applied or tested by the production path.
   override prevents the host's SSH commit-signing policy from affecting temporary
   fixture repositories; it does not change product behavior. `git diff --check`
   passed and the checkpoint worktree was clean.
+- Full regression after CODE round-4 repairs:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,451 passed in 315.77s at checkpoint `39bb2b2`. The same per-process Git
+  override was used for temporary fixture repositories; `git diff --check`
+  passed before the code checkpoint and the committed checkpoint was clean.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
