@@ -321,7 +321,10 @@ def _source_text(content: SourceContent, entry: ProposalEntry, pointer: str,
 
 def parse_and_render(context: ProposalContext, raw: str,
                      source_reader: SourceReader | None = None) -> ProposalResult:
-    raw_bytes = _utf8(raw, "/", [])
+    raw_issues: list[str] = []
+    raw_bytes = _utf8(raw, "/", raw_issues)
+    if raw_issues:
+        raise ProposalError(raw_issues)
     if len(raw_bytes) > MAX_RAW_BYTES:
         raise ProposalError([f"/: raw response exceeds {MAX_RAW_BYTES} bytes"])
     try:
@@ -395,7 +398,9 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
                  entries: Sequence[ProposalEntry], source_reader: SourceReader,
                  issues: list[str], *, plan: bool) -> list[ProposedFile]:
     by_path = {entry.path: entry for entry in entries}
-    casefold = {entry.path.casefold(): entry.path for entry in entries}
+    casefold_paths: dict[str, list[str]] = {}
+    for entry in entries:
+        casefold_paths.setdefault(entry.path.casefold(), []).append(entry.path)
     grouped: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for index, edit in enumerate(edits):
         pointer = f"/edits/{index}"
@@ -407,9 +412,14 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
             path_issue = _valid_path(path)
             if path_issue:
                 issues.append(f"{pointer}/path: {path_issue}")
-            collision = casefold.get(path.casefold())
-            if collision is not None and collision != path:
-                issues.append(f"{pointer}/path: case-collides with {collision!r}")
+            collisions = sorted(set(casefold_paths.get(path.casefold(), ())))
+            if len(collisions) > 1:
+                issues.append(
+                    f"{pointer}/path: case-collides with ambiguous existing paths "
+                    + repr(collisions)
+                )
+            elif collisions and collisions[0] != path:
+                issues.append(f"{pointer}/path: case-collides with {collisions[0]!r}")
         grouped.setdefault(path, []).append((index, edit))
 
     total_source = 0
@@ -440,7 +450,11 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
             if any(other != path and (other.startswith(path + "/") or path.startswith(other + "/"))
                    for other in grouped):
                 issues.append(f"/edits: create target {path!r} conflicts with another edit path")
-            data = rows[0][1]["new_text"].encode("utf-8")
+            data = _utf8(
+                rows[0][1]["new_text"],
+                f"/edits/{rows[0][0]}/new_text",
+                issues,
+            )
             if not data:
                 issues.append(f"/edits/{rows[0][0]}/new_text: created file must be nonempty")
             if b"\r" in data or b"\0" in data:
@@ -487,7 +501,7 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
         proposed = text
         for start, end, new, unused in reversed(spans):
             proposed = proposed[:start] + new + proposed[end:]
-        encoded = proposed.encode("utf-8")
+        encoded = _utf8(proposed, f"/edits/{rows[0][0]}/new_text", issues)
         if b"\r" in encoded or b"\0" in encoded:
             issues.append(f"/edits: result for {path!r} must be LF-only text")
         result.append(ProposedFile(path, entry.mode, content.pinned, encoded, entry.oid))

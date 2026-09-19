@@ -778,7 +778,9 @@ def _plan_patch_supplement(
                                  reason="tracked settlement was not confirmed", context=None)
     structural_targets = _proposal_structural_targets(closure)
     claim_targets = (
-        _proposal_claim_targets(claim_state) if claim_status.startswith("parsed") else ()
+        _proposal_claim_targets(claim_state)
+        if claim_status.startswith(("parsed", "reused"))
+        else ()
     )
     targets = (*structural_targets, *claim_targets)
     if not targets:

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import time
+from types import SimpleNamespace
 
 from paranoia_local import census_execution as census
 from paranoia_local import engines
@@ -88,8 +90,11 @@ def test_execution_failure_has_no_retry_or_fresh_fallback(monkeypatch):
     calls = []
     def resume(self, session, prompt, cwd, model, effort, **kwargs):
         calls.append(session)
-        return engines.Review("failure", "failed-session", "raw", returncode=1,
-                              error=True, failure_detail="quota")
+        return engines.Review(
+            "failure", "failed-session", "raw-provider", returncode=1,
+            error=True, failure_detail="quota", stderr="provider-stderr",
+            duration_ms=17, provider_duration_ms=11,
+        )
     monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
     context, reader = context_and_reader()
     result = handlers._run_patch_proposal(
@@ -100,6 +105,16 @@ def test_execution_failure_has_no_retry_or_fresh_fallback(monkeypatch):
     assert result.result is None and result.reason == "quota"
     assert calls == ["lane-session"]
     assert len(result.attempts) == 1
+    attempt = result.attempts[0]
+    assert attempt["returncode"] == 1
+    assert attempt["raw_excerpt"] == "raw-provider"
+    assert attempt["failure_detail_excerpt"] == "quota"
+    assert attempt["stderr_excerpt"] == "provider-stderr"
+    assert attempt["duration_ms"] == 17
+    assert attempt["provider_duration_ms"] == 11
+    assert attempt["raw_sha256"] == hashlib.sha256(b"raw-provider").hexdigest()
+    assert attempt["failure_detail_sha256"] == hashlib.sha256(b"quota").hexdigest()
+    assert attempt["stderr_sha256"] == hashlib.sha256(b"provider-stderr").hexdigest()
 
 
 def test_missing_or_insufficient_deadline_spends_no_provider_call(monkeypatch):
@@ -137,7 +152,7 @@ def repository(tmp_path: Path) -> Path:
     return repo
 
 
-def install_settled_census(monkeypatch):
+def install_settled_census(monkeypatch, *, blocking=True):
     trailer = (
         "CLASS-REGISTER: staged census parsed — NONE\n"
         "CLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\n"
@@ -149,14 +164,19 @@ def install_settled_census(monkeypatch):
         assert closure.lineage is not None
         lane = sp.LANES[mode][0]
         state = rc.normalize_state(closure.lineage.review_state, stakes=stakes, snapshot=snapshot)
-        state.update(phase="correction", last_round=closure.round_no, debt=[{
+        debt = [{
             "id": "D1", "finding_id": "G1", "status": "open", "severity": "MAJOR",
             "summary": "value must be two", "evidence": [
                 "repository/app.py:1" if mode == "branch" else "plan:1"
             ], "remedy": "replace one with two", "source_ids": [f"{lane}:F1"],
             "class_ids": [], "first_round": closure.round_no,
             "last_round": closure.round_no,
-        }])
+        }] if blocking else []
+        state.update(
+            phase="correction" if blocking else "final",
+            last_round=closure.round_no,
+            debt=debt,
+        )
         closure.lineage.review_state = state
         closure._settled = True
         closure.register_status = "staged census parsed — NONE"
@@ -215,6 +235,7 @@ def test_public_branch_handoff_proposes_before_cleanup_and_preserves_trailer(
     ).read_text())
     assert proposal_record["patch_applied"] is False
     assert proposal_record["tests_executed"] is False
+    assert not calls[0][1].exists()
 
 
 def test_public_plan_handoff_uses_captured_plan_and_preserves_trailer(
@@ -239,6 +260,50 @@ def test_public_plan_handoff_uses_captured_plan_and_preserves_trailer(
     assert "The value is two." in output
     assert output.endswith(trailer)
     assert calls == [("lane-session", True)]
+
+
+def test_clean_review_is_not_needed_and_spends_no_proposal_call(tmp_path, monkeypatch):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    install_settled_census(monkeypatch, blocking=False)
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("proposal called")),
+    )
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": "clean-review", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert "PATCH-PROPOSAL: NOT-NEEDED" in output
+
+
+def test_successful_patch_with_missing_supplemental_audit_stays_unavailable(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_reply("branch")
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(text, "proposal-session", text),
+    )
+    real_log = handlers._log
+    def selective_log(log_dir, tool, engine, review, now, extra):
+        if tool == "critique_branch_patch_proposal":
+            return None
+        return real_log(log_dir, tool, engine, review, now, extra)
+    monkeypatch.setattr(handlers, "_log", selective_log)
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": "missing-proposal-audit", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+    assert "supplemental proposal audit receipt unavailable" in output
+    assert "value = 2" not in output
+    assert output.endswith(trailer)
 
 
 def test_plan_path_change_after_capture_reports_stale_without_rebasing(
@@ -288,6 +353,44 @@ def test_public_omitted_and_false_make_zero_proposal_calls(tmp_path, monkeypatch
         assert "PATCH-PROPOSAL" not in output
 
 
+def test_enabled_proposal_does_not_change_durable_state_or_existing_trailer(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    state_root = tmp_path / "state"
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(state_root))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_reply("branch")
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(text, "proposal-session", text),
+    )
+    common = {
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "stakes": "local", "web_search": False,
+    }
+    disabled = handlers.critique_branch(
+        {**common, "lineage": "state-disabled", "propose_patch": False},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-disabled",
+    )
+    enabled = handlers.critique_branch(
+        {**common, "lineage": "state-enabled", "propose_patch": True},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-enabled",
+    )
+    disabled_state = handlers.cc.load_lineage(
+        state_root, "state-disabled", stamp="READ",
+    )
+    enabled_state = handlers.cc.load_lineage(
+        state_root, "state-enabled", stamp="READ",
+    )
+    assert disabled_state.review_state == enabled_state.review_state
+    assert disabled_state.classes == enabled_state.classes
+    assert disabled.endswith(trailer)
+    assert enabled.endswith(trailer)
+    assert "PATCH-PROPOSAL" not in disabled
+    assert "PATCH-PROPOSAL: PROPOSED" in enabled
+
+
 def test_missing_settled_review_audit_receipt_prevents_proposal_spend(tmp_path, monkeypatch):
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
@@ -333,6 +436,78 @@ def test_failed_current_claim_audit_prevents_plan_proposal_spend(tmp_path, monke
     assert "current claim audit did not complete successfully" in output
 
 
+def test_reused_current_claim_audit_retains_semantic_proposal_target(tmp_path, monkeypatch):
+    author_handle = census.AuthorHandle("integrity", "lane-session", "codex")
+    lane = census.LaneResult(
+        "integrity", {"lane": "integrity"}, [], [], {}, author_handle,
+    )
+    closure = SimpleNamespace(
+        _settled=True,
+        mode="plan",
+        lineage=SimpleNamespace(review_state={"debt": []}, classes={}),
+        proposal_census=census.CensusResult([], [], [], {}, (lane,)),
+        proposal_debt_lanes={},
+    )
+    claim_state = pc.empty_state()
+    claim_state["claims"] = {
+        "C-0123456789": {
+            "claim_id": "C-0123456789", "kind": "fact", "scope": "external",
+            "anchor": "plan:1", "proposition": "The value is one.",
+            "verdict": "refuted", "rationale": "The retained source says two.",
+            "replacement": "The value is two.", "evidence": [],
+            "capture_provenance": [],
+        },
+    }
+    captured = []
+    def run_proposal(**kwargs):
+        captured.append(kwargs["context"])
+        return handlers._ProposalExecution(
+            None, (), (), "fixture stop", "lane-session", None, 0,
+        )
+    monkeypatch.setattr(handlers, "_run_patch_proposal", run_proposal)
+    output = handlers._plan_patch_supplement(
+        plan_bytes=b"The value is one.\n", plan_path=None, plan_input_issue=None,
+        structural_snapshot="snapshot", closure=closure, claim_state=claim_state,
+        claim_status="reused 1 unchanged supported packets; no claim model call",
+        claim_verification=True, stakes="local", engine=engines.CodexEngine(),
+        cwd=tmp_path, model="m", effort="high", deadline=time.monotonic() + 2_000,
+        on_progress=None, log_dir=tmp_path / "logs", now=lambda: "NOW",
+        review_log_path=tmp_path / "review.json",
+    )
+    assert [target.key for target in captured[0].targets] == ["claim:C-0123456789"]
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+
+
+def test_author_selection_uses_coverage_count_then_canonical_lane_order():
+    targets = tuple(
+        pp.ProposalTarget(
+            f"structural:D{index}", "repair", "MAJOR", ("repository/app.py:1",),
+        )
+        for index in range(1, 4)
+    )
+    lane_results = tuple(
+        census.LaneResult(
+            lane, {"lane": lane}, [], [], {},
+            census.AuthorHandle(lane, f"{lane}-session", "codex"),
+        )
+        for lane in sp.LANES["branch"]
+    )
+    closure = SimpleNamespace(
+        mode="branch",
+        proposal_census=census.CensusResult([], [], [], {}, lane_results),
+        proposal_debt_lanes={
+            "D1": ("behaviour", "integrity"),
+            "D2": ("integrity",),
+            "D3": ("behaviour",),
+        },
+    )
+    # Behaviour and integrity both cover two targets; canonical lane order wins.
+    selected = handlers._select_proposal_author(closure, targets)
+    assert selected is not None and selected.lane == sp.LANES["branch"][0]
+    closure.proposal_census = None
+    assert handlers._select_proposal_author(closure, targets) is None
+
+
 def test_explicit_true_unsupported_modes_refuse_before_provider(tmp_path, monkeypatch):
     repo = repository(tmp_path)
     monkeypatch.setattr(
@@ -349,3 +524,12 @@ def test_explicit_true_unsupported_modes_refuse_before_provider(tmp_path, monkey
             "repo_path": str(repo), "plan_text": "plan", "class_closure": False,
             "propose_patch": True,
         }, engine=engines.CodexEngine())
+    for arguments in (
+        {"converge": False, "class_closure": False},
+        {"converge": True, "class_closure": False},
+    ):
+        with __import__("pytest").raises(ValueError):
+            handlers.critique_branch({
+                "repo_path": str(repo), "round": 1, "lineage": "unsupported-more",
+                "propose_patch": True, **arguments,
+            }, engine=engines.CodexEngine())

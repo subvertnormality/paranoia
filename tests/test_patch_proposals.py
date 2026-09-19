@@ -70,6 +70,10 @@ def test_schema_is_closed_and_provider_projection_preserves_required_fields():
 
 @pytest.mark.parametrize("bad", [
     '{"schema_version":1,"schema_version":1}',
+    '{"schema_version":1,"status":"declined","summary":"x",'
+    '"addressed_finding_ids":[],"unaddressed":[{"finding_id":"structural:D1",'
+    '"reason":"first","reason":"second"}],"edits":[],"suggested_tests":[],'
+    '"limitations":[]}',
     '{"schema_version":true,"status":"declined","summary":"x",'
     '"addressed_finding_ids":[],"unaddressed":[],"edits":[],'
     '"suggested_tests":[],"limitations":[]}',
@@ -103,6 +107,29 @@ def test_partition_partial_and_decline_are_exact():
         pp.parse_and_render(context, response(edits=[replace()]), reader)
 
 
+@pytest.mark.parametrize(("field", "value"), [
+    ("summary", "   "),
+    ("suggested_tests", ["\t"]),
+    ("limitations", ["\n"]),
+])
+def test_semantic_text_must_be_nonblank(field, value):
+    context, reader = branch_context()
+    payload = json.loads(response(edits=[replace()]))
+    payload[field] = value
+    with pytest.raises(pp.ProposalError, match="semantic text must be nonblank"):
+        pp.parse_and_render(context, json.dumps(payload), reader)
+
+
+def test_raw_and_edit_strings_must_be_strict_utf8():
+    context, reader = branch_context()
+    with pytest.raises(pp.ProposalError, match="strict UTF-8"):
+        pp.parse_and_render(context, "\ud800", reader)
+    payload = json.loads(response(edits=[replace()]))
+    payload["edits"][0]["new_text"] = "\ud800"
+    with pytest.raises(pp.ProposalError, match="strict UTF-8"):
+        pp.parse_and_render(context, json.dumps(payload, ensure_ascii=False), reader)
+
+
 def test_replacements_use_original_spans_and_render_no_final_newline():
     data = b"first\nmiddle\nlast"
     context, reader = branch_context(data)
@@ -114,6 +141,16 @@ def test_replacements_use_original_spans_and_render_no_final_newline():
     assert result.files[0].proposed == b"FIRST\nmiddle\nLAST"
     assert b"\\ No newline at end of file\n" in result.patch
     assert result.patch_sha256 == __import__("hashlib").sha256(result.patch).hexdigest()
+
+
+def test_adjacent_replacements_and_empty_replacement_are_valid():
+    context, reader = branch_context(b"abc\n")
+    result = pp.parse_and_render(context, response(edits=[
+        replace(old="a", new="A"),
+        replace(old="b", new=""),
+        replace(old="c", new="C"),
+    ]), reader)
+    assert result.files[0].proposed == b"AC\n"
 
 
 @pytest.mark.parametrize(("old", "new", "message"), [
@@ -159,6 +196,23 @@ def test_source_kinds_encoding_crlf_binary_and_identity_reject():
         pp.parse_and_render(context, response(edits=[replace()]), reader)
 
 
+def test_blob_identity_aggregate_source_and_executable_mode_are_enforced(monkeypatch):
+    data = b"value = 1\n"
+    wrong = pp.ProposalEntry("app.py", "file", "100644", "0" * 40)
+    context, reader = branch_context(data, entries=(wrong,))
+    with pytest.raises(pp.ProposalError, match="blob identity mismatch"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
+
+    executable = entry("app.py", data, mode="100755", kind="executable")
+    context, reader = branch_context(data, entries=(executable,))
+    result = pp.parse_and_render(context, response(edits=[replace()]), reader)
+    assert result.files[0].mode == "100755"
+
+    monkeypatch.setattr(pp, "MAX_SOURCE_BYTES", len(data) - 1)
+    with pytest.raises(pp.ProposalError, match="source exceeds invocation byte limit"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
+
+
 def test_checkout_divergence_is_named_without_rebasing():
     pinned = b"value = 1\n"
     context, unused = branch_context(pinned)
@@ -180,6 +234,69 @@ def test_create_requires_absence_safe_parent_and_nonempty_text():
     create["path"] = "app.py"
     with pytest.raises(pp.ProposalError, match="already exists"):
         pp.parse_and_render(existing, response(edits=[create]), reader)
+
+
+def test_create_parent_path_and_case_collisions_reject():
+    data = b"target\n"
+    file_parent = entry("src", data)
+    context, reader = branch_context(data, entries=(file_parent,))
+    create = {"target": "repository", "operation": "create", "path": "src/new.py",
+              "old_text": None, "new_text": "created = True\n"}
+    with pytest.raises(pp.ProposalError, match="ancestor 'src' is not a directory"):
+        pp.parse_and_render(context, response(edits=[create]), reader)
+    symlink_parent = pp.ProposalEntry("src", "symlink", "120000", "0" * 40)
+    context, reader = branch_context(data, entries=(symlink_parent,))
+    with pytest.raises(pp.ProposalError, match="ancestor 'src' is not a directory"):
+        pp.parse_and_render(context, response(edits=[create]), reader)
+
+    upper = entry("Name.py", data)
+    lower = entry("name.py", data)
+    context, reader = branch_context(data, entries=(upper, lower))
+    with pytest.raises(pp.ProposalError, match="ambiguous existing paths"):
+        pp.parse_and_render(
+            context,
+            response(edits=[replace(path="name.py", old="target\n", new="changed\n")]),
+            reader,
+        )
+
+
+def test_create_empty_and_gitlink_replace_reject():
+    directory = pp.ProposalEntry("src", "directory", "040000")
+    context, reader = branch_context(entries=(directory,))
+    create = {"target": "repository", "operation": "create", "path": "src/new.py",
+              "old_text": None, "new_text": ""}
+    with pytest.raises(pp.ProposalError, match="created file must be nonempty"):
+        pp.parse_and_render(context, response(edits=[create]), reader)
+    gitlink = pp.ProposalEntry("app.py", "gitlink", "160000", "0" * 40)
+    context, reader = branch_context(entries=(gitlink,))
+    with pytest.raises(pp.ProposalError, match="unsupported kind gitlink"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
+
+
+@pytest.mark.parametrize("field", ["mode", "rename_from", "delete"])
+def test_model_cannot_request_mode_rename_or_delete(field):
+    context, reader = branch_context()
+    edit = replace()
+    edit[field] = "unsupported"
+    with pytest.raises(pp.ProposalError, match="Additional properties"):
+        pp.parse_and_render(context, response(edits=[edit]), reader)
+
+
+def test_raw_edit_and_rendered_patch_limits_fail_closed(monkeypatch):
+    context, reader = branch_context()
+    monkeypatch.setattr(pp, "MAX_RAW_BYTES", 32)
+    with pytest.raises(pp.ProposalError, match="raw response exceeds"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
+
+    monkeypatch.setattr(pp, "MAX_RAW_BYTES", 262_144)
+    monkeypatch.setattr(pp, "MAX_EDIT_BYTES", 3)
+    with pytest.raises(pp.ProposalError, match="replacement text exceeds"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
+
+    monkeypatch.setattr(pp, "MAX_EDIT_BYTES", 131_072)
+    monkeypatch.setattr(pp, "MAX_PATCH_BYTES", 20)
+    with pytest.raises(pp.ProposalError, match="rendered patch exceeds"):
+        pp.parse_and_render(context, response(edits=[replace()]), reader)
 
 
 def test_plan_uses_exact_unnumbered_capture_and_virtual_label():
