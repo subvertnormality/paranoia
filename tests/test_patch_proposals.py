@@ -173,6 +173,21 @@ def test_repeated_and_overlapping_old_text_reject():
         pp.parse_and_render(context, response(edits=[
             replace(old="abc", new="x"), replace(old="bcde", new="y"),
         ]), reader)
+    for data, old in ((b"aaa\n", "aa"), (b"ababa\n", "aba")):
+        context, reader = branch_context(data)
+        with pytest.raises(pp.ProposalError, match="occurs 2 times"):
+            pp.parse_and_render(
+                context, response(edits=[replace(old=old, new="x")]), reader,
+            )
+
+
+def test_ascii_json_escaped_unpaired_surrogate_old_text_is_repairable():
+    context, reader = branch_context()
+    payload = json.loads(response(edits=[replace()]))
+    payload["edits"][0]["old_text"] = "\ud800"
+    raw = json.dumps(payload, ensure_ascii=True)
+    with pytest.raises(pp.ProposalError, match="/edits/0/old_text: string contains an unpaired surrogate"):
+        pp.parse_and_render(context, raw, reader)
 
 
 @pytest.mark.parametrize("path", [

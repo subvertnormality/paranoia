@@ -34,6 +34,33 @@ that default is deliberate.
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
 
+### Qualification-only patch supplement
+
+With explicit propose_patch: true, a successful fresh census author may be
+resumed once to produce closed structured edits and once more only for local
+validation repair. This happens after the normal review is durably settled. The
+proposal route is read-only and web-disabled; Paranoia never applies the patch,
+runs repository code, or runs tests.
+
+Branch validation retains the complete Git tree (including directories),
+reserves trusted blob sizes before any source read, and shares one 2 MiB source
+allowance and cache across the initial reply and retry. Creation cannot replace
+an existing directory. Exact preimages must occur once, counting overlapping
+occurrences. A clean caller checkout is required before dispatch, and the
+caller ref plus application preimages are checked again before return.
+
+Plan review captures bytes once. Normal review, claim, digest, and structural
+identity continue to use the historical universal-newline text view; proposal
+eligibility and patch validation use the exact captured bytes and require
+strict UTF-8 LF-only text. plan-artifact.md is a virtual display label.
+Source capture, binding, or attestation failures are retried as evidence work,
+not offered as factual rewrite targets.
+
+Every provider-authored public field is emitted as an inert JSON value. A local
+proposal exception or missing supplemental audit yields PATCH-PROPOSAL:
+UNAVAILABLE while preserving the settled review and its exact existing
+trailer. Proposal-only session observations cannot authorize rebut.
+
 1. **Census:** three independent cold lanes inspect the complete artifact. A
    separate call consolidates their validated findings into durable debt.
 2. **Correction:** later rounds target open debt, claimed fixes, and their

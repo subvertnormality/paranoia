@@ -723,6 +723,37 @@ def _source_failure_phases(
     return tuple(phases)
 
 
+def source_failure_only(claim: dict[str, Any]) -> bool:
+    """Whether an unverified claim lacks a completed source-processing route.
+
+    Such a row is operational evidence debt, not authority to rewrite the factual
+    proposition.  Keep this public so supplemental consumers reuse the same
+    server-owned phase classification as the canonical claim renderer.
+    """
+    if claim.get("verdict") != "unverified":
+        return False
+    evidence = claim.get("evidence", [])
+    provenance = claim.get("capture_provenance", [])
+    if not isinstance(evidence, list) or not evidence or not isinstance(provenance, list):
+        return False
+    if len(provenance) != len(evidence):
+        return False
+    for row in provenance:
+        if not isinstance(row, dict):
+            return False
+        error = row.get("error")
+        if not error:
+            return False
+        text = str(error)
+        if not (
+            text.startswith(BINDING_FAILURE_PREFIX)
+            or text.startswith(ATTESTATION_FAILURE_PREFIX)
+            or row.get("text_sha256") is None
+        ):
+            return False
+    return bool(_source_failure_phases(provenance, evidence))
+
+
 def _validate_capture_attestations(
     value: Any, evidence: list[dict[str, str]],
 ) -> list[dict[str, Any]]:

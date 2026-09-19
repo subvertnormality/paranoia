@@ -2,8 +2,8 @@
 
 Status: **A1-A5 COMPLETE — FEASIBILITY GO, WITH RECORDED SHORTFALLS.** This is
 the pre-production assessment required by `docs/reviewer-patch-proposal-plan.md`.
-`PROPOSE_PATCH_DEFAULT` remains absent/false, no production proposal path is wired,
-and no model-authored edit has been applied.
+`PROPOSE_PATCH_DEFAULT` remains false. The production proposal path is wired only
+for explicit qualification calls, and no model-authored edit has been applied.
 
 Accepted plan digest: `c8ca80d70c699d65bf1c312d25af301e4df70fdc8fe88c94b4af56698d320a89`.
 Reviewed implementation baseline: `2e23bd2ed17f9d10c2b07b0e7386738d1afbd254`.
@@ -64,7 +64,8 @@ SHA-256 and byte length of the full binary-capable repair diff. Branch diffs are
 from recorded heads and command; plan diffs bind both full content hashes and Git blob IDs.
 
 Same-snapshot validation retries are not repair transitions. Cause is `unknown` unless the
-retained audit itself proves validation/protocol failure, execution failure, or required final;
+retained audit itself proves validation/protocol failure, execution failure, checkpoint, or
+required final;
 the ledger does not infer human intent from a patch. Caller reconstruction time, unrecorded
 human inspection, and subscription price remain unknown. A2 is **COMPLETE** for the A1 set.
 

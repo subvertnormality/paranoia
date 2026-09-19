@@ -47,6 +47,10 @@ class ProposalError(ValueError):
         self.issues = tuple(ordered[:20])
 
 
+class SourceReadError(ValueError):
+    """A bounded source-admission failure that the proposal author can repair."""
+
+
 @dataclass(frozen=True)
 class ProposalTarget:
     key: str
@@ -68,6 +72,7 @@ class ProposalEntry:
     kind: Literal["file", "executable", "symlink", "gitlink", "directory"]
     mode: str
     oid: str | None = None
+    size: int | None = None
 
 
 @dataclass(frozen=True)
@@ -354,11 +359,15 @@ def parse_and_render(context: ProposalContext, raw: str,
     edits = value["edits"]
     edit_bytes = 0
     paths: list[str] = []
+    unsafe_edits: set[int] = set()
     for index, edit in enumerate(edits):
         for field in ("old_text", "new_text"):
             text = edit[field]
             if isinstance(text, str):
+                before = len(issues)
                 edit_bytes += len(_utf8(text, f"/edits/{index}/{field}", issues))
+                if len(issues) != before:
+                    unsafe_edits.add(index)
         if context.mode == "branch" and isinstance(edit["path"], str):
             paths.append(edit["path"])
     if edit_bytes > MAX_EDIT_BYTES:
@@ -372,13 +381,18 @@ def parse_and_render(context: ProposalContext, raw: str,
             assert context.plan_bytes is not None
             entry = ProposalEntry(PLAN_LABEL, "file", "100644")
             source_reader = source_reader or (lambda unused: SourceContent(context.plan_bytes))
-            files = _apply_edits(context, edits, (entry,), source_reader, issues, plan=True)
+            files = _apply_edits(
+                context, edits, (entry,), source_reader, issues,
+                plan=True, unsafe_edits=unsafe_edits,
+            )
         else:
             if source_reader is None:
                 issues.append("/: repository proposal requires a pinned source reader")
             else:
-                files = _apply_edits(context, edits, context.entries, source_reader, issues,
-                                     plan=False)
+                files = _apply_edits(
+                    context, edits, context.entries, source_reader, issues,
+                    plan=False, unsafe_edits=unsafe_edits,
+                )
     if issues:
         raise ProposalError(issues)
     patch = render_patch(files, plan=context.mode == "plan") if files else b""
@@ -396,13 +410,17 @@ def parse_and_render(context: ProposalContext, raw: str,
 
 def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
                  entries: Sequence[ProposalEntry], source_reader: SourceReader,
-                 issues: list[str], *, plan: bool) -> list[ProposedFile]:
+                 issues: list[str], *, plan: bool,
+                 unsafe_edits: set[int] | None = None) -> list[ProposedFile]:
+    unsafe_edits = unsafe_edits or set()
     by_path = {entry.path: entry for entry in entries}
     casefold_paths: dict[str, list[str]] = {}
     for entry in entries:
         casefold_paths.setdefault(entry.path.casefold(), []).append(entry.path)
     grouped: dict[str, list[tuple[int, dict[str, Any]]]] = {}
     for index, edit in enumerate(edits):
+        if index in unsafe_edits:
+            continue
         pointer = f"/edits/{index}"
         path = PLAN_LABEL if plan else edit["path"]
         if not isinstance(path, str):
@@ -468,7 +486,11 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
         if entry.kind not in {"file", "executable"}:
             issues.append(f"/edits: replace target {path!r} is unsupported kind {entry.kind}")
             continue
-        content = source_reader(entry)
+        try:
+            content = source_reader(entry)
+        except SourceReadError as exc:
+            issues.append(f"/edits/{rows[0][0]}/path: {exc}")
+            continue
         total_source += len(content.pinned)
         text = _source_text(content, entry, f"/edits/{rows[0][0]}/path", issues)
         if text is None:
@@ -482,15 +504,19 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
                 continue
             if old == new:
                 issues.append(f"/edits/{index}: no-op replacement")
-            count = text.count(old)
-            if count != 1:
+            occurrences: list[int] = []
+            position = text.find(old)
+            while position >= 0:
+                occurrences.append(position)
+                position = text.find(old, position + 1)
+            if len(occurrences) != 1:
                 detail = "checkout-view-diverged-from-pinned-blob" if (
-                    count == 0 and content.checkout is not None
-                    and old.encode("utf-8") in content.checkout
-                ) else f"old_text occurs {count} times in pinned blob"
+                    not occurrences and content.checkout is not None
+                    and _utf8(old, f"/edits/{index}/old_text", issues) in content.checkout
+                ) else f"old_text occurs {len(occurrences)} times in pinned blob"
                 issues.append(f"/edits/{index}/old_text: {detail}")
                 continue
-            start = text.index(old)
+            start = occurrences[0]
             spans.append((start, start + len(old), new, index))
         spans.sort()
         for left, right in zip(spans, spans[1:]):

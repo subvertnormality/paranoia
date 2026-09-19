@@ -60,6 +60,7 @@ default and returns cited findings plus a computed convergence trailer.
 | `lineage` | string | Derived | Explicit key; required for a detached head or raw commit |
 | `exempt` | object array | `[]` | Exempt exact `{class_id,path,line,line_text}` predicate matches |
 | `unexempt` | object array | `[]` | Revoke exact `{class_id,path,line}` exemptions |
+| `propose_patch` | boolean | `false` during qualification | Request a supplemental reviewer-authored, unapplied candidate patch after tracked settlement |
 
 Rules:
 
@@ -73,6 +74,11 @@ Rules:
   contract requires a new lineage.
 - A contract is declarative requirements data, not reviewer instructions.
 - Lost or ambiguous substantive lineage state blocks with `STATE-UNAVAILABLE`.
+- `propose_patch: true` requires committed tracked review (`converge: true`,
+  `class_closure: true`, `include_uncommitted: false`) and a clean caller
+  checkout. It never changes the review verdict, durable state, or returned
+  convergence trailer. The candidate is validated against pinned blobs but is
+  not applied and no tests are run. Stale caller ref/preimages are reported.
 
 Example:
 
@@ -104,6 +110,7 @@ runs before structural review by default.
 | `focus` | string | — | Optional review focus |
 | `stakes` | string | Modest internal-tool assumptions | Scope and consequence boundary |
 | `already_raised` | string array | `[]` | Accepted cited findings from earlier rounds |
+| `propose_patch` | boolean | `false` during qualification | Request a supplemental reviewer-authored, unapplied plan-text candidate after tracked settlement |
 
 Rules:
 
@@ -117,6 +124,11 @@ Rules:
   conformance, and local design choices.
 - One-shot plan review uses `class_closure: false`. It returns review prose and
   claim packets but no computed convergence verdict.
+- `propose_patch: true` requires tracked closure. The candidate binds the exact
+  captured plan bytes and uses `plan-artifact.md` only as a virtual diff label;
+  apply it deliberately to the original buffer or named path. Capture, binding,
+  or attestation failures remain evidence-work debt and never authorize a
+  factual rewrite.
 
 ```json
 {

@@ -245,6 +245,34 @@ def test_session_routing_ignores_failed_echoes_and_requires_explicit_unknown(tmp
         session_routing.resolve("s", "claude", (tmp_path,))
 
 
+def test_session_routing_ignores_proposal_only_telemetry_but_keeps_real_review_owner(
+    tmp_path,
+):
+    proposal_run = {
+        "tool": "run",
+        "attempts": [{
+            "role": "patch-proposal", "provider_outcome": "completed",
+            "returncode": 0, "session_ref": "proposal-only", "engine": "codex",
+        }],
+    }
+    (tmp_path / "proposal-run.json").write_text(json.dumps(proposal_run))
+    assert not session_routing.ownership("proposal-only", (tmp_path,)).owners
+    with pytest.raises(ValueError, match="unknown"):
+        session_routing.resolve("proposal-only", None, (tmp_path,))
+
+    review = {
+        "tool": "critique_branch", "engine": "codex", "error": False,
+        "returncode": 0, "session_ref": "shared", "attempt_ledger": [],
+    }
+    (tmp_path / "review.json").write_text(json.dumps(review))
+    reused = {
+        **proposal_run,
+        "attempts": [{**proposal_run["attempts"][0], "session_ref": "shared"}],
+    }
+    (tmp_path / "reused-proposal-run.json").write_text(json.dumps(reused))
+    assert session_routing.resolve("shared", None, (tmp_path,)) == "codex"
+
+
 def test_common_trace_captures_parallel_attempts_without_summing_wall_time(tmp_path):
     engine = engines.CodexEngine()
     def call():

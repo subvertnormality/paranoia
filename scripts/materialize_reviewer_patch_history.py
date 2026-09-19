@@ -129,9 +129,14 @@ def cause(predecessor: dict[str, Any], successor: dict[str, Any]) -> list[str]:
     categories: list[str] = []
     if any(isinstance(row, dict) and row.get("validation_issue") for row in attempts):
         categories.append("validation/protocol failure")
-    if any(isinstance(row, dict) and row.get("outcome") not in {None, "completed"}
-           for row in attempts):
+    if any(isinstance(row, dict) and (
+        row.get("outcome") in {"failed", "execution-failed"}
+        or (type(row.get("returncode")) is int and row.get("returncode") != 0)
+    ) for row in attempts):
         categories.append("execution failure")
+    if any(isinstance(row, dict) and row.get("outcome") == "checkpoint"
+           for row in attempts):
+        categories.append("checkpoint")
     trailer = predecessor.get("rendered_trailer") or ""
     if "cold final regression is required" in trailer.lower():
         categories.append("required final")

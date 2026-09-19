@@ -51,6 +51,7 @@ def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnersh
                 if isinstance(attempts, list):
                     rows.extend(row for row in attempts if isinstance(row, dict)
                                 and row.get("provider_outcome") == "completed"
+                                and row.get("role") != "patch-proposal"
                                 and type(row.get("returncode")) is int and row["returncode"] == 0)
             for row in rows:
                 if row.get("session_ref") == session_ref and row.get("engine") in ENGINES:

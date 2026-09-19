@@ -7,9 +7,9 @@ gate passes; no proposal is applied or tested by the production path.
 | Gate | Branch evidence | Plan evidence | Status / disposition |
 | --- | --- | --- | --- |
 | G1 feasibility | Six frozen families across both providers; retained successes, decline, and repeated-occurrence failure | Structural routes qualified for both providers; Claude verified route qualified; Codex verified harness failure retained | PASS for implementation feasibility only |
-| G2 local correctness | Pure protocol/rendering, native argv, continuation, custody, audit-failure and public-handler lifecycle matrix | Exact plan capture/staleness, current/reused claim gating, plan-path custody and the same failure matrix | PASS pre-flip at revision `8543823967a4a1e09eea2977d8fa42da5ed13910` |
-| G3 state independence | Explicit true and false produce identical durable review/class state and existing trailer; proposal audit remains supplemental | Explicit true and false produce identical durable review/class/claim state and existing trailer | PASS pre-flip |
-| G4 native correctness | Production-entry native campaign not run | Production-entry native campaign not run | PENDING explicit campaign authorization |
+| G2 local correctness | Pure protocol/rendering plus Git-backed directory, pre-read byte admission, retry cache, clean/stale caller, inert rendering, exception containment and public-handler lifecycle coverage | Exact plan capture/newline/staleness, source-processing debt, audit/trailer equality, custody and the same failure matrix | PASS pre-flip on the current branch |
+| G3 state independence | Paired isolated state roots drive the production census/materializer/class engine/persistence through nonempty debt/class, wrong repair, correct repair and cold final; true and false successors/trailers match | Explicit true and false produce identical durable review/class/claim state and existing trailer | PASS pre-flip |
+| G4 native correctness | Production-entry native campaign authorized but not run | Production-entry native campaign authorized but not run | PENDING campaign execution |
 | G5 usefulness | Paired E1-E9 experiment not run | L8/L9 paired experiment not run | PENDING; no benefit claim |
 | G6 human quality | No named independent human inspection yet | No named independent human inspection yet | PENDING; cannot be supplied by an LLM |
 | G7 delivery acceptance | Requires post-flip regression, primary E2E, docs/default agreement and CODE closure | Same, separately | BLOCKED until G1-G6 pass; no candidate flip |
@@ -26,7 +26,8 @@ gate passes; no proposal is applied or tested by the production path.
 - Focused pre-flip matrix:
   `/home/andy/tools/paranoia-local/.venv/bin/pytest -q tests/test_patch_proposals.py
   tests/test_patch_proposals_integration.py tests/test_patch_experiments.py
-  tests/test_engines.py tests/test_census_execution.py` — 135 passed in 6.93s.
+  tests/test_architecture_performance.py tests/test_engines.py
+  tests/test_census_execution.py` — 211 passed in 11.81s.
 - Full regression:
   `/home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
   2,418 passed in 267.59s after the final plan-mode G3 fixture. `git diff

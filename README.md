@@ -145,6 +145,15 @@ You can bind an approved implementation plan to the branch review with
 contract for the lineage; later rounds verify the implementation against the same
 text. Changing the contract requires a new lineage.
 
+During the current qualification, explicit propose_patch: true can ask the
+successful fresh census author for a supplemental candidate diff after the
+tracked review has settled. Omission and false remain disabled. The proposal is
+read-only, bound to the reviewed snapshot and complete target/class context,
+locally validated against pinned source, separately audited, and never applied
+or tested by Paranoia. The original verdict, durable state, and convergence
+trailer remain authoritative. A dirty caller tree blocks branch proposal spend;
+later ref or preimage movement marks a returned candidate stale.
+
 ### Review a plan
 
 Tracked plan reviews require an explicit, stable lineage because plans do not
@@ -173,6 +182,12 @@ cannot close a claim.
 Set `claim_verification: false` only when you deliberately want a structural-only
 review. See [external claim verification](docs/how-it-works.md#external-claim-verification)
 for the evidence model and limits.
+
+Plan proposals use plan-artifact.md as a virtual diff label and bind the exact
+captured plan bytes. The handoff identifies whether the source was plan_text or
+plan_path and where a path-backed plan came from. Evidence capture, binding, or
+cold-attestation failures remain evidence-work debt; Paranoia will not turn
+those operational failures into suggested factual rewrites.
 
 ### Ask a focused question
 
