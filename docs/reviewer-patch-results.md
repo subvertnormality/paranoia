@@ -24,14 +24,18 @@ gate passes; no proposal is applied or tested by the production path.
 - Production path status: implemented under explicit true; omitted and false make zero
   proposal calls. `PROPOSE_PATCH_DEFAULT` remains false.
 - Focused pre-flip matrix:
-  `/home/andy/tools/paranoia-local/.venv/bin/pytest -q tests/test_patch_proposals.py
-  tests/test_patch_proposals_integration.py tests/test_patch_experiments.py
+  `PYTHONPATH=src /home/andy/tools/paranoia-local/.venv/bin/pytest -q
+  tests/test_patch_proposals.py tests/test_patch_proposals_integration.py
   tests/test_architecture_performance.py tests/test_engines.py
-  tests/test_census_execution.py` — 211 passed in 11.81s.
+  tests/test_census_execution.py` — 211 passed in 15.68s.
 - Full regression:
-  `/home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
-  2,418 passed in 267.59s after the final plan-mode G3 fixture. `git diff
-  --check` passed and the worktree was clean.
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,436 passed in 459.71s at checkpoint `828c4c3`. The per-process Git
+  override prevents the host's SSH commit-signing policy from affecting temporary
+  fixture repositories; it does not change product behavior. `git diff --check`
+  passed and the checkpoint worktree was clean.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
