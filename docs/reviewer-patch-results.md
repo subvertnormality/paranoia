@@ -28,11 +28,11 @@ gate passes; no proposal is applied or tested by the production path.
   tests/test_patch_proposals.py tests/test_patch_proposals_integration.py
   tests/test_architecture_performance.py tests/test_engines.py
   tests/test_census_execution.py` — 223 passed in 17.83s.
-- Full regression after CODE round-2 repairs:
+- Full regression after CODE round-3 repairs:
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
   GIT_CONFIG_VALUE_0=false PYTHONPATH=src
   /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
-  2,441 passed in 304.45s at checkpoint `3abac3a`. The per-process Git
+  2,449 passed in 310.92s at checkpoint `01279d9`. The per-process Git
   override prevents the host's SSH commit-signing policy from affecting temporary
   fixture repositories; it does not change product behavior. `git diff --check`
   passed and the checkpoint worktree was clean.
