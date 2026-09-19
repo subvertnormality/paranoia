@@ -15,6 +15,10 @@ while proposals bind exact captured bytes. Source-processing and localized-disco
 claim debt are never factual rewrite targets without a current full semantic adjudication.
 Reject a replacement group when its final bytes equal its pinned original, while preserving
 valid adjacent edits and the existing single validation retry for both branch and plan.
+Branch proposal cleanliness must compare HEAD, index, untracked paths and raw checkout
+bytes without invoking repository-selected clean/process filters, both before dispatch
+and after response. Validate create paths as one prospective case-folded inventory,
+including new/new and existing ancestor file/directory collisions.
 If such debt is the only remaining claim blocker, report proposal UNAVAILABLE rather than
 NOT-NEEDED. Runner telemetry excludes both the requested author handle and returned proposal
 handle when a supplemental receipt is missing.

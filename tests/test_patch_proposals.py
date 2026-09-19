@@ -291,6 +291,28 @@ def test_create_parent_path_and_case_collisions_reject():
             reader,
         )
 
+    context, reader = branch_context(entries=())
+    creates = [
+        {"target": "repository", "operation": "create", "path": path,
+         "old_text": None, "new_text": "created = True\n"}
+        for path in ("Name.py", "name.py")
+    ]
+    with pytest.raises(pp.ProposalError, match="another edit path"):
+        pp.parse_and_render(context, response(edits=creates), reader)
+
+    upper_file = entry("Src", data)
+    context, reader = branch_context(data, entries=(upper_file,))
+    with pytest.raises(pp.ProposalError, match="case-collides with existing path 'Src'"):
+        pp.parse_and_render(context, response(edits=[create]), reader)
+
+    context, reader = branch_context(entries=())
+    distinct = [
+        {"target": "repository", "operation": "create", "path": path,
+         "old_text": None, "new_text": "created = True\n"}
+        for path in ("alpha.py", "beta.py")
+    ]
+    assert len(pp.parse_and_render(context, response(edits=distinct), reader).files) == 2
+
 
 def test_create_empty_and_gitlink_replace_reject():
     directory = pp.ProposalEntry("src", "directory", "040000")

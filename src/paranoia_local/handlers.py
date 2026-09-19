@@ -14,8 +14,10 @@ from . import telemetry
 
 import hashlib
 import json
+import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -761,19 +763,116 @@ def _proposal_section(
     return "\n".join(lines)
 
 
-def _branch_proposal_admission_issue(repo: Path) -> str | None:
+def _branch_proposal_raw_cleanliness_issue(
+    repo: Path, expected_head: str, *, depth: int = 0,
+) -> str | None:
+    """Compare HEAD, index and raw checkout bytes without invoking Git filters."""
+    if depth > 8:
+        return "nested submodule depth exceeds the filter-free cleanliness limit"
+    if not orientation.has_head(repo) or orientation.resolve_head(repo) != expected_head:
+        return "caller checkout HEAD moved after review"
+
+    expected: dict[bytes, tuple[str, str]] = {}
+    for record in inert_git.run(
+        repo, ["ls-tree", "-rz", "--full-tree", expected_head],
+    ).split(b"\0"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3:
+            raise RuntimeError("malformed filter-free HEAD inventory")
+        mode, unused_kind, oid = fields
+        expected[raw_path] = (mode.decode("ascii"), oid.decode("ascii"))
+
+    indexed: dict[bytes, tuple[str, str]] = {}
+    for record in inert_git.run(
+        repo, ["ls-files", "-s", "-z", "--cached"],
+    ).split(b"\0"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3 or fields[2] != b"0":
+            return "caller index contains an unmerged or malformed entry"
+        indexed[raw_path] = (fields[0].decode("ascii"), fields[1].decode("ascii"))
+    if indexed != expected:
+        return "caller index differs from the reviewed HEAD"
+
+    untracked = [
+        row for row in inert_git.run(
+            repo, ["ls-files", "-z", "--others", "--exclude-standard"],
+        ).split(b"\0") if row
+    ]
+    if untracked:
+        return "caller checkout contains non-ignored untracked paths"
+
+    skip_worktree: set[bytes] = set()
+    for record in inert_git.run(
+        repo, ["ls-files", "-t", "-z", "--cached"],
+    ).split(b"\0"):
+        if not record:
+            continue
+        tag, separator, raw_path = record.partition(b" ")
+        if not separator or len(tag) != 1:
+            raise RuntimeError("malformed filter-free index tag inventory")
+        if tag == b"S":
+            skip_worktree.add(raw_path)
+
+    file_mode = inert_git.invoke(repo, ["config", "--bool", "core.fileMode"])
+    if file_mode.returncode not in (0, 1):
+        raise RuntimeError("could not read core.fileMode for filter-free cleanliness")
+    file_mode_reliable = (
+        file_mode.returncode != 0
+        or file_mode.stdout.decode("ascii", errors="strict").strip().lower() != "false"
+    )
+
+    for raw_path, (indexed_mode, oid) in sorted(indexed.items()):
+        path_text = raw_path.decode("utf-8", errors="surrogateescape")
+        path = repo.joinpath(*path_text.split("/"))
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            if raw_path in skip_worktree or indexed_mode == "160000":
+                continue
+            return f"tracked path {path_text!r} is absent from the caller checkout"
+
+        if indexed_mode == "160000":
+            if not stat.S_ISDIR(info.st_mode) or not (path / ".git").exists():
+                return f"gitlink {path_text!r} is not an initialized or absent submodule"
+            issue = _branch_proposal_raw_cleanliness_issue(path, oid, depth=depth + 1)
+            if issue is not None:
+                return f"submodule {path_text!r} is not clean: {issue}"
+            continue
+        if indexed_mode == "120000":
+            if not stat.S_ISLNK(info.st_mode):
+                return f"tracked symlink {path_text!r} changed filesystem kind"
+            data = os.fsencode(os.readlink(path))
+            actual_mode = "120000"
+        else:
+            if not stat.S_ISREG(info.st_mode):
+                return f"tracked file {path_text!r} changed filesystem kind"
+            data = path.read_bytes()
+            actual_mode = (
+                indexed_mode if not file_mode_reliable
+                else "100755" if info.st_mode & stat.S_IXUSR else "100644"
+            )
+        if actual_mode != indexed_mode or git_objects.blob_oid(data, len(oid)) != oid:
+            return f"tracked path {path_text!r} differs from the reviewed HEAD"
+    return None
+
+
+def _branch_proposal_admission_issue(repo: Path, head_id: str) -> str | None:
     try:
-        dirty = inert_git.run(
-            repo, ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-        )
+        dirty = _branch_proposal_raw_cleanliness_issue(repo, head_id)
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         return "caller checkout cleanliness could not be established: " + rc.bounded_diagnostic(
             str(exc), sp.MAX_ISSUE_CHARS,
         )
-    if dirty:
+    if dirty is not None:
         return (
             "caller checkout is not clean; preserve the edits and rerun after committing "
-            "or otherwise selecting a clean application tree"
+            "or otherwise selecting a clean application tree (" + dirty + ")"
         )
     return None
 
@@ -782,7 +881,7 @@ def _branch_proposal_suitability(
     repo: Path, head_id: str, result: pp.ProposalResult,
 ) -> str:
     try:
-        if _branch_proposal_admission_issue(repo) is not None:
+        if _branch_proposal_admission_issue(repo, head_id) is not None:
             return "STALE"
         if not orientation.has_head(repo) or orientation.resolve_head(repo) != head_id:
             return "STALE"
@@ -825,7 +924,7 @@ def _branch_patch_supplement(
     if author is None:
         return _proposal_section(None, status="UNAVAILABLE",
                                  reason="no successful fresh-census author session", context=None)
-    admission_issue = _branch_proposal_admission_issue(repo)
+    admission_issue = _branch_proposal_admission_issue(repo, head_id)
     if admission_issue is not None:
         return _proposal_section(
             None, status="UNAVAILABLE", reason=admission_issue, context=None,

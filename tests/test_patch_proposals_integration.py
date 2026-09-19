@@ -520,6 +520,47 @@ def test_dirty_caller_tree_blocks_proposal_spend_but_preserves_review(
     assert (repo / "app.py").read_text() == "caller edit\n"
 
 
+def test_public_branch_cleanliness_never_executes_repository_filter(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    staged = handlers._staged_structural_review
+    sentinel = tmp_path / "filter-ran"
+
+    def configure_filter(*args, **kwargs):
+        result = staged(*args, **kwargs)
+        git(repo, "config", "filter.proposal-test.clean",
+            f"sh -c 'echo ran >> {sentinel}; cat'")
+        info = repo / ".git" / "info" / "attributes"
+        info.parent.mkdir(parents=True, exist_ok=True)
+        info.write_text("app.py filter=proposal-test\n", encoding="utf-8")
+        (repo / "app.py").touch()
+        return result
+
+    calls = 0
+    def resume(self, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        (repo / "app.py").touch()
+        text = proposal_reply("branch")
+        return engines.Review(text, "proposal-session", text)
+
+    monkeypatch.setattr(handlers, "_staged_structural_review", configure_filter)
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": "filter-free-cleanliness", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert calls == 1
+    assert "PATCH-PROPOSAL: PROPOSED" in output
+    assert "APPLICATION-SUITABILITY: CURRENT" in output
+    assert output.endswith(trailer)
+    assert not sentinel.exists()
+
+
 @pytest.mark.parametrize("kind", ["localized-omission", "localized-validation"])
 def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structurally_clear(
     tmp_path, monkeypatch, kind,

@@ -50,6 +50,11 @@ occurrences. Individually valid replacement groups that cancel back to the
 original bytes are rejected through the same validation retry; valid adjacent
 edits remain supported. A clean caller checkout is required before dispatch, and the
 caller ref plus application preimages are checked again before return.
+Both cleanliness checks compare the reviewed HEAD, index, untracked inventory,
+filesystem kinds/modes, and raw content identities without invoking repository
+clean/process filters. Proposed creates are checked as one prospective inventory:
+case-folded file/file, file/directory, and ancestor-component collisions reject
+through the existing validation retry.
 
 Plan review captures bytes once. Normal review, claim, digest, and structural
 identity continue to use the historical universal-newline text view; proposal

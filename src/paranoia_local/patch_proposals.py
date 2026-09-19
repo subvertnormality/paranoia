@@ -440,6 +440,18 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
                 issues.append(f"{pointer}/path: case-collides with {collisions[0]!r}")
         grouped.setdefault(path, []).append((index, edit))
 
+    grouped_casefold: dict[str, list[str]] = {}
+    for path in grouped:
+        grouped_casefold.setdefault(path.casefold(), []).append(path)
+    for collisions in grouped_casefold.values():
+        distinct = sorted(set(collisions))
+        if len(distinct) > 1:
+            for path in distinct:
+                issues.append(
+                    f"/edits/{grouped[path][0][0]}/path: case-collides with "
+                    f"another edit path {distinct!r}"
+                )
+
     total_source = 0
     result: list[ProposedFile] = []
     for path, rows in grouped.items():
@@ -462,10 +474,25 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
             ancestor = ""
             for component in path.split("/")[:-1]:
                 ancestor = f"{ancestor}/{component}".lstrip("/")
-                parent = by_path.get(ancestor)
+                collisions = sorted(set(casefold_paths.get(ancestor.casefold(), ())))
+                parent = by_path.get(collisions[0]) if len(collisions) == 1 else None
+                if len(collisions) > 1:
+                    issues.append(
+                        f"/edits: create ancestor {ancestor!r} case-collides "
+                        f"with ambiguous existing paths {collisions!r}"
+                    )
+                elif collisions and collisions[0] != ancestor:
+                    issues.append(
+                        f"/edits: create ancestor {ancestor!r} case-collides "
+                        f"with existing path {collisions[0]!r}"
+                    )
                 if parent is not None and parent.kind != "directory":
                     issues.append(f"/edits: create ancestor {ancestor!r} is not a directory")
-            if any(other != path and (other.startswith(path + "/") or path.startswith(other + "/"))
+            folded_path = path.casefold()
+            if any(other != path and (
+                       other.casefold().startswith(folded_path + "/")
+                       or folded_path.startswith(other.casefold() + "/")
+                   )
                    for other in grouped):
                 issues.append(f"/edits: create target {path!r} conflicts with another edit path")
             data = _utf8(
