@@ -92,6 +92,78 @@ def test_invalid_reply_retries_same_returned_session_and_retains_rejection(monke
     assert len(result.rejected_payloads) == 1
 
 
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+def test_cancelling_adjacent_edits_use_existing_validation_retry(monkeypatch, mode):
+    data = b"ab\n"
+    if mode == "branch":
+        entry = pp.ProposalEntry(
+            "app.py", "file", "100644", git_objects.blob_oid(data, 40),
+        )
+        context = pp.ProposalContext(
+            "branch",
+            (pp.ProposalTarget(
+                "structural:D1", "repair", "MAJOR", ("repository/app.py:1",),
+            ),),
+            "stakes", "head", "snapshot", None, None, (entry,),
+        )
+        reader = lambda unused: pp.SourceContent(data)
+        target_name, path = "repository", "app.py"
+    else:
+        context = pp.ProposalContext(
+            "plan",
+            (pp.ProposalTarget(
+                "structural:D1", "repair", "MAJOR", ("plan:1",),
+            ),),
+            "stakes", "plan-snapshot", "structural", None, None, (),
+            data, "plan-digest", "plan_text", None,
+        )
+        reader = None
+        target_name, path = "plan", None
+
+    def payload(edits):
+        return json.dumps({
+            "schema_version": 1, "status": "proposed", "summary": "repair",
+            "addressed_finding_ids": ["structural:D1"], "unaddressed": [],
+            "edits": edits, "suggested_tests": ["Run tests."],
+            "limitations": ["Tests not run."],
+        })
+
+    replies = [
+        payload([
+            {"target": target_name, "operation": "replace", "path": path,
+             "old_text": "a", "new_text": ""},
+            {"target": target_name, "operation": "replace", "path": path,
+             "old_text": "b", "new_text": "ab"},
+        ]),
+        payload([
+            {"target": target_name, "operation": "replace", "path": path,
+             "old_text": "ab", "new_text": "AB"},
+        ]),
+    ]
+    sessions = []
+    def resume(self, session, *args, **kwargs):
+        sessions.append(session)
+        text = replies.pop(0)
+        return engines.Review(text, "repair-session", text)
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+
+    result = handlers._run_patch_proposal(
+        context=context, source_reader=reader, author=author(),
+        engine=engines.CodexEngine(), cwd=Path("/repo"), model="m", effort="high",
+        deadline=time.monotonic() + 2_000, on_progress=None,
+    )
+    assert result.result is not None
+    assert result.result.files[0].proposed == b"AB\n"
+    assert sessions == ["lane-session", "repair-session"]
+    assert [row["outcome"] for row in result.attempts] == [
+        "validation-invalid", "completed",
+    ]
+    assert "replacement group leaves source unchanged" in (
+        result.attempts[0]["validation_issue"]
+    )
+    assert len(result.rejected_payloads) == 1
+
+
 def test_execution_failure_has_no_retry_or_fresh_fallback(monkeypatch):
     calls = []
     def resume(self, session, prompt, cwd, model, effort, **kwargs):

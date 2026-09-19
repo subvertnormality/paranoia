@@ -46,7 +46,9 @@ Branch validation retains the complete Git tree (including directories),
 reserves trusted blob sizes before any source read, and shares one 2 MiB source
 allowance and cache across the initial reply and retry. Creation cannot replace
 an existing directory. Exact preimages must occur once, counting overlapping
-occurrences. A clean caller checkout is required before dispatch, and the
+occurrences. Individually valid replacement groups that cancel back to the
+original bytes are rejected through the same validation retry; valid adjacent
+edits remain supported. A clean caller checkout is required before dispatch, and the
 caller ref plus application preimages are checked again before return.
 
 Plan review captures bytes once. Normal review, claim, digest, and structural

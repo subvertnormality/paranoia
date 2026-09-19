@@ -143,14 +143,31 @@ def test_replacements_use_original_spans_and_render_no_final_newline():
     assert result.patch_sha256 == __import__("hashlib").sha256(result.patch).hexdigest()
 
 
-def test_adjacent_replacements_and_empty_replacement_are_valid():
-    context, reader = branch_context(b"abc\n")
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+def test_adjacent_replacements_and_empty_replacement_are_valid(mode):
+    context = plan_context(b"abc\n") if mode == "plan" else branch_context(b"abc\n")[0]
+    reader = None if mode == "plan" else branch_context(b"abc\n")[1]
+    target_name = "plan" if mode == "plan" else "repository"
+    path = None if mode == "plan" else "app.py"
     result = pp.parse_and_render(context, response(edits=[
-        replace(old="a", new="A"),
-        replace(old="b", new=""),
-        replace(old="c", new="C"),
+        replace(path=path, old="a", new="A", target=target_name),
+        replace(path=path, old="b", new="", target=target_name),
+        replace(path=path, old="c", new="C", target=target_name),
     ]), reader)
     assert result.files[0].proposed == b"AC\n"
+
+
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+def test_adjacent_replacements_that_cancel_are_repairable(mode):
+    context = plan_context(b"ab\n") if mode == "plan" else branch_context(b"ab\n")[0]
+    reader = None if mode == "plan" else branch_context(b"ab\n")[1]
+    target_name = "plan" if mode == "plan" else "repository"
+    path = None if mode == "plan" else "app.py"
+    with pytest.raises(pp.ProposalError, match="replacement group leaves source unchanged"):
+        pp.parse_and_render(context, response(edits=[
+            replace(path=path, old="a", new="", target=target_name),
+            replace(path=path, old="b", new="ab", target=target_name),
+        ]), reader)
 
 
 @pytest.mark.parametrize(("old", "new", "message"), [

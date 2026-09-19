@@ -528,6 +528,10 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
         for start, end, new, unused in reversed(spans):
             proposed = proposed[:start] + new + proposed[end:]
         encoded = _utf8(proposed, f"/edits/{rows[0][0]}/new_text", issues)
+        if encoded == content.pinned:
+            issues.append(
+                f"/edits/{rows[0][0]}: replacement group leaves source unchanged"
+            )
         if b"\r" in encoded or b"\0" in encoded:
             issues.append(f"/edits: result for {path!r} must be LF-only text")
         result.append(ProposedFile(path, entry.mode, content.pinned, encoded, entry.oid))
