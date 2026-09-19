@@ -182,6 +182,25 @@ class TestDispatch:
         assert "proposal-only" in still_refused
         assert spy_get_engine == []
 
+        # A runner trace is the durable fallback when the supplemental receipt
+        # could not be written or the provider returned a different/no handle.
+        (tmp_path / "proposal.json").unlink()
+        (tmp_path / "proposal-run.json").write_text(json.dumps({
+            "tool": "run", "attempts": [{
+                "role": "patch-proposal", "provider_outcome": "completed",
+                "returncode": 0, "requested_session": author,
+                "session_ref": "different-proposal-session", "engine": "codex",
+            }],
+        }))
+        for explicit in (None, "codex"):
+            fallback_refused = server.dispatch(
+                "rebut", {**arguments, "engine": explicit} if explicit else arguments,
+                default_engine_name="claude", log_dir=tmp_path,
+                now=lambda: "t-run-fallback",
+            )
+            assert "proposal-only" in fallback_refused
+        assert spy_get_engine == []
+
         (tmp_path / "independent.json").write_text(json.dumps({
             "tool": "query", "engine": "codex", "error": False,
             "returncode": 0, "session_ref": author,

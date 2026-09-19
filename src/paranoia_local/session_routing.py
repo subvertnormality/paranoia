@@ -70,9 +70,10 @@ def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnersh
                 for row in attempts:
                     if not isinstance(row, dict) or row.get("role") != "patch-proposal":
                         continue
-                    value = row.get("session_ref")
-                    if isinstance(value, str) and value:
-                        proposal_sessions.add(value)
+                    for field in ("requested_session", "session_ref"):
+                        value = row.get(field)
+                        if isinstance(value, str) and value:
+                            proposal_sessions.add(value)
 
     for record in records:
         rows: list[tuple[dict, bool]] = []

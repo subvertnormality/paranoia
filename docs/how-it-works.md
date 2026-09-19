@@ -62,7 +62,10 @@ UNAVAILABLE while preserving the settled review and its exact existing
 trailer. Completed proposal attempts and rejected replies remain bounded in
 the supplemental failure audit. Known proposal-only author or continuation
 handles cannot authorize rebut, even when the caller supplies an engine;
-only an independent completed critique or query can establish that authority.
+runner fallback provenance covers both the requested author handle and any returned
+proposal handle. Only an independent completed critique or query can establish
+that authority. Omission or localized-validation claim debt with no current
+semantic target reports proposal UNAVAILABLE, not a clean NOT-NEEDED result.
 
 1. **Census:** three independent cold lanes inspect the complete artifact. A
    separate call consolidates their validated findings into durable debt.

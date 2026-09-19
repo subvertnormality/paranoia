@@ -448,6 +448,55 @@ def test_dirty_caller_tree_blocks_proposal_spend_but_preserves_review(
     assert (repo / "app.py").read_text() == "caller edit\n"
 
 
+@pytest.mark.parametrize("kind", ["localized-omission", "localized-validation"])
+def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structurally_clear(
+    tmp_path, monkeypatch, kind,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state-root"))
+    trailer = install_settled_census(monkeypatch, blocking=False)
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+    state = pc.empty_state()
+    if kind == "localized-omission":
+        state["claims"] = {
+            "C-0123456789": {
+                "claim_id": "C-0123456789", "kind": "fact", "scope": "external",
+                "anchor": "The value is one.", "proposition": "The value is one.",
+                "verdict": "unverified", "replacement": None,
+                "rationale": "Current discovery omitted the retained claim.",
+                "evidence": [], "capture_provenance": [],
+                "current_adjudication": "localized-discovery-omission",
+            },
+        }
+    else:
+        state["debt"] = {
+            "round": 1, "reason": "localized claim validation failed",
+            "raw_sha256": "a" * 64, "rejected_excerpt": "invalid retained row",
+        }
+    monkeypatch.setattr(
+        handlers, "_verify_plan_claims",
+        lambda *args, **kwargs: (state, "parsed localized claim result"),
+    )
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("proposal called")),
+    )
+    output = handlers.critique_plan({
+        "repo_path": str(repo), "plan_text": "The value is one.\n",
+        "round": 1, "lineage": f"nonactionable-{kind}", "stakes": "local",
+        "claim_verification": True, "web_search": True, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / f"logs-{kind}")
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+    assert "no independently actionable semantic target" in output
+    review_audit = json.loads(next(
+        path for path in (tmp_path / f"logs-{kind}").glob("*.json")
+        if "patch_proposal" not in path.name
+    ).read_text())
+    assert trailer in review_audit["rendered_trailer"]
+    assert output.endswith(review_audit["rendered_trailer"])
+
+
 def test_caller_edit_during_continuation_marks_patch_stale(tmp_path, monkeypatch):
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))

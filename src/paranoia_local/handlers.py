@@ -926,7 +926,7 @@ def _plan_patch_supplement(
                                  reason="tracked settlement was not confirmed", context=None)
     structural_targets = _proposal_structural_targets(closure)
     normalized_claims = pc.normalize_state(claim_state)
-    blocked_only_by_source_processing = any(
+    blocked_by_source_processing = any(
         pc.source_failure_only(row)
         for row in normalized_claims.get("claims", {}).values()
     )
@@ -937,12 +937,21 @@ def _plan_patch_supplement(
     )
     targets = (*structural_targets, *claim_targets)
     if not targets:
-        if blocked_only_by_source_processing:
+        if blocked_by_source_processing:
             return _proposal_section(
                 None, status="UNAVAILABLE",
                 reason=(
                     "claim evidence is blocked by capture, binding, or attestation "
                     "processing; retry evidence work rather than rewriting the proposition"
+                ),
+                context=None,
+            )
+        if pc.is_blocked(normalized_claims):
+            return _proposal_section(
+                None, status="UNAVAILABLE",
+                reason=(
+                    "current claim debt has no independently actionable semantic target; "
+                    "retry or repair claim adjudication rather than rewriting the proposition"
                 ),
                 context=None,
             )

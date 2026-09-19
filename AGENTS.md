@@ -13,6 +13,9 @@ complete Git tree inventories retain directories, and returned suitability reche
 preimages. Plan review keeps its historical universal-newline text/digest/snapshot semantics
 while proposals bind exact captured bytes. Source-processing and localized-discovery-omission
 claim debt are never factual rewrite targets without a current full semantic adjudication.
+If such debt is the only remaining claim blocker, report proposal UNAVAILABLE rather than
+NOT-NEEDED. Runner telemetry excludes both the requested author handle and returned proposal
+handle when a supplemental receipt is missing.
 Known proposal-only sessions are not rebut authority even with an explicit engine and cannot be
 promoted by a rebut continuation; an independent completed critique or query remains authoritative.
 

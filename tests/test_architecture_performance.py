@@ -252,7 +252,8 @@ def test_session_routing_ignores_proposal_only_telemetry_but_keeps_real_review_o
         "tool": "run",
         "attempts": [{
             "role": "patch-proposal", "provider_outcome": "completed",
-            "returncode": 0, "session_ref": "proposal-only", "engine": "codex",
+            "returncode": 0, "requested_session": "proposal-author",
+            "session_ref": "proposal-only", "engine": "codex",
         }],
     }
     (tmp_path / "proposal-run.json").write_text(json.dumps(proposal_run))
@@ -261,6 +262,8 @@ def test_session_routing_ignores_proposal_only_telemetry_but_keeps_real_review_o
         session_routing.resolve("proposal-only", None, (tmp_path,))
     with pytest.raises(ValueError, match="proposal-only"):
         session_routing.resolve("proposal-only", "codex", (tmp_path,))
+    with pytest.raises(ValueError, match="proposal-only"):
+        session_routing.resolve("proposal-author", "codex", (tmp_path,))
 
     review = {
         "tool": "critique_branch", "engine": "codex", "error": False,
