@@ -55,6 +55,18 @@ gate passes; no proposal is applied or tested by the production path.
   2,456 passed in 296.77s at checkpoint `33d477e`. The focused proposal
   matrix passed 230 tests and the clean committed issue-115/117/126 guard set
   passed 68 tests.
+- CODE round 6 found one blocking cleanliness defect and one minor prospective
+  path defect. Branch proposal admission and suitability now compare HEAD,
+  index, untracked paths, modes, kinds, and raw bytes without invoking
+  repository-selected clean/process filters. Create validation rejects
+  case-folded new/new and existing-ancestor file/directory collisions.
+- Full regression after the CODE round-6 repairs:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,457 passed in 288.21s at checkpoint `806266a`. The proposal matrix
+  passed 231 tests and the clean committed issue-115/117/126 guard set passed
+  68 tests.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
