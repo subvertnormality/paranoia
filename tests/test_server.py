@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,10 @@ class SpyEngine:
     def run(self, prompt, cwd, model, effort, web_search, runner=None, timeout=None):
         return Review(text=f"REVIEW via {self.name}", session_ref="s1", raw="")
 
-    def resume(self, session_ref, prompt, cwd, model, effort, web_search, runner=None, timeout=None):
+    def resume(
+        self, session_ref, prompt, cwd, model, effort, web_search,
+        runner=None, timeout=None, **kwargs,
+    ):
         return Review(text="REBUT via " + self.name, session_ref=session_ref, raw="")
 
 
@@ -127,6 +131,49 @@ class TestDispatch:
             "query", {}, default_engine_name="codex", log_dir=tmp_path, now=lambda: "t",
         )
         assert "[paranoia-local error]" in out
+
+    def test_rebut_dispatch_excludes_reused_proposal_author_until_independent_review(
+        self, repo: Path, tmp_path: Path, spy_get_engine,
+    ) -> None:
+        author = "proposal-author"
+        (tmp_path / "proposal.json").write_text(json.dumps({
+            "tool": "critique_branch_patch_proposal",
+            "author_session_ref": author, "proposal_session_ref": author,
+            "proposal_attempt_ledger": [{
+                "role": "patch-proposal", "returncode": 0,
+                "session_ref": author,
+            }],
+        }))
+        (tmp_path / "census.json").write_text(json.dumps({
+            "tool": "critique_branch", "engine": "codex",
+            "error": False, "returncode": 0,
+            "session_ref": "review-session",
+            "attempt_ledger": [{
+                "role": "behaviour", "outcome": "completed", "returncode": 0,
+                "session_ref": author, "engine": "codex",
+            }],
+        }))
+        arguments = {
+            "repo_path": str(repo), "session_ref": author,
+            "rebuttal": "The finding is incorrect.",
+        }
+        refused = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t",
+        )
+        assert "provider is unknown" in refused
+        assert spy_get_engine == []
+
+        (tmp_path / "independent.json").write_text(json.dumps({
+            "tool": "query", "engine": "codex", "error": False,
+            "returncode": 0, "session_ref": author,
+        }))
+        accepted = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t2",
+        )
+        assert "REBUT via codex" in accepted
+        assert spy_get_engine == ["codex"]
 
     def test_bad_engine_name_returns_error_text(self, repo: Path, tmp_path: Path, spy_get_engine) -> None:
         out = server.dispatch(

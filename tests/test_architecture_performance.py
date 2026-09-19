@@ -273,6 +273,39 @@ def test_session_routing_ignores_proposal_only_telemetry_but_keeps_real_review_o
     assert session_routing.resolve("shared", None, (tmp_path,)) == "codex"
 
 
+def test_session_routing_excludes_proposal_author_from_census_and_run_audits(
+    tmp_path,
+):
+    author = "reused-author"
+    census = {
+        "tool": "critique_branch", "engine": "codex", "error": False,
+        "returncode": 0, "session_ref": "independent-review",
+        "attempt_ledger": [{
+            "role": "behaviour", "outcome": "completed", "returncode": 0,
+            "session_ref": author, "engine": "codex",
+        }],
+    }
+    proposal = {
+        "tool": "critique_branch_patch_proposal",
+        "author_session_ref": author, "proposal_session_ref": author,
+        "proposal_attempt_ledger": [{
+            "role": "patch-proposal", "returncode": 0, "session_ref": author,
+        }],
+    }
+    run = {
+        "tool": "run", "attempts": [{
+            "role": "behaviour", "provider_outcome": "completed",
+            "returncode": 0, "session_ref": author, "engine": "codex",
+        }],
+    }
+    for name, value in (("census", census), ("proposal", proposal), ("run", run)):
+        (tmp_path / f"{name}.json").write_text(json.dumps(value))
+    assert not session_routing.ownership(author, (tmp_path,)).owners
+    with pytest.raises(ValueError, match="unknown"):
+        session_routing.resolve(author, None, (tmp_path,))
+    assert session_routing.resolve("independent-review", None, (tmp_path,)) == "codex"
+
+
 def test_common_trace_captures_parallel_attempts_without_summing_wall_time(tmp_path):
     engine = engines.CodexEngine()
     def call():

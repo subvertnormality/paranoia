@@ -19,6 +19,7 @@ class SessionOwnership:
 def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnership:
     owners: set[str] = set()
     incomplete = False
+    records: list[dict] = []
     for directory in dict.fromkeys(directories):
         try:
             paths = list(directory.glob("*.json"))
@@ -37,25 +38,54 @@ def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnersh
             except (OSError, ValueError):
                 incomplete = True
                 continue
-            rows = []
-            if record.get("tool") in {"critique_branch", "critique_plan", "query", "rebut"}:
-                if record.get("error") is False and type(record.get("returncode")) is int and record["returncode"] == 0:
-                    rows.append(record)
-                ledger = record.get("attempt_ledger", [])
-                if isinstance(ledger, list):
-                    rows.extend(row for row in ledger if isinstance(row, dict)
-                                and row.get("outcome") in {"completed", "validation-invalid", "checkpoint"}
-                                and type(row.get("returncode")) is int and row["returncode"] == 0)
-            elif record.get("tool") == "run":
-                attempts = record.get("attempts", [])
-                if isinstance(attempts, list):
-                    rows.extend(row for row in attempts if isinstance(row, dict)
-                                and row.get("provider_outcome") == "completed"
-                                and row.get("role") != "patch-proposal"
-                                and type(row.get("returncode")) is int and row["returncode"] == 0)
-            for row in rows:
-                if row.get("session_ref") == session_ref and row.get("engine") in ENGINES:
-                    owners.add(row["engine"])
+            records.append(record)
+
+    # Proposal authors and their continuation handles are internal auxiliary
+    # provenance, not rebut authority.  Collect them first so directory ordering
+    # cannot let an earlier census/run record manufacture ownership.
+    proposal_sessions: set[str] = set()
+    for record in records:
+        if record.get("tool") not in {
+            "critique_branch_patch_proposal", "critique_plan_patch_proposal",
+        }:
+            continue
+        for field in ("author_session_ref", "proposal_session_ref"):
+            value = record.get(field)
+            if isinstance(value, str) and value:
+                proposal_sessions.add(value)
+        ledger = record.get("proposal_attempt_ledger", [])
+        if isinstance(ledger, list):
+            for row in ledger:
+                if not isinstance(row, dict):
+                    continue
+                value = row.get("session_ref")
+                if isinstance(value, str) and value:
+                    proposal_sessions.add(value)
+
+    for record in records:
+        rows: list[tuple[dict, bool]] = []
+        if record.get("tool") in {"critique_branch", "critique_plan", "query", "rebut"}:
+            if record.get("error") is False and type(record.get("returncode")) is int and record["returncode"] == 0:
+                # A top-level completed review is genuine independent authority
+                # even if a later proposal happened to reuse its handle.
+                rows.append((record, True))
+            ledger = record.get("attempt_ledger", [])
+            if isinstance(ledger, list):
+                rows.extend((row, False) for row in ledger if isinstance(row, dict)
+                            and row.get("outcome") in {"completed", "validation-invalid", "checkpoint"}
+                            and type(row.get("returncode")) is int and row["returncode"] == 0)
+        elif record.get("tool") == "run":
+            attempts = record.get("attempts", [])
+            if isinstance(attempts, list):
+                rows.extend((row, False) for row in attempts if isinstance(row, dict)
+                            and row.get("provider_outcome") == "completed"
+                            and row.get("role") != "patch-proposal"
+                            and type(row.get("returncode")) is int and row["returncode"] == 0)
+        for row, independent_review in rows:
+            if row.get("session_ref") == session_ref and row.get("engine") in ENGINES:
+                if session_ref in proposal_sessions and not independent_review:
+                    continue
+                owners.add(row["engine"])
     return SessionOwnership(frozenset(owners), incomplete)
 
 

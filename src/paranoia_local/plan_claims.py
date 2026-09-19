@@ -724,11 +724,13 @@ def _source_failure_phases(
 
 
 def source_failure_only(claim: dict[str, Any]) -> bool:
-    """Whether an unverified claim lacks a completed source-processing route.
+    """Whether an unverified claim has unresolved source-processing debt.
 
-    Such a row is operational evidence debt, not authority to rewrite the factual
-    proposition.  Keep this public so supplemental consumers reuse the same
-    server-owned phase classification as the canonical claim renderer.
+    A captured contextual sibling is not an independent semantic adjudication of the
+    proposition.  If any server-owned capture, binding, or attestation phase failed,
+    the canonical renderer requires retrying evidence processing and forbids weakening
+    the assertion solely for that failure.  Keep this public so supplemental consumers
+    reuse that same conservative mixed-failure interpretation.
     """
     if claim.get("verdict") != "unverified":
         return False
@@ -738,19 +740,6 @@ def source_failure_only(claim: dict[str, Any]) -> bool:
         return False
     if len(provenance) != len(evidence):
         return False
-    for row in provenance:
-        if not isinstance(row, dict):
-            return False
-        error = row.get("error")
-        if not error:
-            return False
-        text = str(error)
-        if not (
-            text.startswith(BINDING_FAILURE_PREFIX)
-            or text.startswith(ATTESTATION_FAILURE_PREFIX)
-            or row.get("text_sha256") is None
-        ):
-            return False
     return bool(_source_failure_phases(provenance, evidence))
 
 

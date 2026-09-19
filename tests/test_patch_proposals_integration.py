@@ -168,18 +168,46 @@ def proposal_payload(edits, *, summary="repair", status="proposed"):
     })
 
 
-def source_failure_claim_state():
+def source_failure_claim_state(*, mixed=False):
     from tests.test_plan_claims import PLAN, _audit, _claim, _source
-    source = _source(relation="context")
-    failed = _claim(
-        verdict="unverified", evidence=[source],
-        capture_provenance=[{
-            "evidence_index": 0, "requested_url": source["url"],
-            "final_url": source["url"], "status": 503,
+    sources = [
+        _source(url=f"https://example.com/source-{index}", relation="context")
+        for index in range(4 if mixed else 1)
+    ]
+    provenance = [{
+        "evidence_index": 0, "requested_url": sources[0]["url"],
+        "final_url": sources[0]["url"], "status": 503,
+        "content_type": "text/html", "fallback_attempted": False,
+        "content_sha256": None, "text_sha256": None,
+        "error": "server returned HTTP 503",
+    }]
+    if mixed:
+        provenance = [{
+            "evidence_index": 0, "requested_url": sources[0]["url"],
+            "final_url": sources[0]["url"], "status": 200,
             "content_type": "text/html", "fallback_attempted": False,
-            "content_sha256": None, "text_sha256": None,
-            "error": "server returned HTTP 503",
-        }],
+            "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+            "error": None,
+        }, {
+            "evidence_index": 1, "requested_url": sources[1]["url"],
+            "final_url": None, "status": 503, "content_type": "text/html",
+            "fallback_attempted": False, "content_sha256": None,
+            "text_sha256": None, "error": "server returned HTTP 503",
+        }, {
+            "evidence_index": 2, "requested_url": sources[2]["url"],
+            "final_url": sources[2]["url"], "status": 200,
+            "content_type": "text/html", "fallback_attempted": False,
+            "content_sha256": "c" * 64, "text_sha256": "d" * 64,
+            "error": pc.BINDING_FAILURE_PREFIX + "passage mismatch",
+        }, {
+            "evidence_index": 3, "requested_url": sources[3]["url"],
+            "final_url": sources[3]["url"], "status": 200,
+            "content_type": "text/html", "fallback_attempted": False,
+            "content_sha256": "e" * 64, "text_sha256": "f" * 64,
+            "error": pc.ATTESTATION_FAILURE_PREFIX + "provider unavailable",
+        }]
+    failed = _claim(
+        verdict="unverified", evidence=sources, capture_provenance=provenance,
     )
     return pc.reconcile(
         {}, pc.parse_audit(_audit(failed), PLAN),
@@ -280,20 +308,22 @@ def test_source_allowance_and_cache_survive_validation_retry(tmp_path, monkeypat
     assert reads == [a_oid]
 
 
-def test_source_failure_only_claim_is_not_a_rewrite_target():
-    state = source_failure_claim_state()
+@pytest.mark.parametrize("mixed", [False, True])
+def test_source_failure_only_claim_is_not_a_rewrite_target(mixed):
+    state = source_failure_claim_state(mixed=mixed)
     row = next(iter(state["claims"].values()))
     assert pc.source_failure_only(row)
     assert handlers._proposal_claim_targets(state) == ()
 
 
+@pytest.mark.parametrize("mixed", [False, True])
 def test_public_plan_reports_source_processing_debt_unavailable_without_spend(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, mixed,
 ):
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state-root"))
     trailer = install_settled_census(monkeypatch, blocking=False)
-    state = source_failure_claim_state()
+    state = source_failure_claim_state(mixed=mixed)
     monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: None)
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
     monkeypatch.setattr(
@@ -847,7 +877,7 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
 
     def run(self, prompt, cwd, *args, **kwargs):
         provider_calls.append(prompt)
-        defective = "'broken'" in (cwd / "app.py").read_text()
+        defective = (cwd / "app.py").read_text() != "value = 2\n"
         defect = {
             "id": "wrong-value", "severity": "MAJOR",
             "summary": "The durable value remains broken.",
@@ -858,7 +888,7 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
                 line.split()[-1] for line in prompt.splitlines()
                 if line.startswith("ROLE: census lane ")
             )
-            findings = [defect] if lane_name == "behaviour" else []
+            findings = [defect] if lane_name in {"behaviour", "domain"} else []
             value = json.loads(lane(lane_name, findings=findings))
             value = json.loads(json.dumps(value).replace("plan:1", anchor))
             text = json.dumps(value)
@@ -942,8 +972,8 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
     monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume_proposal)
     monkeypatch.setattr(
         engines.CodexEngine, "resume",
-        lambda *args, **kwargs: (_ for _ in ()).throw(
-            AssertionError("unexpected validation retry")
+        lambda self, session_ref, prompt, *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("unexpected validation retry:\n" + prompt)
         ),
     )
     roots = {
@@ -981,6 +1011,9 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
     assert "PATCH-PROPOSAL: PROPOSED" in first[True]
     assert "PATCH-PROPOSAL" not in first[False]
 
+    (repo / "app.py").write_text("value = 3\n", encoding="utf-8")
+    git(repo, "add", "app.py")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "wrong repair")
     wrong, wrong_states = paired(2)
     assert wrong_states[False].review_state["debt"]
     assert "CONVERGENCE: BLOCKED" in wrong[False]
@@ -990,6 +1023,182 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
     (repo / "app.py").write_text("value = 2\n", encoding="utf-8")
     git(repo, "add", "app.py")
     git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "repair")
+    corrected, corrected_states = paired(3)
+    assert corrected_states[False].review_state["phase"] == "final"
+    assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
+
+    final, final_states = paired(4)
+    assert final_states[False].review_state["phase"] == "clear"
+    assert "CONVERGENCE: NOT-BLOCKED" in final[False]
+    assert "CONVERGENCE: NOT-BLOCKED" in final[True]
+    assert proposal_calls
+    assert all(
+        prompts.CLASS_AUTHORING_INSTRUCTIONS in prompt
+        for prompt in provider_calls if "ROLE: census lane " not in prompt
+    )
+
+
+def test_plan_production_lifecycle_is_state_independent_with_wrong_and_correct_repairs(
+    tmp_path, monkeypatch,
+):
+    from paranoia_local import prompts
+    from tests.test_review_census import _task_from_prompt, lane, payload, wire
+
+    repo = repository(tmp_path)
+    anchor = "plan:1"
+    current = {"text": "The value is broken.\n"}
+    provider_calls = []
+    proposal_calls = []
+
+    def run(self, prompt, cwd, *args, **kwargs):
+        provider_calls.append(prompt)
+        defective = current["text"] != "The value is two.\n"
+        defect = {
+            "id": "wrong-plan-value", "severity": "MAJOR",
+            "summary": "The plan's durable value statement is not two.",
+            "evidence": [anchor], "remedy": "State that the value is two.",
+        }
+        if "ROLE: census lane " in prompt:
+            lane_name = next(
+                line.split()[-1] for line in prompt.splitlines()
+                if line.startswith("ROLE: census lane ")
+            )
+            findings = [defect] if lane_name in {"behaviour", "domain"} else []
+            text = lane(lane_name, findings=findings)
+        else:
+            task = _task_from_prompt(prompt)
+            role = task["role"]
+            if role == "census":
+                sources = [
+                    finding["id"] for manifest in task["manifests"]
+                    for finding in manifest["findings"]
+                ]
+                text = wire({
+                    "role": "census", "governing_findings": [{
+                        **defect, "source_ids": sources,
+                        "classification": {"kind": "new_class", "definition": {
+                            "invariant": "The plan states that the value is exactly two.",
+                            "severity": "MAJOR",
+                            "procedure": "Inspect the supplied plan value statement.",
+                            "members": ["plan-value-statement"],
+                        }},
+                    }],
+                    "debt_outcomes": [], "class_actions": {},
+                })
+            else:
+                cls = task["active_classes"][0]
+                class_id = cls["class_id"]
+                finding_rows = ([{
+                    **defect,
+                    "classification": {
+                        "kind": "existing_class", "class_id": class_id,
+                    },
+                }] if defective else [])
+                outcome = (
+                    {
+                        "verdict": "violated", "evidence": [anchor],
+                        "basis": {
+                            "kind": "new_finding",
+                            "finding_id": "wrong-plan-value",
+                        },
+                    }
+                    if defective else {
+                        "verdict": "satisfied",
+                        "member_coverage": [{
+                            "member_id": "plan-value-statement",
+                            "evidence": [anchor],
+                        }],
+                    }
+                )
+                value = {
+                    "role": role, "governing_findings": finding_rows,
+                    "debt_outcomes": [{
+                        "debt_id": debt["id"], "status": "closed",
+                        "evidence": [anchor],
+                    } for debt in task["existing_debt"]],
+                    "class_outcomes": {class_id: outcome},
+                    "class_actions": {class_id: None},
+                }
+                if role == "final":
+                    value["coverage"] = payload(lane())["coverage"]
+                    for row in value["coverage"]:
+                        row["evidence"] = [anchor]
+                text = wire(value)
+        return engines.Review(text, "review-session", text)
+
+    def resume_proposal(self, session_ref, prompt, cwd, *args, **kwargs):
+        proposal_calls.append((session_ref, prompt))
+        targets_text = prompt.split(
+            "=== CURRENT TARGETS ===\n", 1,
+        )[1].split("\n\n=== DECLARATIVE CONTRACT ===", 1)[0]
+        target_ids = [row["id"] for row in json.loads(targets_text)]
+        text = json.dumps({
+            "schema_version": 1, "status": "proposed",
+            "summary": "State that the plan value is two.",
+            "addressed_finding_ids": target_ids, "unaddressed": [],
+            "edits": [{
+                "target": "plan", "operation": "replace", "path": None,
+                "old_text": "The value is broken.\n",
+                "new_text": "The value is two.\n",
+            }],
+            "suggested_tests": ["Re-review the revised plan."],
+            "limitations": ["The proposal was not applied."],
+        })
+        return engines.Review(text, "proposal-session", text)
+
+    monkeypatch.setattr(engines.CodexEngine, "run", run)
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume_proposal)
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume",
+        lambda self, session_ref, prompt, *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("unexpected validation retry:\n" + prompt)
+        ),
+    )
+    roots = {
+        False: tmp_path / "plan-state-disabled",
+        True: tmp_path / "plan-state-enabled",
+    }
+    lineage = "plan-production-state-independence"
+    common = {
+        "repo_path": str(repo), "lineage": lineage,
+        "stakes": "trusted local tool", "claim_verification": False,
+        "web_search": False,
+    }
+
+    def paired(round_no):
+        outputs = {}
+        states = {}
+        for enabled in (False, True):
+            monkeypatch.setenv("PARANOIA_STATE_ROOT", str(roots[enabled]))
+            outputs[enabled] = handlers.critique_plan({
+                **common, "plan_text": current["text"], "round": round_no,
+                "propose_patch": enabled,
+            }, engine=engines.CodexEngine(),
+                log_dir=tmp_path / f"plan-logs-{enabled}-{round_no}",
+                now=lambda: f"P{round_no}")
+            states[enabled] = cc.load_lineage(
+                roots[enabled], lineage, stamp="read", mode=cc.PLAN_MODE,
+            )
+        assert states[False].review_state == states[True].review_state
+        assert states[False].classes == states[True].classes
+        assert states[False].claim_state == states[True].claim_state
+        trailer = outputs[False][outputs[False].rfind("LINEAGE:"):]
+        assert outputs[True].endswith(trailer)
+        return outputs, states
+
+    first, first_states = paired(1)
+    assert first_states[False].review_state["debt"]
+    assert len(first_states[False].classes) == 1
+    assert "PATCH-PROPOSAL: PROPOSED" in first[True]
+    assert "PATCH-PROPOSAL" not in first[False]
+
+    current["text"] = "The value is three.\n"
+    wrong, wrong_states = paired(2)
+    assert wrong_states[False].review_state["debt"]
+    assert "CONVERGENCE: BLOCKED" in wrong[False]
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in wrong[True]
+
+    current["text"] = "The value is two.\n"
     corrected, corrected_states = paired(3)
     assert corrected_states[False].review_state["phase"] == "final"
     assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
