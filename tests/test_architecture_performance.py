@@ -257,8 +257,10 @@ def test_session_routing_ignores_proposal_only_telemetry_but_keeps_real_review_o
     }
     (tmp_path / "proposal-run.json").write_text(json.dumps(proposal_run))
     assert not session_routing.ownership("proposal-only", (tmp_path,)).owners
-    with pytest.raises(ValueError, match="unknown"):
+    with pytest.raises(ValueError, match="proposal-only"):
         session_routing.resolve("proposal-only", None, (tmp_path,))
+    with pytest.raises(ValueError, match="proposal-only"):
+        session_routing.resolve("proposal-only", "codex", (tmp_path,))
 
     review = {
         "tool": "critique_branch", "engine": "codex", "error": False,
@@ -301,7 +303,7 @@ def test_session_routing_excludes_proposal_author_from_census_and_run_audits(
     for name, value in (("census", census), ("proposal", proposal), ("run", run)):
         (tmp_path / f"{name}.json").write_text(json.dumps(value))
     assert not session_routing.ownership(author, (tmp_path,)).owners
-    with pytest.raises(ValueError, match="unknown"):
+    with pytest.raises(ValueError, match="proposal-only"):
         session_routing.resolve(author, None, (tmp_path,))
     assert session_routing.resolve("independent-review", None, (tmp_path,)) == "codex"
 

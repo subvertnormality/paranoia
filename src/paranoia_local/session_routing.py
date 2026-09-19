@@ -14,6 +14,7 @@ MAX_AUDIT_BYTES = 20_000_000
 class SessionOwnership:
     owners: frozenset[str]
     incomplete: bool = False
+    proposal_only: bool = False
 
 
 def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnership:
@@ -45,30 +46,42 @@ def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnersh
     # cannot let an earlier census/run record manufacture ownership.
     proposal_sessions: set[str] = set()
     for record in records:
-        if record.get("tool") not in {
+        if record.get("tool") in {
             "critique_branch_patch_proposal", "critique_plan_patch_proposal",
         }:
-            continue
-        for field in ("author_session_ref", "proposal_session_ref"):
-            value = record.get(field)
-            if isinstance(value, str) and value:
-                proposal_sessions.add(value)
-        ledger = record.get("proposal_attempt_ledger", [])
-        if isinstance(ledger, list):
-            for row in ledger:
-                if not isinstance(row, dict):
-                    continue
-                value = row.get("session_ref")
+            for field in ("author_session_ref", "proposal_session_ref"):
+                value = record.get(field)
                 if isinstance(value, str) and value:
                     proposal_sessions.add(value)
+            ledger = record.get("proposal_attempt_ledger", [])
+            if isinstance(ledger, list):
+                for row in ledger:
+                    if not isinstance(row, dict):
+                        continue
+                    value = row.get("session_ref")
+                    if isinstance(value, str) and value:
+                        proposal_sessions.add(value)
+        elif record.get("tool") == "run":
+            # The runner record survives even when writing the supplemental receipt
+            # fails.  Its proposal role is therefore a second authoritative exclusion
+            # source, not rebut ownership.
+            attempts = record.get("attempts", [])
+            if isinstance(attempts, list):
+                for row in attempts:
+                    if not isinstance(row, dict) or row.get("role") != "patch-proposal":
+                        continue
+                    value = row.get("session_ref")
+                    if isinstance(value, str) and value:
+                        proposal_sessions.add(value)
 
     for record in records:
         rows: list[tuple[dict, bool]] = []
         if record.get("tool") in {"critique_branch", "critique_plan", "query", "rebut"}:
             if record.get("error") is False and type(record.get("returncode")) is int and record["returncode"] == 0:
-                # A top-level completed review is genuine independent authority
-                # even if a later proposal happened to reuse its handle.
-                rows.append((record, True))
+                # A top-level critique or query is genuine independent authority even
+                # if a later proposal happened to reuse its handle.  A rebut is itself
+                # a continuation and cannot promote known proposal-only provenance.
+                rows.append((record, record.get("tool") != "rebut"))
             ledger = record.get("attempt_ledger", [])
             if isinstance(ledger, list):
                 rows.extend((row, False) for row in ledger if isinstance(row, dict)
@@ -86,7 +99,10 @@ def ownership(session_ref: str, directories: tuple[Path, ...]) -> SessionOwnersh
                 if session_ref in proposal_sessions and not independent_review:
                     continue
                 owners.add(row["engine"])
-    return SessionOwnership(frozenset(owners), incomplete)
+    return SessionOwnership(
+        frozenset(owners), incomplete,
+        session_ref in proposal_sessions and not owners,
+    )
 
 
 def resolve(session_ref: str, explicit: str | None, directories: tuple[Path, ...]) -> str:
@@ -104,6 +120,10 @@ def resolve(session_ref: str, explicit: str | None, directories: tuple[Path, ...
         if found.incomplete and explicit is None:
             raise ValueError("rebut audit scan is incomplete; supply the known engine explicitly")
         return owner
+    if found.proposal_only:
+        raise ValueError(
+            "rebut session is proposal-only and has no independent review authority"
+        )
     if explicit is not None:
         return explicit
     raise ValueError("rebut session provider is unknown; supply engine explicitly or restore its audit record")

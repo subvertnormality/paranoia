@@ -743,6 +743,16 @@ def source_failure_only(claim: dict[str, Any]) -> bool:
     return bool(_source_failure_phases(provenance, evidence))
 
 
+def has_current_semantic_adjudication(claim: dict[str, Any]) -> bool:
+    """Whether this exact active claim received a current full evidence judgement.
+
+    The marker is server-owned during reconciliation.  Absence is conservative for
+    pre-cutover state, and a localized discovery omission is explicitly ineligible for
+    factual rewrite even though its durable packet remains useful diagnostic history.
+    """
+    return claim.get("current_adjudication") == "full-evidence-packet"
+
+
 def _validate_capture_attestations(
     value: Any, evidence: list[dict[str, str]],
 ) -> list[dict[str, Any]]:
@@ -971,6 +981,7 @@ def reconcile(
             "Exact proposition and anchor are unchanged; the authoritative evidence packet "
             "was frozen by the first exhaustive round."
         )
+        record["current_adjudication"] = "frozen-exact-supported"
         current[claim_id] = record
         used.add(claim_id)
     for claim in audit.claims:
@@ -989,6 +1000,7 @@ def reconcile(
         record.pop("prior_claim_id", None)
         record["claim_id"] = claim_id
         record["verified_round"] = round_no
+        record["current_adjudication"] = "full-evidence-packet"
         if isinstance(previous, dict) and previous.get("proposition") != record["proposition"]:
             record["previous_proposition"] = previous.get("proposition")
         current[claim_id] = record
@@ -1027,6 +1039,7 @@ def reconcile(
                         "The current audit omitted this prior claim without a valid "
                         "disposition; omission cannot clear governing inventory."
                     ),
+                    "current_adjudication": "localized-discovery-omission",
                 })
                 current[claim_id] = carried
     # History is diagnostic only and must not grow without bound or consume active prompt

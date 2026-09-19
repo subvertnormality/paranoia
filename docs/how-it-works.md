@@ -59,7 +59,10 @@ not offered as factual rewrite targets.
 Every provider-authored public field is emitted as an inert JSON value. A local
 proposal exception or missing supplemental audit yields PATCH-PROPOSAL:
 UNAVAILABLE while preserving the settled review and its exact existing
-trailer. Proposal-only session observations cannot authorize rebut.
+trailer. Completed proposal attempts and rejected replies remain bounded in
+the supplemental failure audit. Known proposal-only author or continuation
+handles cannot authorize rebut, even when the caller supplies an engine;
+only an independent completed critique or query can establish that authority.
 
 1. **Census:** three independent cold lanes inspect the complete artifact. A
    separate call consolidates their validated findings into durable debt.

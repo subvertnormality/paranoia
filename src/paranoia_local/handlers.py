@@ -414,15 +414,26 @@ def _run_patch_proposal(
     rejected: list[dict[str, Any]] = []
     result: pp.ProposalResult | None = None
     failure: str | None = None
-    review = proposal_engine.resume_proposal(
-        author.session_ref, prompt, cwd, model, effort,
-        timeout=PROPOSAL_INITIAL_TIMEOUT_SEC, on_progress=on_progress,
-        response_schema=pp.provider_schema(context),
-    )
+    try:
+        review = proposal_engine.resume_proposal(
+            author.session_ref, prompt, cwd, model, effort,
+            timeout=PROPOSAL_INITIAL_TIMEOUT_SEC, on_progress=on_progress,
+            response_schema=pp.provider_schema(context),
+        )
+    except Exception as exc:
+        failure = rc.bounded_diagnostic(
+            f"local proposal execution failed: {type(exc).__name__}: {exc}",
+            sp.MAX_ISSUE_CHARS,
+        )
+        return _ProposalExecution(
+            None, (), (), failure, author.session_ref, None,
+            int((time.monotonic() - started) * 1000),
+        )
     attempts.append(_attempt(
         "patch-proposal", proposal_engine, review,
         sequence=1, requested_timeout_sec=PROPOSAL_INITIAL_TIMEOUT_SEC,
     ))
+    repairable = False
     if review.error:
         failure = rc.bounded_diagnostic(
             review.failure_detail or review.text or "proposal provider failure",
@@ -433,13 +444,19 @@ def _run_patch_proposal(
             result = pp.parse_and_render(context, review.text, source_reader)
         except pp.ProposalError as exc:
             failure = str(exc)
+            repairable = True
             attempts[-1] = replace(
                 attempts[-1], outcome="validation-invalid", validation_issue=failure,
             )
             rejected.append(rc.rejected_payload(
                 "patch-proposal", review.text, sequence=1, validation_issue=failure,
             ))
-    if failure is not None and not review.error and review.session_ref:
+        except Exception as exc:
+            failure = rc.bounded_diagnostic(
+                f"local proposal processing failed: {type(exc).__name__}: {exc}",
+                sp.MAX_ISSUE_CHARS,
+            )
+    if repairable and failure is not None and not review.error and review.session_ref:
         retry_prompt = (
             "Your complete patch-proposal object was rejected by local validation:\n"
             + failure
@@ -457,11 +474,23 @@ def _run_patch_proposal(
                 f"{MAX_PROPOSAL_PROMPT_CHARS} UTF-8 bytes"
             )
         if retry_issue is None:
-            review = proposal_engine.resume_proposal(
-                review.session_ref, retry_prompt, cwd, model, effort,
-                timeout=PROPOSAL_RETRY_TIMEOUT_SEC, on_progress=on_progress,
-                response_schema=pp.provider_schema(context),
-            )
+            try:
+                review = proposal_engine.resume_proposal(
+                    review.session_ref, retry_prompt, cwd, model, effort,
+                    timeout=PROPOSAL_RETRY_TIMEOUT_SEC, on_progress=on_progress,
+                    response_schema=pp.provider_schema(context),
+                )
+            except Exception as exc:
+                failure = rc.bounded_diagnostic(
+                    f"local proposal retry failed: {type(exc).__name__}: {exc}",
+                    sp.MAX_ISSUE_CHARS,
+                )
+                return _ProposalExecution(
+                    None, tuple(attempt.json() for attempt in attempts),
+                    tuple(rejected), failure, author.session_ref,
+                    attempts[-1].session_ref,
+                    int((time.monotonic() - started) * 1000),
+                )
             attempts.append(_attempt(
                 "patch-proposal-validation-retry", proposal_engine, review,
                 sequence=2, requested_timeout_sec=PROPOSAL_RETRY_TIMEOUT_SEC,
@@ -485,6 +514,12 @@ def _run_patch_proposal(
                         "patch-proposal-validation-retry", review.text,
                         sequence=2, validation_issue=failure,
                     ))
+                except Exception as exc:
+                    failure = rc.bounded_diagnostic(
+                        f"local proposal retry processing failed: "
+                        f"{type(exc).__name__}: {exc}",
+                        sp.MAX_ISSUE_CHARS,
+                    )
         else:
             failure = retry_issue
     return _ProposalExecution(
@@ -534,6 +569,8 @@ def _proposal_claim_targets(claim_state: dict[str, Any]) -> tuple[pp.ProposalTar
     for claim_id, row in state.get("claims", {}).items():
         verdict = row.get("verdict")
         if verdict not in {"refuted", "unverified"}:
+            continue
+        if not pc.has_current_semantic_adjudication(row):
             continue
         if pc.source_failure_only(row):
             continue

@@ -161,7 +161,25 @@ class TestDispatch:
             "rebut", arguments, default_engine_name="claude",
             log_dir=tmp_path, now=lambda: "t",
         )
-        assert "provider is unknown" in refused
+        assert "proposal-only" in refused
+        assert spy_get_engine == []
+
+        explicitly_refused = server.dispatch(
+            "rebut", {**arguments, "engine": "codex"},
+            default_engine_name="claude", log_dir=tmp_path, now=lambda: "t-explicit",
+        )
+        assert "proposal-only" in explicitly_refused
+        assert spy_get_engine == []
+
+        (tmp_path / "stale-rebut.json").write_text(json.dumps({
+            "tool": "rebut", "engine": "codex", "error": False,
+            "returncode": 0, "session_ref": author,
+        }))
+        still_refused = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t-promoted",
+        )
+        assert "proposal-only" in still_refused
         assert spy_get_engine == []
 
         (tmp_path / "independent.json").write_text(json.dumps({

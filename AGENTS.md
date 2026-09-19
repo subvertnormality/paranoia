@@ -6,20 +6,15 @@ false are disabled, and explicit true is reserved for the qualification harness.
 Do not publish delivered/default-on wording before the plan's pre-flip gates pass.
 Proposal generation is supplemental after durable settlement: ordinary proposal-local
 preparation, provider, validation, logging and rendering failures must return the original
-review and exact trailer with an inert UNAVAILABLE diagnostic. Branch admission requires a
+review and exact trailer with an inert UNAVAILABLE diagnostic; retain every completed proposal
+attempt and rejected reply in the bounded supplemental failure audit. Branch admission requires a
 clean caller tree; pinned blob sizes and one shared retry-surviving source allowance gate reads,
 complete Git tree inventories retain directories, and returned suitability rechecks ref and
 preimages. Plan review keeps its historical universal-newline text/digest/snapshot semantics
-while proposals bind exact captured bytes. Source-processing-only claim debt is never a factual
-rewrite target. Proposal-only sessions are not rebut authority.
-Proposal generation is supplemental after durable settlement: ordinary proposal-local
-preparation, provider, validation, logging and rendering failures must return the original
-review and exact trailer with an inert UNAVAILABLE diagnostic. Branch admission requires a
-clean caller tree; pinned blob sizes and one shared retry-surviving source allowance gate reads,
-complete Git tree inventories retain directories, and returned suitability rechecks ref and
-preimages. Plan review keeps its historical universal-newline text/digest/snapshot semantics
-while proposals bind exact captured bytes. Source-processing-only claim debt is never a factual
-rewrite target. Proposal-only sessions are not rebut authority.
+while proposals bind exact captured bytes. Source-processing and localized-discovery-omission
+claim debt are never factual rewrite targets without a current full semantic adjudication.
+Known proposal-only sessions are not rebut authority even with an explicit engine and cannot be
+promoted by a rebut continuation; an independent completed critique or query remains authoritative.
 
 Issue #126 follows docs/claim-admission-126-plan.md. Account explicitly for
 repository preparation before claim admission, preserve complete model and

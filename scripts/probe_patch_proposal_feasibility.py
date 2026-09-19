@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 from copy import deepcopy
 import hashlib
 import json
@@ -255,9 +256,76 @@ def decode(text: str, scenario: str, root: Path, *, schema: dict[str, Any],
         results[path] = source
     if scenario == "cross-file" and touched != allowed:
         raise ValueError("cross-file proposal did not cover both required consumers")
-    if scenario == "repeated" and "isinstance(value, int)" in results.get("validators.py", ""):
-        raise ValueError("repeated-occurrence proposal left a sibling occurrence")
+    if scenario == "repeated":
+        _validate_repeated_identifiers(results.get("validators.py", ""))
     return value
+
+
+def _safe_validator_expression(node: ast.AST, value: object) -> object:
+    """Interpret only the bounded expression language admitted by this fixture."""
+    if isinstance(node, ast.Name) and node.id == "value":
+        return value
+    if isinstance(node, ast.Constant):
+        return node.value
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        return not bool(_safe_validator_expression(node.operand, value))
+    if isinstance(node, ast.BoolOp) and isinstance(node.op, (ast.And, ast.Or)):
+        items = [bool(_safe_validator_expression(item, value)) for item in node.values]
+        return all(items) if isinstance(node.op, ast.And) else any(items)
+    if (
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "isinstance" and len(node.args) == 2
+        and not node.keywords and isinstance(node.args[1], ast.Name)
+        and node.args[1].id in {"int", "bool"}
+    ):
+        target = _safe_validator_expression(node.args[0], value)
+        return isinstance(target, int if node.args[1].id == "int" else bool)
+    if (
+        isinstance(node, ast.Compare) and len(node.ops) == len(node.comparators) == 1
+        and isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name)
+        and node.left.func.id == "type" and len(node.left.args) == 1
+        and not node.left.keywords and isinstance(node.comparators[0], ast.Name)
+        and node.comparators[0].id in {"int", "bool"}
+        and isinstance(node.ops[0], (ast.Is, ast.IsNot, ast.Eq, ast.NotEq))
+    ):
+        left = type(_safe_validator_expression(node.left.args[0], value))
+        right = int if node.comparators[0].id == "int" else bool
+        if isinstance(node.ops[0], (ast.Is, ast.Eq)):
+            return left is right
+        return left is not right
+    raise ValueError("validator uses an unsupported expression")
+
+
+def _validate_repeated_identifiers(source: str) -> None:
+    try:
+        module = ast.parse(source)
+    except (SyntaxError, ValueError) as exc:
+        raise ValueError("repeated-occurrence proposal is not valid Python syntax") from exc
+    functions = {
+        node.name: node for node in module.body if isinstance(node, ast.FunctionDef)
+    }
+    for name in ("user_id", "account_id", "event_id"):
+        function = functions.get(name)
+        if (
+            function is None or len(function.args.args) != 1
+            or function.args.args[0].arg != "value" or len(function.body) != 1
+            or not isinstance(function.body[0], ast.Return)
+        ):
+            raise ValueError(f"repeated-occurrence proposal did not preserve {name}")
+        expression = function.body[0].value
+        accepted = (0, 1, -1, 42)
+        rejected = (True, False, "1", None, 1.5)
+        try:
+            valid = all(bool(_safe_validator_expression(expression, item)) for item in accepted)
+            invalid = all(
+                not bool(_safe_validator_expression(expression, item)) for item in rejected
+            )
+        except ValueError as exc:
+            raise ValueError(f"{name}: {exc}") from exc
+        if not valid or not invalid:
+            raise ValueError(
+                f"repeated-occurrence proposal does not exclude Booleans in {name}"
+            )
 
 
 def channel(value: str | None) -> dict[str, Any]:

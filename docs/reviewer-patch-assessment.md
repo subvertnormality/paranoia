@@ -79,7 +79,7 @@ and one verified plan case per provider:
 | --- | --- | --- | --- |
 | B1 | Codex | local Boolean-identity fix | qualified on corrected read-only attempt |
 | B2 | Claude | cross-file invariant | qualified; both required files covered |
-| B3 | Codex | repeated class occurrences | failed initial and retry; sibling remained |
+| B3 | Codex | repeated class occurrences | historical trial failed: its substring oracle falsely rejected both complete retained repairs; not relabeled as passing acceptance |
 | B4 | Claude | regression-prone repair | qualified after one lane validation retry |
 | B5 | Codex | misleading suggested syntax | qualified with behavioral alternative |
 | B6 | Claude | architectural decision | qualified decline with concrete reason |
@@ -122,14 +122,16 @@ including retained negative evidence.
 usable snapshot-bound proposals; both structural plan routes qualified; the architectural
 case remained an honest decline; and neither route required write permission, web, or
 repository execution. Originating sessions and lane attempts remain distinct from proposal
-attempts. The repeated-occurrence failure is a quality warning, and P2 is a harness-retention
-warning, but neither negates the continuation/schema capability A5 tests. They remain inputs
+attempts. The repeated-occurrence result is a retained harness false rejection, and P2 is a
+harness-retention warning, but neither negates the continuation/schema capability A5 tests. They remain inputs
 to the later controlled and human gates. `PROPOSE_PATCH_DEFAULT` stays false until G1-G6 pass.
 
 ## Cost hypothesis and conclusion
 
 Potentially avoidable work is caller source rediscovery and translation of findings into exact
-edits. The repeated-occurrence failure shows sibling coverage is not inherently avoided.
+edits. Both retained repeated-occurrence replies covered every sibling, but the original
+substring oracle falsely rejected them; the trial remains historically failed rather than being
+reclassified as passing acceptance.
 Unavoidable work includes original review, proposal call, caller inspection, application or
 amendment, tests, tracked correction, and cold final. Proposal inference added 8.3-26.5 seconds
 in retained qualifying examples; full runs took 47.2-203.3 seconds, with the verified case

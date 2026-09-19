@@ -6,9 +6,9 @@ gate passes; no proposal is applied or tested by the production path.
 
 | Gate | Branch evidence | Plan evidence | Status / disposition |
 | --- | --- | --- | --- |
-| G1 feasibility | Six frozen families across both providers; retained successes, decline, and repeated-occurrence failure | Structural routes qualified for both providers; Claude verified route qualified; Codex verified harness failure retained | PASS for implementation feasibility only |
-| G2 local correctness | Pure protocol/rendering plus Git-backed directory, pre-read byte admission, retry cache, clean/stale caller, inert rendering, exception containment and public-handler lifecycle coverage | Exact plan capture/newline/staleness, source-processing debt, audit/trailer equality, custody and the same failure matrix | PASS pre-flip on the current branch |
-| G3 state independence | Paired isolated state roots drive the production census/materializer/class engine/persistence through nonempty debt/class, an actual committed wrong repair, correct repair and cold final; true and false successors/trailers match | Paired isolated state roots drive the production plan census/materializer/class engine/persistence through nonempty debt/class, wrong plan text, correct plan text and cold final; true and false review/class/claim successors and trailers match | PASS pre-flip |
+| G1 feasibility | Six frozen families across both providers; retained successes and decline; the repeated-occurrence trial remains historically failed with a documented false-rejecting harness diagnosis | Structural routes qualified for both providers; Claude verified route qualified; Codex verified harness failure retained | PASS for implementation feasibility only |
+| G2 local correctness | Pure protocol/rendering plus Git-backed directory, pre-read byte admission, retry cache, clean/stale caller, inert rendering, exception containment with retained attempt evidence, rebut-role exclusion and public-handler lifecycle coverage | Exact plan capture/newline/staleness, source-processing and localized-omission exclusion, audit/trailer equality, custody, the same failure matrix, and a public verified-plan factual-repair lifecycle with real capture, binding and cold attestation | PASS pre-flip on the current branch |
+| G3 state independence | Paired isolated state roots drive the production census/materializer/class engine/persistence through nonempty debt/class, an actual committed wrong repair, correct repair and cold final; true and false successors/trailers match | Paired isolated state roots drive both structural-only and verified production plan lifecycles through nonempty debt/class/claim state, wrong and scope-weakening text, correct text and cold final; true and false review/class/claim successors and trailers match | PASS pre-flip |
 | G4 native correctness | Production-entry native campaign authorized but not run | Production-entry native campaign authorized but not run | PENDING campaign execution |
 | G5 usefulness | Paired E1-E9 experiment not run | L8/L9 paired experiment not run | PENDING; no benefit claim |
 | G6 human quality | No named independent human inspection yet | No named independent human inspection yet | PENDING; cannot be supplied by an LLM |
@@ -27,7 +27,7 @@ gate passes; no proposal is applied or tested by the production path.
   `PYTHONPATH=src /home/andy/tools/paranoia-local/.venv/bin/pytest -q
   tests/test_patch_proposals.py tests/test_patch_proposals_integration.py
   tests/test_architecture_performance.py tests/test_engines.py
-  tests/test_census_execution.py` — 215 passed in 12.99s.
+  tests/test_census_execution.py` — 223 passed in 17.83s.
 - Full regression after CODE round-2 repairs:
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
   GIT_CONFIG_VALUE_0=false PYTHONPATH=src
@@ -40,8 +40,10 @@ gate passes; no proposal is applied or tested by the production path.
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
   identically in both arm orders.
-- Known negative evidence: the Codex repeated-occurrence proposal failed its one retry;
-  the frozen Codex verified-plan probe lost exact attempt telemetry after a harness assertion.
+- Known negative evidence: the Codex repeated-occurrence trial failed its one retry because
+  the historical substring oracle falsely rejected both complete retained repairs; it remains
+  recorded as failed rather than retroactively relabeled passing.
+- The frozen Codex verified-plan probe lost exact attempt telemetry after a harness assertion.
 - Cost: qualifying proposal calls added 8.3-26.5 seconds in the small feasibility set.
   Human time, subscription price, and comparative experiment cost remain unknown.
 

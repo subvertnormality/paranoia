@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
 import runpy
 import time
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ import pytest
 from paranoia_local import census_execution as census
 from paranoia_local import class_closure as cc
 from paranoia_local import engines
+from paranoia_local import external_sources
 from paranoia_local import git_objects
 from paranoia_local import handlers
 from paranoia_local import inert_git
@@ -134,6 +136,54 @@ def test_missing_or_insufficient_deadline_spends_no_provider_call(monkeypatch):
             deadline=deadline, on_progress=None,
         )
         assert result.result is None and not result.attempts
+
+
+def test_post_response_source_read_exception_retains_completed_attempt(monkeypatch):
+    text = valid_response()
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(
+            text, "proposal-session", "raw-provider", duration_ms=19,
+        ),
+    )
+    context, _ = context_and_reader()
+    result = handlers._run_patch_proposal(
+        context=context,
+        source_reader=lambda unused: (_ for _ in ()).throw(RuntimeError("read exploded")),
+        author=author(), engine=engines.CodexEngine(), cwd=Path("/repo"),
+        model="m", effort="high", deadline=time.monotonic() + 2_000,
+        on_progress=None,
+    )
+    assert result.result is None
+    assert result.reason == "local proposal processing failed: RuntimeError: read exploded"
+    assert result.proposal_session_ref == "proposal-session"
+    assert len(result.attempts) == 1
+    assert result.attempts[0]["raw_excerpt"] == "raw-provider"
+    assert result.attempts[0]["duration_ms"] == 19
+
+
+def test_retry_exception_retains_initial_rejection_and_attempt(monkeypatch):
+    calls = 0
+    def resume(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return engines.Review("{}", "repair-session", "raw-invalid")
+        raise RuntimeError("retry exploded")
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+    context, reader = context_and_reader()
+    result = handlers._run_patch_proposal(
+        context=context, source_reader=reader, author=author(),
+        engine=engines.CodexEngine(), cwd=Path("/repo"), model="m", effort="high",
+        deadline=time.monotonic() + 2_000, on_progress=None,
+    )
+    assert result.result is None
+    assert result.reason == "local proposal retry failed: RuntimeError: retry exploded"
+    assert result.proposal_session_ref == "repair-session"
+    assert len(result.attempts) == 1
+    assert result.attempts[0]["outcome"] == "validation-invalid"
+    assert result.attempts[0]["validation_issue"]
+    assert len(result.rejected_payloads) == 1
 
 
 def git(repo: Path, *args: str) -> str:
@@ -443,8 +493,94 @@ def test_public_handlers_contain_proposal_exceptions_and_preserve_settlement(
         }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
     assert "settled body" in output
     assert "PATCH-PROPOSAL: UNAVAILABLE" in output
-    assert "local proposal processing failed: RuntimeError: boom" in output
+    assert "local proposal execution failed: RuntimeError: boom" in output
     assert output.endswith(trailer)
+
+
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+def test_public_handlers_audit_attempts_when_proposal_retry_raises(
+    tmp_path, monkeypatch, mode,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    calls = 0
+    def resume(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return engines.Review("{}", "repair-session", "raw-invalid")
+        raise RuntimeError("retry exploded")
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+    arguments = {
+        "repo_path": str(repo), "round": 1, "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }
+    if mode == "branch":
+        output = handlers.critique_branch({
+            **arguments, "base_ref": "main", "head_ref": "feature",
+            "lineage": "retry-exception-branch",
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    else:
+        output = handlers.critique_plan({
+            **arguments, "plan_text": "The value is one.\n",
+            "lineage": "retry-exception-plan", "claim_verification": False,
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+    assert "local proposal retry failed: RuntimeError: retry exploded" in output
+    assert output.endswith(trailer)
+    audit = json.loads(next(
+        path for path in (tmp_path / "logs").glob("*patch_proposal*.json")
+    ).read_text())
+    assert len(audit["proposal_attempt_ledger"]) == 1
+    assert audit["proposal_attempt_ledger"][0]["outcome"] == "validation-invalid"
+    assert audit["proposal_attempt_ledger"][0]["raw_excerpt"] == "raw-invalid"
+    assert len(audit["rejected_payloads"]) == 1
+
+
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+def test_public_handlers_audit_completed_response_when_local_processing_raises(
+    tmp_path, monkeypatch, mode,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_reply(mode)
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(
+            text, "proposal-session", "raw-completed", duration_ms=23,
+        ),
+    )
+    monkeypatch.setattr(
+        pp, "parse_and_render",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("post-response boom")),
+    )
+    common = {
+        "repo_path": str(repo), "round": 1, "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }
+    if mode == "branch":
+        output = handlers.critique_branch({
+            **common, "base_ref": "main", "head_ref": "feature",
+            "lineage": "post-response-branch",
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    else:
+        output = handlers.critique_plan({
+            **common, "plan_text": "The value is one.\n",
+            "lineage": "post-response-plan", "claim_verification": False,
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+    assert "local proposal processing failed: RuntimeError: post-response boom" in output
+    assert output.endswith(trailer)
+    audit = json.loads(next(
+        path for path in (tmp_path / "logs").glob("*patch_proposal*.json")
+    ).read_text())
+    assert len(audit["proposal_attempt_ledger"]) == 1
+    assert audit["proposal_attempt_ledger"][0]["raw_excerpt"] == "raw-completed"
+    assert audit["proposal_attempt_ledger"][0]["duration_ms"] == 23
+    assert audit["proposal_session_ref"] == "proposal-session"
+    assert audit["rejected_payloads"] == []
 
 
 def test_provider_failure_text_is_inert_and_cannot_forge_trailer(tmp_path, monkeypatch):
@@ -492,6 +628,35 @@ def test_history_classifies_validation_and_checkpoint_separately_from_execution(
     assert cause({}, {"attempt_ledger": [{
         "outcome": "failed", "returncode": 1,
     }]}) == ["execution failure"]
+
+
+def test_repeated_feasibility_oracle_accepts_both_retained_complete_repairs(tmp_path):
+    module = runpy.run_path(str(
+        Path(__file__).parents[1] / "scripts" / "probe_patch_proposal_feasibility.py"
+    ))
+    repo = tmp_path / "repeated"
+    repo.mkdir()
+    module["fixture"](repo, "repeated")
+    artifact = json.loads((
+        Path(__file__).parents[1]
+        / "docs" / "reviewer-patch-feasibility-repeated-codex.json"
+    ).read_text())
+    target_ids = ["structural:probe-D1"]
+    schema = module["proposal_schema"](plan_mode=False, target_ids=target_ids)
+    for attempt in artifact["proposal_attempts"]:
+        value = module["decode"](
+            attempt["response"]["excerpt"], "repeated", repo,
+            schema=schema, target_ids=target_ids, plan_text=None,
+        )
+        assert value["status"] == "proposed"
+
+    incomplete = json.loads(artifact["proposal_attempts"][1]["response"]["excerpt"])
+    incomplete["edits"] = incomplete["edits"][:-1]
+    with pytest.raises(ValueError, match="event_id"):
+        module["decode"](
+            json.dumps(incomplete), "repeated", repo,
+            schema=schema, target_ids=target_ids, plan_text=None,
+        )
 
 
 def install_settled_census(monkeypatch, *, blocking=True):
@@ -1214,6 +1379,252 @@ def test_plan_production_lifecycle_is_state_independent_with_wrong_and_correct_r
     )
 
 
+def test_verified_plan_public_lifecycle_reverifies_wrong_weakening_and_correct_repairs(
+    tmp_path, monkeypatch,
+):
+    from tests.test_plan_claims import _audit, _claim, _source
+    from tests.test_review_census import _task_from_prompt, lane, payload, wire
+
+    repo = repository(tmp_path)
+    correct = "Official service limit is two.\n"
+    wrong = "Official service limit is three.\n"
+    weakened = "A service limit may be documented later.\n"
+    current = {"text": "Official service limit is one.\n"}
+    source = _source(
+        url="https://example.com/official-limit",
+        quote="Official service limit is two.",
+    )
+    proposal_targets = []
+    discovery_calls = []
+
+    monkeypatch.setattr(handlers.inert_git, "require_supported_version", lambda: (2, 36, 0))
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
+
+    def capture_all(candidates, **kwargs):
+        return [
+            external_sources.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64,
+                "b" * 64, source["quote"],
+            )
+            for candidate in candidates
+        ]
+    monkeypatch.setattr(handlers.external_sources, "capture_all", capture_all)
+
+    def claim_reply(prompt):
+        text = current["text"]
+        prior_ids = sorted(set(re.findall(r"C-[0-9a-f]{10}", prompt)))
+        discovery_calls.append((text, tuple(prior_ids)))
+        if text == weakened:
+            # This is the localized-omission case: no disposition may turn the
+            # dropped requirement into semantic permission to weaken it.
+            return _audit()
+        supported = text == correct
+        evidence = [{**source, "relation": "supports_claim" if supported else "refutes_claim"}]
+        dispositions = ([{
+            "claim_id": claim_id, "disposition": "removed",
+            "reason": "The predecessor wording is absent from the current plan.",
+        } for claim_id in prior_ids] if text in {wrong, correct} else [])
+        return _audit(_claim(
+            anchor=text.strip(), proposition=text.strip(),
+            verdict="supported" if supported else "refuted",
+            evidence=evidence, replacement=None if supported else correct.strip(),
+            rationale="The captured official source states that the limit is two.",
+        ), dispositions=dispositions)
+
+    def run(self, prompt, cwd, *args, **kwargs):
+        if self.role == engines.ROLE_DISCOVERY:
+            text = claim_reply(prompt)
+            return engines.Review(text, "discovery-session", text)
+        if self.role == engines.ROLE_BINDING:
+            text = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({
+                "bindings": [{
+                    "claim_index": 0, "evidence_index": 0, "usable": True,
+                    "location": source["location"], "passage": source["quote"],
+                }],
+            })
+            return engines.Review(text, "binding-session", text)
+        if self.role == engines.ROLE_TEXT:
+            text = "=== EVIDENCE ATTESTATION JSON ===\n" + json.dumps({
+                "attestations": [{
+                    "claim_index": 0, "evidence_index": 0,
+                    "publisher_authority": True,
+                    "authority_reason": "The publisher owns the service limit.",
+                    "passage_entailment": True,
+                    "entailment_reason": "The passage states the exact governing limit.",
+                }],
+            })
+            return engines.Review(text, "attestation-session", text)
+
+        defective = current["text"] != correct
+        defect = {
+            "id": "wrong-plan-limit", "severity": "MAJOR",
+            "summary": "The plan does not preserve the verified service limit.",
+            "evidence": ["plan:1"],
+            "remedy": "State the verified official limit without weakening the requirement.",
+        }
+        if "ROLE: census lane " in prompt:
+            lane_name = next(
+                line.split()[-1] for line in prompt.splitlines()
+                if line.startswith("ROLE: census lane ")
+            )
+            return engines.Review(
+                lane(lane_name, findings=[defect] if lane_name == "domain" else []),
+                f"{lane_name}-session", "lane-raw",
+            )
+        task = _task_from_prompt(prompt)
+        role = task["role"]
+        if role == "census":
+            sources = [
+                finding["id"] for manifest in task["manifests"]
+                for finding in manifest["findings"]
+            ]
+            text = wire({
+                "role": "census", "governing_findings": [{
+                    **defect, "source_ids": sources,
+                    "classification": {"kind": "new_class", "definition": {
+                        "invariant": "The plan preserves the verified official service limit.",
+                        "severity": "MAJOR",
+                        "procedure": "Inspect the plan and authoritative claim evidence.",
+                        "members": ["verified-service-limit"],
+                    }},
+                }],
+                "debt_outcomes": [], "class_actions": {},
+            })
+        else:
+            cls = task["active_classes"][0]
+            class_id = cls["class_id"]
+            findings = ([{
+                **defect,
+                "classification": {"kind": "existing_class", "class_id": class_id},
+            }] if defective else [])
+            outcome = ({
+                "verdict": "violated", "evidence": ["plan:1"],
+                "basis": {"kind": "new_finding", "finding_id": "wrong-plan-limit"},
+            } if defective else {
+                "verdict": "satisfied",
+                "member_coverage": [{
+                    "member_id": "verified-service-limit", "evidence": ["plan:1"],
+                }],
+            })
+            value = {
+                "role": role, "governing_findings": findings,
+                "debt_outcomes": [{
+                    "debt_id": debt["id"], "status": "closed", "evidence": ["plan:1"],
+                } for debt in task["existing_debt"]],
+                "class_outcomes": {class_id: outcome},
+                "class_actions": {class_id: None},
+            }
+            if role == "final":
+                value["coverage"] = payload(lane())["coverage"]
+                for row in value["coverage"]:
+                    row["evidence"] = ["plan:1"]
+            text = wire(value)
+        return engines.Review(text, "review-session", text)
+
+    transitions = {
+        "Official service limit is one.\n": wrong,
+        wrong: weakened,
+        weakened: correct,
+    }
+    def resume_proposal(self, session_ref, prompt, cwd, *args, **kwargs):
+        targets_text = prompt.split(
+            "=== CURRENT TARGETS ===\n", 1,
+        )[1].split("\n\n=== DECLARATIVE CONTRACT ===", 1)[0]
+        target_ids = [row["id"] for row in json.loads(targets_text)]
+        proposal_targets.append((current["text"], tuple(target_ids)))
+        replacement = transitions[current["text"]]
+        text = json.dumps({
+            "schema_version": 1, "status": "proposed",
+            "summary": "Replace the current service-limit statement.",
+            "addressed_finding_ids": target_ids, "unaddressed": [],
+            "edits": [{
+                "target": "plan", "operation": "replace", "path": None,
+                "old_text": current["text"], "new_text": replacement,
+            }],
+            "suggested_tests": ["Re-run verified plan review."],
+            "limitations": ["The replacement requires current evidence verification."],
+        })
+        return engines.Review(text, "proposal-session", text)
+
+    def resume(self, session_ref, prompt, cwd, *args, **kwargs):
+        if self.role in {
+            engines.ROLE_DISCOVERY, engines.ROLE_BINDING, engines.ROLE_TEXT,
+        }:
+            review = run(self, prompt, cwd, *args, **kwargs)
+            return engines.Review(
+                review.text, session_ref, review.raw, returncode=review.returncode,
+                error=review.error, failure_detail=review.failure_detail,
+                stderr=review.stderr,
+            )
+        raise AssertionError("unexpected structural validation retry:\n" + prompt)
+
+    monkeypatch.setattr(engines.CodexEngine, "run", run)
+    monkeypatch.setattr(engines.CodexEngine, "resume", resume)
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume_proposal)
+    roots = {False: tmp_path / "verified-disabled", True: tmp_path / "verified-enabled"}
+    lineage = "verified-plan-production-lifecycle"
+
+    def paired(round_no):
+        outputs = {}
+        states = {}
+        for enabled in (False, True):
+            monkeypatch.setenv("PARANOIA_STATE_ROOT", str(roots[enabled]))
+            outputs[enabled] = handlers.critique_plan({
+                "repo_path": str(repo), "plan_text": current["text"],
+                "round": round_no, "lineage": lineage, "stakes": "trusted local tool",
+                "claim_verification": True, "web_search": True,
+                "propose_patch": enabled,
+            }, engine=engines.CodexEngine(),
+                log_dir=tmp_path / f"verified-logs-{enabled}-{round_no}",
+                now=lambda: f"V{round_no}")
+            states[enabled] = cc.load_lineage(
+                roots[enabled], lineage, stamp="read", mode=cc.PLAN_MODE,
+            )
+        assert states[False].review_state == states[True].review_state
+        assert states[False].classes == states[True].classes
+        assert states[False].claim_state == states[True].claim_state
+        assert outputs[True].endswith(outputs[False][outputs[False].rfind("LINEAGE:"):])
+        return outputs, states
+
+    first, first_states = paired(1)
+    assert next(iter(first_states[False].claim_state["claims"].values()))["verdict"] == "refuted"
+    assert "PATCH-PROPOSAL: PROPOSED" in first[True]
+    assert wrong.strip() in first[True]
+
+    current["text"] = wrong
+    wrong_outputs, wrong_states = paired(2)
+    claims = list(wrong_states[False].claim_state["claims"].values())
+    assert len(claims) == 1 and claims[0]["verdict"] == "refuted"
+    assert claims[0]["current_adjudication"] == "full-evidence-packet"
+    assert "CONVERGENCE: BLOCKED" in wrong_outputs[False]
+
+    current["text"] = weakened
+    weak_outputs, weak_states = paired(3)
+    weak_claims = list(weak_states[False].claim_state["claims"].values())
+    assert len(weak_claims) == 1 and weak_claims[0]["verdict"] == "unverified"
+    assert weak_claims[0]["current_adjudication"] == "localized-discovery-omission"
+    assert handlers._proposal_claim_targets(weak_states[False].claim_state) == ()
+    assert "CONVERGENCE: BLOCKED" in weak_outputs[False]
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in weak_outputs[True]
+
+    current["text"] = correct
+    corrected, corrected_states = paired(4)
+    current_claims = list(corrected_states[False].claim_state["claims"].values())
+    assert len(current_claims) == 1 and current_claims[0]["verdict"] == "supported"
+    assert current_claims[0]["current_adjudication"] == "full-evidence-packet"
+    assert corrected_states[False].review_state["phase"] == "final"
+    assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
+
+    final, final_states = paired(5)
+    assert final_states[False].review_state["phase"] == "clear"
+    assert "CONVERGENCE: NOT-BLOCKED" in final[False]
+    assert "CONVERGENCE: NOT-BLOCKED" in final[True]
+    assert len(proposal_targets) == 1
+    assert proposal_targets[0][0] == "Official service limit is one.\n"
+    assert any(target.startswith("claim:") for target in proposal_targets[0][1])
+    assert any(text == correct for text, unused in discovery_calls)
+
+
 def test_missing_settled_review_audit_receipt_prevents_proposal_spend(tmp_path, monkeypatch):
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
@@ -1279,6 +1690,7 @@ def test_reused_current_claim_audit_retains_semantic_proposal_target(tmp_path, m
             "verdict": "refuted", "rationale": "The retained source says two.",
             "replacement": "The value is two.", "evidence": [],
             "capture_provenance": [],
+            "current_adjudication": "full-evidence-packet",
         },
     }
     captured = []

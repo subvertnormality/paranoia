@@ -437,6 +437,7 @@
     "reasoning_output_tokens": 34
   },
   "qualification_failure": "repeated-occurrence proposal left a sibling occurrence",
+  "qualification_diagnosis": "The historical harness used a substring oracle that falsely rejected both retained replies. Each reply excludes Boolean values in user_id, account_id, and event_id while preserving ordinary integer acceptance. The original failed trial, provider bytes, attempts, and qualified=false result remain unchanged; this diagnosis is not retroactive passing acceptance.",
   "qualified": false,
   "scenario": "repeated",
   "schema_version": 1,
