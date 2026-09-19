@@ -391,6 +391,46 @@ def test_enabled_proposal_does_not_change_durable_state_or_existing_trailer(
     assert "PATCH-PROPOSAL: PROPOSED" in enabled
 
 
+def test_enabled_plan_proposal_does_not_change_durable_state_or_trailer(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    state_root = tmp_path / "state"
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(state_root))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_reply("plan")
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(text, "proposal-session", text),
+    )
+    common = {
+        "repo_path": str(repo), "plan_text": "The value is one.\n",
+        "round": 1, "stakes": "local", "claim_verification": False,
+        "web_search": False,
+    }
+    disabled = handlers.critique_plan(
+        {**common, "lineage": "plan-state-disabled", "propose_patch": False},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-disabled",
+    )
+    enabled = handlers.critique_plan(
+        {**common, "lineage": "plan-state-enabled", "propose_patch": True},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-enabled",
+    )
+    disabled_state = handlers.cc.load_lineage(
+        state_root, "plan-state-disabled", stamp="READ",
+    )
+    enabled_state = handlers.cc.load_lineage(
+        state_root, "plan-state-enabled", stamp="READ",
+    )
+    assert disabled_state.review_state == enabled_state.review_state
+    assert disabled_state.classes == enabled_state.classes
+    assert disabled_state.claim_state == enabled_state.claim_state
+    assert disabled.endswith(trailer)
+    assert enabled.endswith(trailer)
+    assert "PATCH-PROPOSAL" not in disabled
+    assert "PATCH-PROPOSAL: PROPOSED" in enabled
+
+
 def test_missing_settled_review_audit_receipt_prevents_proposal_spend(tmp_path, monkeypatch):
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
