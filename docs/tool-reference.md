@@ -1,5 +1,10 @@
 # Paranoia Local tool reference
 
+> Reviewer-authored patch proposals are under qualification under
+> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
+> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
+> while explicit true is reserved for the qualification harness.
+
 This page documents the public MCP interface. The runtime schemas in
 [`src/paranoia_local/server.py`](../src/paranoia_local/server.py) are authoritative
 if this page and an installed version differ.

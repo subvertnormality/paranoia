@@ -1,5 +1,10 @@
 # Paranoia
 
+> Reviewer-authored patch proposals are under qualification under
+> [`docs/reviewer-patch-proposal-plan.md`](docs/reviewer-patch-proposal-plan.md).
+> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
+> while explicit true is reserved for the qualification harness.
+
 Get a cold, adversarial review of your code, plans, and technical decisions from
 the other frontier coding agent.
 

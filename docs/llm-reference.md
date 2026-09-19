@@ -1,5 +1,10 @@
 # Paranoia Local: LLM operating reference
 
+> Reviewer-authored patch proposals are under qualification under
+> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
+> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
+> while explicit true is reserved for the qualification harness.
+
 Purpose: provide enough precise context for an agent to install, select, and call
 Paranoia Local without inferring behavior from introductory prose. Runtime MCP
 schemas are authoritative.

@@ -1,0 +1,441 @@
+{
+  "claim_attempts": [],
+  "claim_state": null,
+  "claim_status": null,
+  "effort": "medium",
+  "elapsed_ms": 95902,
+  "engine": "claude",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "domain",
+  "lane_attempts": [
+    {
+      "duration_ms": 69359,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 67622,
+      "raw_excerpt": "{\"duration_api_ms\":68672,\"stop_reason\":\"tool_use\",\"session_id\":\"5b147a67-a9ca-4e4a-a5c8-e7832ae7563a\",\"total_cost_usd\":0.545293,\"usage\":{\"input_tokens\":424,\"cache_creation_input_tokens\":12844,\"cache_read_input_tokens\":79456,\"output_tokens\":5243,\"output_tokens_details\":{\"thinking_tokens\":1560},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":12844,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":56,\"output_tokens\":4323,\"cache_read_input_tokens\":12320,\"cache_creation_input_tokens\":524,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":524},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":2094,\"outputTokens\":13,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":0,\"costUSD\":0.002159,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":424,\"outputTokens\":5243,\"cacheReadInputTokens\":79456,\"cacheCreationInputTokens\":12844,\"webSearchRequests\":0,\"costUSD\":0.543134,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":1560,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":11,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"lane\\\":\\\"domain\\\",\\\"coverage\\\":[{\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The plan is two sentences with no implementation scope, no named files or functions, no owner, no acceptance evidence definition, and no fail-closed behavior. It cannot bind future implementation work.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3\\\",\\\"rationale\\\":\\\"Sole rollout instruction names an undefined 'new parser' and no scope.\\\"},{\\\"anchor\\\":\\\"plan:7\\\",\\\"rationale\\\":\\\"Sole acceptance instruction names unspecified tests with no location or pass criteria.\\\"}],\\\"finding_ids\\\":[\\\"parser-referent-missing\\\",\\\"tests-do-not-exist\\\"]},{\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The repository contains only a one-function validator and a README; there is no parser, old or new, no request handling, and no feature flag. The existing validator also contradicts its own documented contract by accepting booleans, which the plan does not address.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/validator.py:1-3\\\",\\\"rationale\\\":\\\"Only code in the repository; isinstance(value, int) returns True for bool despite the comment saying booleans must be rejected.\\\"},{\\\"anchor\\\":\\\"repository/README.md:3\\\",\\\"rationale\\\":\\\"Documented contract requires rejecting Boolean values.\\\"},{\\\"anchor\\\":\\\"plan:3\\\",\\\"rationale\\\":\\\"Plan presumes a 'new parser' exists to enable; nothing in the repository matches.\\\"}],\\\"finding_ids\\\":[\\\"parser-referent-missing\\\",\\\"validator-accepts-bool\\\"]},{\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The plan never states what the parser takes as input, what it produces, or how its output differs from current behavior, so no transformation can be verified.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3\\\",\\\"rationale\\\":\\\"No input/output contract for the parser is given.\\\"}],\\\"finding_ids\\\":[\\\"parser-referent-missing\\\"]},{\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"'Every request' is the only consumer description; no call sites, request paths, or downstream dependents are identified, and the repository has none to identify.\\\",\\\"evidence\\\":[{\\\"",
+      "raw_sha256": "b23e5f61d929510dab4cd77ddba4cf7218fd2d4d327fd1e240cf9601de963a57",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\"lane\":\"domain\",\"coverage\":[{\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan is two sentences with no implementation scope, no named files or functions, no owner, no acceptance evidence definition, and no fail-closed behavior. It cannot bind future implementation work.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"Sole rollout instruction names an undefined 'new parser' and no scope.\"},{\"anchor\":\"plan:7\",\"rationale\":\"Sole acceptance instruction names unspecified tests with no location or pass criteria.\"}],\"finding_ids\":[\"parser-referent-missing\",\"tests-do-not-exist\"]},{\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The repository contains only a one-function validator and a README; there is no parser, old or new, no request handling, and no feature flag. The existing validator also contradicts its own documented contract by accepting booleans, which the plan does not address.\",\"evidence\":[{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"Only code in the repository; isinstance(value, int) returns True for bool despite the comment saying booleans must be rejected.\"},{\"anchor\":\"repository/README.md:3\",\"rationale\":\"Documented contract requires rejecting Boolean values.\"},{\"anchor\":\"plan:3\",\"rationale\":\"Plan presumes a 'new parser' exists to enable; nothing in the repository matches.\"}],\"finding_ids\":[\"parser-referent-missing\",\"validator-accepts-bool\"]},{\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The plan never states what the parser takes as input, what it produces, or how its output differs from current behavior, so no transformation can be verified.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"No input/output contract for the parser is given.\"}],\"finding_ids\":[\"parser-referent-missing\"]},{\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"'Every request' is the only consumer description; no call sites, request paths, or downstream dependents are identified, and the repository has none to identify.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"Consumer set is 'every request' with no enumeration.\"},{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"No request handling or callers exist in the repository.\"}],\"finding_ids\":[\"parser-referent-missing\"]},{\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"Immediate 100% enablement with no flag, staged rollout, rollback path, or fail-closed behavior on parser failure.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"'for every request immediately' with no kill switch or rollback.\"}],\"finding_ids\":[\"no-rollout-guard\"]},{\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"The plan gates delivery on tests passing, but the repository contains no tests and the plan names none to write. Passing zero tests is vacuous acceptance.\",\"evidence\":[{\"anchor\":\"plan:7\",\"rationale\":\"Acceptance is 'run the tests' with no test scope.\"},{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"Only source file; no test file exists anywhere in the repository.\"}],\"finding_ids\":[\"tests-do-not-exist\"]},{\"id\":\"docs-operations\",\"status\":\"finding\",\"summary\":\"No README update, operator runbook, or monitoring guidance for a rollout that changes behavior for all requests at once.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"Rollout step carries no operational guidance.\"},{\"anchor\":\"repository/README.md:1-3\",\"rationale\":\"README only describes the fixture; the plan does not name it for update.\"}],\"finding_ids\":[\"no-rollout-guard\"]},{\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"Rollout says enable immediately; Acceptance says deliver only when tests pass. The plan does not order these, so enablement could precede acceptance.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"'immediately' implies enablement before any gate.\"},{\"anchor\":\"plan:7\",\"rationale\":\"Delivery is conditioned on tests, but enablement is not.\"}],\"finding_ids\":[\"no-rollout-guard\"]},{\"id\":\"proportionality\",\"status\":\"finding\",\"summary\":\"The blast radius (all requests, immediately) is disproportionate to the evidence offer",
+      "response_sha256": "0a5762636f1caea75027308de35f3945c01286cfea718b8e9817cdbd4a27c372",
+      "returncode": 0,
+      "role": "census-domain",
+      "sequence": null,
+      "session_ref": "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.545293,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 12844,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 12844,
+          "cache_read_input_tokens": 79456,
+          "inference_geo": "not_available",
+          "input_tokens": 424,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 524,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 524,
+              "cache_read_input_tokens": 12320,
+              "input_tokens": 56,
+              "model": null,
+              "output_tokens": 4323,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 5243,
+          "output_tokens_details": {
+            "thinking_tokens": 1560
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "plan:3",
+          "plan:7"
+        ],
+        "finding_ids": [
+          "parser-referent-missing",
+          "tests-do-not-exist"
+        ],
+        "id": "artifact-complete",
+        "status": "finding",
+        "summary": "The plan is two sentences with no implementation scope, no named files or functions, no owner, no acceptance evidence definition, and no fail-closed behavior. It cannot bind future implementation work."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3",
+          "repository/README.md:3",
+          "plan:3"
+        ],
+        "finding_ids": [
+          "parser-referent-missing",
+          "validator-accepts-bool"
+        ],
+        "id": "repository-premises",
+        "status": "finding",
+        "summary": "The repository contains only a one-function validator and a README; there is no parser, old or new, no request handling, and no feature flag. The existing validator also contradicts its own documented contract by accepting booleans, which the plan does not address."
+      },
+      {
+        "evidence": [
+          "plan:3"
+        ],
+        "finding_ids": [
+          "parser-referent-missing"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "The plan never states what the parser takes as input, what it produces, or how its output differs from current behavior, so no transformation can be verified."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "parser-referent-missing"
+        ],
+        "id": "consumers",
+        "status": "finding",
+        "summary": "'Every request' is the only consumer description; no call sites, request paths, or downstream dependents are identified, and the repository has none to identify."
+      },
+      {
+        "evidence": [
+          "plan:3"
+        ],
+        "finding_ids": [
+          "no-rollout-guard"
+        ],
+        "id": "failure-recovery",
+        "status": "finding",
+        "summary": "Immediate 100% enablement with no flag, staged rollout, rollback path, or fail-closed behavior on parser failure."
+      },
+      {
+        "evidence": [
+          "plan:7",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "tests-do-not-exist"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "The plan gates delivery on tests passing, but the repository contains no tests and the plan names none to write. Passing zero tests is vacuous acceptance."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [
+          "no-rollout-guard"
+        ],
+        "id": "docs-operations",
+        "status": "finding",
+        "summary": "No README update, operator runbook, or monitoring guidance for a rollout that changes behavior for all requests at once."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "plan:7"
+        ],
+        "finding_ids": [
+          "no-rollout-guard"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "Rollout says enable immediately; Acceptance says deliver only when tests pass. The plan does not order these, so enablement could precede acceptance."
+      },
+      {
+        "evidence": [
+          "plan:3"
+        ],
+        "finding_ids": [
+          "no-rollout-guard"
+        ],
+        "id": "proportionality",
+        "status": "finding",
+        "summary": "The blast radius (all requests, immediately) is disproportionate to the evidence offered (unspecified tests), and the plan omits the minimal guard a change of this scope needs."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:1-3",
+          "repository/README.md:1-3"
+        ],
+        "id": "parser-referent-missing",
+        "remedy": "Rewrite the Rollout section to name the parser module and entry function to be created or enabled, its input and output contract, the exact call sites that switch to it, and the mechanism (flag or config key) that controls enablement. If the parser is to be built in this plan, add it as an explicit scoped work item.",
+        "severity": "FATAL",
+        "summary": "The plan's only work item is to enable a 'new parser', but no parser, request pipeline, or feature switch exists in the repository. The plan names no files, functions, inputs, outputs, or callers, so there is nothing an implementer can bind to and nothing a reviewer can check."
+      },
+      {
+        "evidence": [
+          "plan:7",
+          "repository/validator.py:1-3"
+        ],
+        "id": "tests-do-not-exist",
+        "remedy": "Replace the Acceptance section with named test files and cases: at minimum, parser input/output cases for every request type it will handle, a case proving identifiers reject True and False, and the exact command whose non-zero exit blocks delivery. State that failing or absent tests fail closed.",
+        "severity": "BLOCKER",
+        "summary": "Acceptance is 'run the tests and deliver when they pass', but the repository has no tests and the plan does not define any to write. The gate is vacuously satisfiable."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "plan:7",
+          "repository/README.md:1-3"
+        ],
+        "id": "no-rollout-guard",
+        "remedy": "Add a flag-controlled enablement defaulting to off, state that enablement happens only after the acceptance command passes, define a one-step rollback (flip the flag), name what is monitored after enablement and what threshold triggers rollback, and add a README update describing the parser and the flag.",
+        "severity": "MAJOR",
+        "summary": "Enabling for every request immediately gives no staged exposure, no kill switch, no rollback, and no ordering relative to the acceptance gate. Docs and operator guidance are also absent for an all-traffic behavior change."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:3",
+          "repository/validator.py:2",
+          "repository/README.md:3"
+        ],
+        "id": "validator-accepts-bool",
+        "remedy": "Add a scoped work item to change accepts_identifier to reject bool explicitly (isinstance check with a bool exclusion) and a named test asserting accepts_identifier(True) and accepts_identifier(False) are False, or explicitly declare the validator out of scope with a named residual owner.",
+        "severity": "MAJOR",
+        "summary": "The existing validator accepts booleans because bool subclasses int, contradicting both its inline comment and the README contract. The plan does not mention this defect; any parser built on or beside this validator inherits it and the planned tests would not catch it since none are specified."
+      }
+    ],
+    "lane": "domain"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+  "mode": "plan",
+  "model": "claude-fable-5-1",
+  "patch_applied": false,
+  "plan_digest": "61398e61e6938d47b287b46b7b8594e79792c3ae7d23473691b468bd814650fc",
+  "plan_text": "# Rollout\n\nEnable the new parser for every request immediately.\n\n# Acceptance\n\nRun the tests and deliver when they pass.\n",
+  "proposal": {
+    "addressed_finding_ids": [
+      "structural:probe-D1"
+    ],
+    "edits": [
+      {
+        "new_text": "# Rollout\n\nScope: add `parser.py` exposing `parse_request(raw: bytes) -> dict` and switch the single request entry point to call it. Identifier fields in the parsed output are validated by `accepts_identifier` in `validator.py`, which must be corrected in this change to reject `bool` (currently `isinstance(value, int)` accepts `True` and `False`, contradicting the comment in `validator.py` and the contract in `README.md`).\n\nEnablement: the new parser is controlled by the environment variable `NEW_PARSER_ENABLED`, defaulting to off. Once the Acceptance gate below passes, set `NEW_PARSER_ENABLED=1` so the new parser handles every request. Enablement must not happen before the Acceptance gate passes.\n\nRollback: unset `NEW_PARSER_ENABLED` to return every request to the previous behavior in one step. Any parser exception on a request is fail-closed: the request is rejected with an error response rather than falling through to unparsed handling.\n\nDocs: update `README.md` to describe `parse_request`, the `NEW_PARSER_ENABLED` flag, and the rollback step.",
+        "old_text": "# Rollout\n\nEnable the new parser for every request immediately.",
+        "operation": "replace",
+        "path": null,
+        "target": "plan"
+      },
+      {
+        "new_text": "# Acceptance\n\nAdd `test_parser.py` containing, at minimum:\n\n- one case per request type `parse_request` handles, asserting the exact output dict;\n- a case asserting `parse_request` raises on malformed input rather than returning a partial result;\n- cases asserting `accepts_identifier(True)` and `accepts_identifier(False)` are both `False`, and `accepts_identifier(1)` is `True`;\n- a case asserting the request entry point uses the previous behavior when `NEW_PARSER_ENABLED` is unset and the new parser when it is `1`.\n\nGate command:\n\n```\npython -m pytest test_parser.py\n```\n\nDeliver, and then enable per the Rollout section, only when this command exits zero. A non-zero exit, a missing `test_parser.py`, or zero collected tests each block delivery.",
+        "old_text": "# Acceptance\n\nRun the tests and deliver when they pass.",
+        "operation": "replace",
+        "path": null,
+        "target": "plan"
+      }
+    ],
+    "limitations": [
+      "The finding text for structural:probe-D1 was not supplied in this session; the patch targets the structural gaps observable in the captured plan text (undefined parser scope, unnamed tests, no fail-closed or rollback behavior, unordered enablement versus acceptance).",
+      "Names such as parser.py, parse_request, NEW_PARSER_ENABLED, and test_parser.py are proposals; the repository contains no parser or request entry point, so these must be confirmed by the plan author before application.",
+      "The replacement wording has not been applied, executed, or verified. No files were modified and no tests were run.",
+      "The plan's rollout is now flag-gated rather than unconditionally immediate; this preserves the requirement that every request uses the new parser once enabled, but the author should confirm the gating is acceptable."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "test_parser.py: assert accepts_identifier(True) is False and accepts_identifier(False) is False after the validator fix.",
+      "test_parser.py: assert accepts_identifier(1) is True to confirm the fix does not reject integers.",
+      "test_parser.py: assert parse_request raises on malformed bytes rather than returning a partial dict.",
+      "test_parser.py: assert the request entry point dispatches to the old path when NEW_PARSER_ENABLED is unset and to parse_request when it is 1.",
+      "Verify that running the gate command with test_parser.py absent exits non-zero, so the fail-closed clause is enforceable."
+    ],
+    "summary": "Candidate patch for structural:probe-D1 against the captured plan text. The Rollout section is rewritten to name the parser module, its entry function, the call site that switches to it, and a flag-controlled enablement that still reaches every request once the acceptance gate passes. The Acceptance section is rewritten to name the test file, the specific cases it must contain (including the existing validator's Boolean rejection contract from repository/README.md:3 and repository/validator.py:2), the exact command, and fail-closed behavior. Governing requirements (new parser on for every request; delivery gated on passing tests) are preserved. Wording is unapplied and unverified; no files were modified and nothing was executed.",
+    "unaddressed": []
+  },
+  "proposal_attempts": [
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--resume",
+        "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+        "--output-format",
+        "json",
+        "--model",
+        "claude-fable-5-1",
+        "--effort",
+        "medium",
+        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Grep,Glob",
+        "--allowedTools",
+        "Read,Grep,Glob"
+      ],
+      "duration_ms": 26507,
+      "error": false,
+      "failure_detail": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "raw": {
+        "bytes": 10737,
+        "excerpt": "{\"duration_api_ms\":25128,\"stop_reason\":\"tool_use\",\"session_id\":\"5b147a67-a9ca-4e4a-a5c8-e7832ae7563a\",\"total_cost_usd\":0.3729,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":13659,\"cache_read_input_tokens\":0,\"output_tokens\":1994,\"output_tokens_details\":{\"thinking_tokens\":263},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":13659,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1994,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":13659,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":13659},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1994,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":13659,\"webSearchRequests\":0,\"costUSD\":0.3729,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":263,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for structural:probe-D1 against the captured plan text. The Rollout section is rewritten to name the parser module, its entry function, the call site that switches to it, and a flag-controlled enablement that still reaches every request once the acceptance gate passes. The Acceptance section is rewritten to name the test file, the specific cases it must contain (including the existing validator's Boolean rejection contract from repository/README.md:3 and repository/validator.py:2), the exact command, and fail-closed behavior. Governing requirements (new parser on for every request; delivery gated on passing tests) are preserved. Wording is unapplied and unverified; no files were modified and nothing was executed.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"# Rollout\\\\n\\\\nEnable the new parser for every request immediately.\\\",\\\"new_text\\\":\\\"# Rollout\\\\n\\\\nScope: add `parser.py` exposing `parse_request(raw: bytes) -> dict` and switch the single request entry point to call it. Identifier fields in the parsed output are validated by `accepts_identifier` in `validator.py`, which must be corrected in this change to reject `bool` (currently `isinstance(value, int)` accepts `True` and `False`, contradicting the comment in `validator.py` and the contract in `README.md`).\\\\n\\\\nEnablement: the new parser is controlled by the environment variable `NEW_PARSER_ENABLED`, defaulting to off. Once the Acceptance gate below passes, set `NEW_PARSER_ENABLED=1` so the new parser handles every request. Enablement must not happen before the Acceptance gate passes.\\\\n\\\\nRollback: unset `NEW_PARSER_ENABLED` to return every request to the previous behavior in one step. Any parser exception on a request is fail-closed: the request is rejected with an error response rather than falling through to unparsed handling.\\\\n\\\\nDocs: update `README.md` to describe `parse_request`, the `NEW_PARSER_ENABLED` flag, and the rollback step.\\\"},{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"# Acceptance\\\\n\\\\nRun the tests and deliver when they pass.\\\",\\\"new_text\\\":\\\"# Acceptance\\\\n\\\\nAdd `test_parser.py` containing, at minimum:\\\\n\\\\n- one case per request type `parse_request` handles, asserting the exact output dict;\\\\",
+        "sha256": "2932f7f34848477f2f3e41717b133b47a7cb7563d4361459e66cf1b3d392bf90"
+      },
+      "response": {
+        "bytes": 4440,
+        "excerpt": "{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Candidate patch for structural:probe-D1 against the captured plan text. The Rollout section is rewritten to name the parser module, its entry function, the call site that switches to it, and a flag-controlled enablement that still reaches every request once the acceptance gate passes. The Acceptance section is rewritten to name the test file, the specific cases it must contain (including the existing validator's Boolean rejection contract from repository/README.md:3 and repository/validator.py:2), the exact command, and fail-closed behavior. Governing requirements (new parser on for every request; delivery gated on passing tests) are preserved. Wording is unapplied and unverified; no files were modified and nothing was executed.\",\"addressed_finding_ids\":[\"structural:probe-D1\"],\"unaddressed\":[],\"edits\":[{\"target\":\"plan\",\"operation\":\"replace\",\"path\":null,\"old_text\":\"# Rollout\\n\\nEnable the new parser for every request immediately.\",\"new_text\":\"# Rollout\\n\\nScope: add `parser.py` exposing `parse_request(raw: bytes) -> dict` and switch the single request entry point to call it. Identifier fields in the parsed output are validated by `accepts_identifier` in `validator.py`, which must be corrected in this change to reject `bool` (currently `isinstance(value, int)` accepts `True` and `False`, contradicting the comment in `validator.py` and the contract in `README.md`).\\n\\nEnablement: the new parser is controlled by the environment variable `NEW_PARSER_ENABLED`, defaulting to off. Once the Acceptance gate below passes, set `NEW_PARSER_ENABLED=1` so the new parser handles every request. Enablement must not happen before the Acceptance gate passes.\\n\\nRollback: unset `NEW_PARSER_ENABLED` to return every request to the previous behavior in one step. Any parser exception on a request is fail-closed: the request is rejected with an error response rather than falling through to unparsed handling.\\n\\nDocs: update `README.md` to describe `parse_request`, the `NEW_PARSER_ENABLED` flag, and the rollback step.\"},{\"target\":\"plan\",\"operation\":\"replace\",\"path\":null,\"old_text\":\"# Acceptance\\n\\nRun the tests and deliver when they pass.\",\"new_text\":\"# Acceptance\\n\\nAdd `test_parser.py` containing, at minimum:\\n\\n- one case per request type `parse_request` handles, asserting the exact output dict;\\n- a case asserting `parse_request` raises on malformed input rather than returning a partial result;\\n- cases asserting `accepts_identifier(True)` and `accepts_identifier(False)` are both `False`, and `accepts_identifier(1)` is `True`;\\n- a case asserting the request entry point uses the previous behavior when `NEW_PARSER_ENABLED` is unset and the new parser when it is `1`.\\n\\nGate command:\\n\\n```\\npython -m pytest test_parser.py\\n```\\n\\nDeliver, and then enable per the Rollout section, only when this command exits zero. A non-zero exit, a missing `test_parser.py`, or zero collected tests each block delivery.\"}],\"suggested_tests\":[\"test_parser.py: assert accepts_identifier(True) is False and accepts_identifier(False) is False after the validator fix.\",\"test_parser.py: assert accepts_identifier(1) is True to confirm the fix does not reject integers.\",\"test_parser.py: assert parse_request raises on malformed bytes rather than returning a partial dict.\",\"test_parser.py: assert the request entry point dispatches to the old path when NEW_PARSER_ENABLED is unset and to parse_request when it is 1.\",\"Verify that running the gate command with test_parser.py absent exits non-zero, so the fail-closed clause is enforceable.\"],\"limitations\":[\"The finding text for structural:probe-D1 was not supplied in this session; the patch targets the structural gaps observable in the captured plan text (undefined parser scope, unnamed tests, no fail-closed or rollback behavior, unordered enablement versus acceptance).\",\"Names such as parser.py, parse_request, NEW_PARSER_ENABLED, and test_parser.py are proposals; the repository contai",
+        "sha256": "1a16a0e5e9e12d4f73256988501c9c9053551d8b13e1e3de7e6f943d3cec53b4"
+      },
+      "returncode": 0,
+      "role": "proposal",
+      "session_ref": "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+      "stderr": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "usage": {
+        "cost_usd": 0.3729,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 13659,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 13659,
+          "cache_read_input_tokens": 0,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 13659,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 13659,
+              "cache_read_input_tokens": 0,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 1994,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 1994,
+          "output_tokens_details": {
+            "thinking_tokens": 263
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null
+    }
+  ],
+  "proposal_duration_ms": 26507,
+  "proposal_raw": {
+    "bytes": 10737,
+    "excerpt": "{\"duration_api_ms\":25128,\"stop_reason\":\"tool_use\",\"session_id\":\"5b147a67-a9ca-4e4a-a5c8-e7832ae7563a\",\"total_cost_usd\":0.3729,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":13659,\"cache_read_input_tokens\":0,\"output_tokens\":1994,\"output_tokens_details\":{\"thinking_tokens\":263},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":13659,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1994,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":13659,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":13659},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1994,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":13659,\"webSearchRequests\":0,\"costUSD\":0.3729,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":263,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for structural:probe-D1 against the captured plan text. The Rollout section is rewritten to name the parser module, its entry function, the call site that switches to it, and a flag-controlled enablement that still reaches every request once the acceptance gate passes. The Acceptance section is rewritten to name the test file, the specific cases it must contain (including the existing validator's Boolean rejection contract from repository/README.md:3 and repository/validator.py:2), the exact command, and fail-closed behavior. Governing requirements (new parser on for every request; delivery gated on passing tests) are preserved. Wording is unapplied and unverified; no files were modified and nothing was executed.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"# Rollout\\\\n\\\\nEnable the new parser for every request immediately.\\\",\\\"new_text\\\":\\\"# Rollout\\\\n\\\\nScope: add `parser.py` exposing `parse_request(raw: bytes) -> dict` and switch the single request entry point to call it. Identifier fields in the parsed output are validated by `accepts_identifier` in `validator.py`, which must be corrected in this change to reject `bool` (currently `isinstance(value, int)` accepts `True` and `False`, contradicting the comment in `validator.py` and the contract in `README.md`).\\\\n\\\\nEnablement: the new parser is controlled by the environment variable `NEW_PARSER_ENABLED`, defaulting to off. Once the Acceptance gate below passes, set `NEW_PARSER_ENABLED=1` so the new parser handles every request. Enablement must not happen before the Acceptance gate passes.\\\\n\\\\nRollback: unset `NEW_PARSER_ENABLED` to return every request to the previous behavior in one step. Any parser exception on a request is fail-closed: the request is rejected with an error response rather than falling through to unparsed handling.\\\\n\\\\nDocs: update `README.md` to describe `parse_request`, the `NEW_PARSER_ENABLED` flag, and the rollback step.\\\"},{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"# Acceptance\\\\n\\\\nRun the tests and deliver when they pass.\\\",\\\"new_text\\\":\\\"# Acceptance\\\\n\\\\nAdd `test_parser.py` containing, at minimum:\\\\n\\\\n- one case per request type `parse_request` handles, asserting the exact output dict;\\\\",
+    "sha256": "2932f7f34848477f2f3e41717b133b47a7cb7563d4361459e66cf1b3d392bf90"
+  },
+  "proposal_resume_argv": [
+    "claude",
+    "-p",
+    "--resume",
+    "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+    "--output-format",
+    "json",
+    "--model",
+    "claude-fable-5-1",
+    "--effort",
+    "medium",
+    "--safe-mode",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--tools",
+    "Read,Grep,Glob",
+    "--allowedTools",
+    "Read,Grep,Glob"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "a8c8e1c336d55d11adc1f42881e45433d0e5daa8532759ccbcb4117c87ca7d36",
+  "proposal_session_ref": "5b147a67-a9ca-4e4a-a5c8-e7832ae7563a",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cost_usd": 0.3729,
+    "tokens": {
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 13659,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "cache_creation_input_tokens": 13659,
+      "cache_read_input_tokens": 0,
+      "inference_geo": "not_available",
+      "input_tokens": 2,
+      "iterations": [
+        {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 13659,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 13659,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 2,
+          "model": null,
+          "output_tokens": 1994,
+          "type": "message"
+        }
+      ],
+      "output_tokens": 1994,
+      "output_tokens_details": {
+        "thinking_tokens": 263
+      },
+      "server_tool_use": {
+        "web_fetch_requests": 0,
+        "web_search_requests": 0
+      },
+      "service_tier": "standard",
+      "speed": "standard"
+    }
+  },
+  "qualification_failure": null,
+  "qualified": true,
+  "scenario": "plan-structural",
+  "schema_version": 1,
+  "source_commit": "9c60058b522d32d5790f1497eae11b7437de9ec9",
+  "target_id": "structural:probe-D1",
+  "tests_executed_by_proposal": false
+}

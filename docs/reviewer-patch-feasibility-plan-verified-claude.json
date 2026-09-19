@@ -1,0 +1,945 @@
+{
+  "claim_attempts": [
+    {
+      "duration_ms": 41603,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "validation-invalid",
+      "provider_duration_ms": 40295,
+      "raw_excerpt": "{\"duration_api_ms\":41168,\"stop_reason\":\"end_turn\",\"session_id\":\"a2cdaf7c-1709-495e-a58e-ad6305a85d8e\",\"total_cost_usd\":0.25419475,\"usage\":{\"input_tokens\":114,\"cache_creation_input_tokens\":4744,\"cache_read_input_tokens\":18015,\"output_tokens\":2036,\"output_tokens_details\":{\"thinking_tokens\":111},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":4744,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":56,\"output_tokens\":1689,\"cache_read_input_tokens\":7384,\"cache_creation_input_tokens\":1105,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":1105},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":28836,\"outputTokens\":607,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":2,\"costUSD\":0.051871,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":114,\"outputTokens\":2036,\"cacheReadInputTokens\":18015,\"cacheCreationInputTokens\":4744,\"webSearchRequests\":0,\"costUSD\":0.20232375,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":111,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":3,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\\\",\\\"proposition\\\":\\\"Python's bool type is not a subclass of int.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"refuted\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\\\",\\\"title\\\":\\\"Built-in Types — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\\\",\\\"location\\\":\\\"Section 'Boolean Type - bool', class bool description\\\",\\\"quote\\\":\\\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\\\",\\\"relation\\\":\\\"refutes_claim\\\"},{\\\"url\\\":\\\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\\\",\\\"title\\\":\\\"Built-in Types — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\\\",\\\"location\\\":\\\"Section 'Boolean Type - bool', class bool description\\\",\\\"quote\\\":\\\"The bool class is a subclass of int (see Numeric Types — int, float, complex).\\\",\\\"relation\\\":\\\"supports_replacement\\\"},{\\\"url\\\":\\\"https://docs.python.org/3/c-api/bool.html\\\",\\\"title\\\":\\\"Boolean Objects — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official CPython C API reference documents the implementation of the bool type\\\",\\\"location\\\":\\\"Boolean Objects, introductory paragraph\\\",\\\"quote\\\":\\\"Booleans in Python are implemented as a subclass of integers.\\\",\\\"relation\\\":\\\"refutes_claim\\\"}],\\\"replacement\\\":\\\"Python's bool type is a subclass of int.\\\",\\\"rationale\\\":\\\"The official Python documentation states directly that bool is a subclass of int. The plan's premise ",
+      "raw_sha256": "bf0e93039946b47f08657a44d43dafc5f4d543e148e3edc5fa20a185c80d4f76",
+      "rejected_reply_excerpt": "=== CLAIM AUDIT JSON ===\n{\"claims\":[{\"kind\":\"fact\",\"scope\":\"external\",\"anchor\":\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\",\"proposition\":\"Python's bool type is not a subclass of int.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex).\",\"relation\":\"supports_replacement\"},{\"url\":\"https://docs.python.org/3/c-api/bool.html\",\"title\":\"Boolean Objects — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official CPython C API reference documents the implementation of the bool type\",\"location\":\"Boolean Objects, introductory paragraph\",\"quote\":\"Booleans in Python are implemented as a subclass of integers.\",\"relation\":\"refutes_claim\"}],\"replacement\":\"Python's bool type is a subclass of int.\",\"rationale\":\"The official Python documentation states directly that bool is a subclass of int. The plan's premise is the opposite of the documented relationship, and because isinstance follows subclass relationships, the acceptance criterion that relies on isinstance(True, int) being false is built on a false external fact.\"},{\"kind\":\"behavior\",\"scope\":\"external\",\"anchor\":\"so isinstance(True, int) is false\",\"proposition\":\"In Python, isinstance(True, int) evaluates to false.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation defines the bool type's class hierarchy and the instances of bool\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/functions.html#isinstance\",\"title\":\"Built-in Functions — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation specifies the semantics of the built-in isinstance function\",\"location\":\"isinstance(object, classinfo) entry\",\"quote\":\"Return True if the object argument is an instance of the classinfo argument, or of a (direct, indirect, or virtual) subclass thereof.\",\"relation\":\"refutes_claim\"}],\"replacement\":null,\"rationale\":\"isinstance returns True for instances of subclasses, and True is an instance of bool, which is documented as a subclass of int. Therefore isinstance(True, int) is True, not false. No single authoritative passage states the literal expression result, so no replacement is proposed, but the refutation follows directly from the two quoted definitions.\"}],\"coverage\":{\"sections_scanned\":2,\"omitted_nonfacts\":1,\"prior_assessments\":[],\"prior_dispositions\":[],\"notes\":\"The plan has two sections. The 'Runtime fact' section contains one conjunction split into two atomic external claims, both refuted by official Python documentation. The 'Acceptance' section is a local implementation decision and was omitted; it depends entirely on the refuted premise, so the plan's acceptance criterion is unsound as written.\"}}\n\nSources:\n- [Built-in Types — Python 3 documentation](https://docs.python.org/3/library/stdtypes.html)\n- [Boolean Objects — Python 3 documentation](https://docs.python.org/3/c-api/bool.html)\n- [Built-in Functions — Python 3 documentation](https://docs.python.org/3/library/functions.html)",
+      "rejected_reply_sha256": "10b73bff83958f85ef080796fa00a913a11781301de9ca24a670a0e5462bdd6e",
+      "requested_timeout_sec": 900,
+      "response_excerpt": "=== CLAIM AUDIT JSON ===\n{\"claims\":[{\"kind\":\"fact\",\"scope\":\"external\",\"anchor\":\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\",\"proposition\":\"Python's bool type is not a subclass of int.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex).\",\"relation\":\"supports_replacement\"},{\"url\":\"https://docs.python.org/3/c-api/bool.html\",\"title\":\"Boolean Objects — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official CPython C API reference documents the implementation of the bool type\",\"location\":\"Boolean Objects, introductory paragraph\",\"quote\":\"Booleans in Python are implemented as a subclass of integers.\",\"relation\":\"refutes_claim\"}],\"replacement\":\"Python's bool type is a subclass of int.\",\"rationale\":\"The official Python documentation states directly that bool is a subclass of int. The plan's premise is the opposite of the documented relationship, and because isinstance follows subclass relationships, the acceptance criterion that relies on isinstance(True, int) being false is built on a false external fact.\"},{\"kind\":\"behavior\",\"scope\":\"external\",\"anchor\":\"so isinstance(True, int) is false\",\"proposition\":\"In Python, isinstance(True, int) evaluates to false.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation defines the bool type's class hierarchy and the instances of bool\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/functions.html#isinstance\",\"title\":\"Built-in Functions — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation specifies the semantics of the built-in isinstance function\",\"location\":\"isinstance(object, classinfo) entry\",\"quote\":\"Return True if the object argument is an instance of the classinfo argument, or of a (direct, indirect, or virtual) subclass thereof.\",\"relation\":\"refutes_claim\"}],\"replacement\":null,\"rationale\":\"isinstance returns True for instances of subclasses, and True is an instance of bool, which is documented as a subclass of int. Therefore isinstance(True, int) is True, not false. No single authoritative passage states the literal expression result, so no replacement is proposed, but the refutation follows directly from the two quoted definitions.\"}],\"coverage\":{\"sections_scanned\":2,\"omitted_nonfacts\":1,\"prior_assessments\":[],\"prior_dispositions\":[],\"notes\":\"The plan has two se",
+      "response_sha256": "10b73bff83958f85ef080796fa00a913a11781301de9ca24a670a0e5462bdd6e",
+      "returncode": 0,
+      "role": "claim-discovery",
+      "sequence": null,
+      "session_ref": "a2cdaf7c-1709-495e-a58e-ad6305a85d8e",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.25419475,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 4744,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 4744,
+          "cache_read_input_tokens": 18015,
+          "inference_geo": "not_available",
+          "input_tokens": 114,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 1105,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 1105,
+              "cache_read_input_tokens": 7384,
+              "input_tokens": 56,
+              "model": null,
+              "output_tokens": 1689,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 2036,
+          "output_tokens_details": {
+            "thinking_tokens": 111
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": "unexpected text after claim audit JSON",
+      "validation_pointer": "/claims"
+    },
+    {
+      "duration_ms": 17457,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 16187,
+      "raw_excerpt": "{\"duration_api_ms\":16144,\"stop_reason\":\"end_turn\",\"session_id\":\"a2cdaf7c-1709-495e-a58e-ad6305a85d8e\",\"total_cost_usd\":0.13681225,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":3006,\"cache_read_input_tokens\":8489,\"output_tokens\":1491,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":3006,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1491,\"cache_read_input_tokens\":8489,\"cache_creation_input_tokens\":3006,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":3006},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1491,\"cacheReadInputTokens\":8489,\"cacheCreationInputTokens\":3006,\"webSearchRequests\":0,\"costUSD\":0.13681225,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"=== CLAIM AUDIT JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\\\",\\\"proposition\\\":\\\"Python's bool type is not a subclass of int.\\\",\\\"prior_claim_id\\\":null,\\\"verdict\\\":\\\"refuted\\\",\\\"evidence\\\":[{\\\"url\\\":\\\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\\\",\\\"title\\\":\\\"Built-in Types — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\\\",\\\"location\\\":\\\"Section 'Boolean Type - bool', class bool description\\\",\\\"quote\\\":\\\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\\\",\\\"relation\\\":\\\"refutes_claim\\\"},{\\\"url\\\":\\\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\\\",\\\"title\\\":\\\"Built-in Types — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\\\",\\\"location\\\":\\\"Section 'Boolean Type - bool', class bool description\\\",\\\"quote\\\":\\\"The bool class is a subclass of int (see Numeric Types — int, float, complex).\\\",\\\"relation\\\":\\\"supports_replacement\\\"},{\\\"url\\\":\\\"https://docs.python.org/3/c-api/bool.html\\\",\\\"title\\\":\\\"Boolean Objects — Python 3 documentation\\\",\\\"publisher\\\":\\\"Python Software Foundation\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The official CPython C API reference documents the implementation of the bool type\\\",\\\"location\\\":\\\"Boolean Objects, introductory paragraph\\\",\\\"quote\\\":\\\"Booleans in Python are implemented as a subclass of integers.\\\",\\\"relation\\\":\\\"refutes_claim\\\"}],\\\"replacement\\\":\\\"Python's bool type is a subclass of int.\\\",\\\"rationale\\\":\\\"The official Python documentation states directly that bool is a subclass of int. The plan's premise is the opposite of the documented relationship, and the acceptance criterion that relies on it is built on a false external fact.\\\"},{\\\"kind\\\":\\\"behavior\\\",\\\"scope\\\":\\\"external\\\",\\\"anchor\\\":\\\"so isinstance(True, int) is false\\\",\\\"proposition\\\":\\\"In Python, isinstance(True, int) evaluates to false.\\\",\\\"prior_claim_id\\\":",
+      "raw_sha256": "91c1cc0aeb378a55329f13b71f389b2ea5855091f6e81c8f57454c55b6511a87",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "=== CLAIM AUDIT JSON ===\n{\"claims\":[{\"kind\":\"fact\",\"scope\":\"external\",\"anchor\":\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\",\"proposition\":\"Python's bool type is not a subclass of int.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python language and standard library documentation defines the built-in bool type and its class hierarchy\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex).\",\"relation\":\"supports_replacement\"},{\"url\":\"https://docs.python.org/3/c-api/bool.html\",\"title\":\"Boolean Objects — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official CPython C API reference documents the implementation of the bool type\",\"location\":\"Boolean Objects, introductory paragraph\",\"quote\":\"Booleans in Python are implemented as a subclass of integers.\",\"relation\":\"refutes_claim\"}],\"replacement\":\"Python's bool type is a subclass of int.\",\"rationale\":\"The official Python documentation states directly that bool is a subclass of int. The plan's premise is the opposite of the documented relationship, and the acceptance criterion that relies on it is built on a false external fact.\"},{\"kind\":\"behavior\",\"scope\":\"external\",\"anchor\":\"so isinstance(True, int) is false\",\"proposition\":\"In Python, isinstance(True, int) evaluates to false.\",\"prior_claim_id\":null,\"verdict\":\"refuted\",\"evidence\":[{\"url\":\"https://docs.python.org/3/library/stdtypes.html#boolean-type-bool\",\"title\":\"Built-in Types — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation defines the bool type's class hierarchy and the instances of bool\",\"location\":\"Section 'Boolean Type - bool', class bool description\",\"quote\":\"The bool class is a subclass of int (see Numeric Types — int, float, complex). It cannot be subclassed further. Its only instances are False and True.\",\"relation\":\"refutes_claim\"},{\"url\":\"https://docs.python.org/3/library/functions.html#isinstance\",\"title\":\"Built-in Functions — Python 3 documentation\",\"publisher\":\"Python Software Foundation\",\"source_kind\":\"primary\",\"authority_basis\":\"The official Python documentation specifies the semantics of the built-in isinstance function\",\"location\":\"isinstance(object, classinfo) entry\",\"quote\":\"Return True if the object argument is an instance of the classinfo argument, or of a (direct, indirect, or virtual) subclass thereof.\",\"relation\":\"refutes_claim\"}],\"replacement\":null,\"rationale\":\"isinstance returns True for instances of subclasses, and True is an instance of bool, which is documented as a subclass of int. Therefore isinstance(True, int) is True, not false. No single authoritative passage states the literal expression result, so no replacement is proposed, but the refutation follows directly from the two quoted definitions.\"}],\"coverage\":{\"sections_scanned\":2,\"omitted_nonfacts\":1,\"prior_assessments\":[],\"prior_dispositions\":[],\"notes\":\"The plan has two sections. The 'Runtime fact' section contains one conjunction split into two atomic ",
+      "response_sha256": "014bc1f9f0e1c61276e837cb15d03aaa04950b7dbf01013aaa03c4d72d885f98",
+      "returncode": 0,
+      "role": "claim-discovery-validation-retry",
+      "sequence": null,
+      "session_ref": "a2cdaf7c-1709-495e-a58e-ad6305a85d8e",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.13681225,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 3006,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 3006,
+          "cache_read_input_tokens": 8489,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 3006,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 3006,
+              "cache_read_input_tokens": 8489,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 1491,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 1491,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    },
+    {
+      "duration_ms": 18816,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "validation-invalid",
+      "provider_duration_ms": 17382,
+      "raw_excerpt": "{\"duration_api_ms\":17325,\"stop_reason\":\"end_turn\",\"session_id\":\"a2cdaf7c-1709-495e-a58e-ad6305a85d8e\",\"total_cost_usd\":2.28055475,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":112604,\"cache_read_input_tokens\":3219,\"output_tokens\":553,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":112604,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":553,\"cache_read_input_tokens\":3219,\"cache_creation_input_tokens\":112604,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":112604},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":553,\"cacheReadInputTokens\":3219,\"cacheCreationInputTokens\":112604,\"webSearchRequests\":0,\"costUSD\":2.28055475,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"=== PLAN EVIDENCE BINDING JSON ===\\n{\\\"bindings\\\":[{\\\"claim_index\\\":0,\\\"evidence_index\\\":0,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, lines 333-334\\\",\\\"passage\\\":\\\"bool is a subclass of int (see Numeric Types — int, float, complex). In\\\\nmany numeric contexts, False and True behave like the integers 0 and 1, respectively.\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":1,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, line 333\\\",\\\"passage\\\":\\\"bool is a subclass of int (see Numeric Types — int, float, complex).\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":2,\\\"usable\\\":true,\\\"location\\\":\\\"Boolean Objects, introductory paragraph, line 2\\\",\\\"passage\\\":\\\"Booleans in Python are implemented as a subclass of integers.\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":0,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, lines 321-322 and 333\\\",\\\"passage\\\":\\\"Booleans represent truth values. The bool type has exactly two\\\\nconstant instances: True and False. [...] bool is a subclass of int (see Numeric Types — int, float, complex).\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":1,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Functions, isinstance(object, classinfo, /) entry, lines 271-273\\\",\\\"passage\\\":\\\"isinstance(object, classinfo, /)\\\\nReturn True if the object argument is an instance of the classinfo\\\\nargument, or of a (direct, indirect, or virtual) subclass thereof.\\\"}]}\",\"ttft_ms\":17363,\"type\":\"result\",\"duration_ms\":17382,\"uuid\":\"26eb40a8-e48e-4a61-9d9d-3ea858751583\",\"ttft_stream_ms\":11842,\"time_to_request_ms\":56,\"queued_turn_count\":0}\n",
+      "raw_sha256": "65d19aa1f37b4be499c7c0bf19f6e4072072cf20aedc2598bd5b56a298d94e23",
+      "rejected_reply_excerpt": "=== PLAN EVIDENCE BINDING JSON ===\n{\"bindings\":[{\"claim_index\":0,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, lines 333-334\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex). In\\nmany numeric contexts, False and True behave like the integers 0 and 1, respectively.\"},{\"claim_index\":0,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, line 333\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":0,\"evidence_index\":2,\"usable\":true,\"location\":\"Boolean Objects, introductory paragraph, line 2\",\"passage\":\"Booleans in Python are implemented as a subclass of integers.\"},{\"claim_index\":1,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, lines 321-322 and 333\",\"passage\":\"Booleans represent truth values. The bool type has exactly two\\nconstant instances: True and False. [...] bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":1,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Functions, isinstance(object, classinfo, /) entry, lines 271-273\",\"passage\":\"isinstance(object, classinfo, /)\\nReturn True if the object argument is an instance of the classinfo\\nargument, or of a (direct, indirect, or virtual) subclass thereof.\"}]}",
+      "rejected_reply_sha256": "fb6944df57759c513581ccc2c1fa14a79b5e8c0cd6b2d6bce70f19e033ae61c5",
+      "requested_timeout_sec": 300,
+      "response_excerpt": "=== PLAN EVIDENCE BINDING JSON ===\n{\"bindings\":[{\"claim_index\":0,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, lines 333-334\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex). In\\nmany numeric contexts, False and True behave like the integers 0 and 1, respectively.\"},{\"claim_index\":0,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, line 333\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":0,\"evidence_index\":2,\"usable\":true,\"location\":\"Boolean Objects, introductory paragraph, line 2\",\"passage\":\"Booleans in Python are implemented as a subclass of integers.\"},{\"claim_index\":1,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, lines 321-322 and 333\",\"passage\":\"Booleans represent truth values. The bool type has exactly two\\nconstant instances: True and False. [...] bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":1,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Functions, isinstance(object, classinfo, /) entry, lines 271-273\",\"passage\":\"isinstance(object, classinfo, /)\\nReturn True if the object argument is an instance of the classinfo\\nargument, or of a (direct, indirect, or virtual) subclass thereof.\"}]}",
+      "response_sha256": "fb6944df57759c513581ccc2c1fa14a79b5e8c0cd6b2d6bce70f19e033ae61c5",
+      "returncode": 0,
+      "role": "claim-binding",
+      "sequence": null,
+      "session_ref": "a2cdaf7c-1709-495e-a58e-ad6305a85d8e",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 2.28055475,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 112604,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 112604,
+          "cache_read_input_tokens": 3219,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 112604,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 112604,
+              "cache_read_input_tokens": 3219,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 553,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 553,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": "indexed binding passage is not in captured text",
+      "validation_pointer": "/bindings"
+    },
+    {
+      "duration_ms": 17341,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 15745,
+      "raw_excerpt": "{\"duration_api_ms\":15683,\"stop_reason\":\"end_turn\",\"session_id\":\"a2cdaf7c-1709-495e-a58e-ad6305a85d8e\",\"total_cost_usd\":4.18954925,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":207528,\"cache_read_input_tokens\":12277,\"output_tokens\":718,\"output_tokens_details\":{\"thinking_tokens\":287},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":207528,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":718,\"cache_read_input_tokens\":12277,\"cache_creation_input_tokens\":207528,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":207528},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":718,\"cacheReadInputTokens\":12277,\"cacheCreationInputTokens\":207528,\"webSearchRequests\":0,\"costUSD\":4.18954925,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":287,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"=== PLAN EVIDENCE BINDING JSON ===\\n{\\\"bindings\\\":[{\\\"claim_index\\\":0,\\\"evidence_index\\\":0,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, line 333\\\",\\\"passage\\\":\\\"bool is a subclass of int (see Numeric Types — int, float, complex).\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":1,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, line 333\\\",\\\"passage\\\":\\\"bool is a subclass of int (see Numeric Types — int, float, complex).\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":2,\\\"usable\\\":true,\\\"location\\\":\\\"Boolean Objects, introductory paragraph, line 2\\\",\\\"passage\\\":\\\"Booleans in Python are implemented as a subclass of integers.\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":0,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Types, Boolean Type - bool section, line 333\\\",\\\"passage\\\":\\\"bool is a subclass of int (see Numeric Types — int, float, complex).\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":1,\\\"usable\\\":true,\\\"location\\\":\\\"Built-in Functions, isinstance(object, classinfo, /) entry, line 272\\\",\\\"passage\\\":\\\"Return True if the object argument is an instance of the classinfo\\\"}]}\",\"ttft_ms\":12083,\"type\":\"result\",\"duration_ms\":15745,\"uuid\":\"b7a9534a-850f-40fa-8e80-a6ed4f0354f0\",\"ttft_stream_ms\":8749,\"time_to_request_ms\":62,\"queued_turn_count\":0}\n",
+      "raw_sha256": "76ba8c80c46912c94112f4cbd1ec3f5dc4474788dba4fd181a639c9e723d1972",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 300,
+      "response_excerpt": "=== PLAN EVIDENCE BINDING JSON ===\n{\"bindings\":[{\"claim_index\":0,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, line 333\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":0,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, line 333\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":0,\"evidence_index\":2,\"usable\":true,\"location\":\"Boolean Objects, introductory paragraph, line 2\",\"passage\":\"Booleans in Python are implemented as a subclass of integers.\"},{\"claim_index\":1,\"evidence_index\":0,\"usable\":true,\"location\":\"Built-in Types, Boolean Type - bool section, line 333\",\"passage\":\"bool is a subclass of int (see Numeric Types — int, float, complex).\"},{\"claim_index\":1,\"evidence_index\":1,\"usable\":true,\"location\":\"Built-in Functions, isinstance(object, classinfo, /) entry, line 272\",\"passage\":\"Return True if the object argument is an instance of the classinfo\"}]}",
+      "response_sha256": "5386475ca9cfac592425a825895cba711ff1d2ee750ed8e6b88b14ba0d641a5a",
+      "returncode": 0,
+      "role": "claim-binding-validation-retry",
+      "sequence": null,
+      "session_ref": "a2cdaf7c-1709-495e-a58e-ad6305a85d8e",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 4.18954925,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 207528,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 207528,
+          "cache_read_input_tokens": 12277,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 207528,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 207528,
+              "cache_read_input_tokens": 12277,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 718,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 718,
+          "output_tokens_details": {
+            "thinking_tokens": 287
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    },
+    {
+      "duration_ms": 16437,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 15098,
+      "raw_excerpt": "{\"duration_api_ms\":16121,\"stop_reason\":\"end_turn\",\"session_id\":\"cff2fee2-be51-41b5-9364-1033d360d2f2\",\"total_cost_usd\":0.11691975000000002,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":2408,\"cache_read_input_tokens\":3219,\"output_tokens\":1311,\"output_tokens_details\":{\"thinking_tokens\":475},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":2408,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1311,\"cache_read_input_tokens\":3219,\"cache_creation_input_tokens\":2408,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":2408},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":2310,\"outputTokens\":15,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":0,\"costUSD\":0.002385,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1311,\"cacheReadInputTokens\":3219,\"cacheCreationInputTokens\":2408,\"webSearchRequests\":0,\"costUSD\":0.11453475000000002,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":475,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":1,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"=== EVIDENCE ATTESTATION JSON ===\\n{\\\"attestations\\\":[{\\\"claim_index\\\":0,\\\"evidence_index\\\":0,\\\"publisher_authority\\\":true,\\\"authority_reason\\\":\\\"docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.\\\",\\\"passage_entailment\\\":true,\\\"entailment_reason\\\":\\\"The passage states directly that bool is a subclass of int, which contradicts the proposition that bool is not a subclass of int, so it refutes the claim.\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":1,\\\"publisher_authority\\\":true,\\\"authority_reason\\\":\\\"docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.\\\",\\\"passage_entailment\\\":true,\\\"entailment_reason\\\":\\\"The passage states verbatim that bool is a subclass of int, which is exactly the replacement proposition, so it supports it.\\\"},{\\\"claim_index\\\":0,\\\"evidence_index\\\":2,\\\"publisher_authority\\\":true,\\\"authority_reason\\\":\\\"The CPython C API reference on docs.python.org is official Python Software Foundation documentation and authoritatively describes how the bool type is implemented relative to int.\\\",\\\"passage_entailment\\\":true,\\\"entailment_reason\\\":\\\"The passage says Booleans in Python are implemented as a subclass of integers, which directly contradicts the proposition that bool is not a subclass of int.\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":0,\\\"publisher_authority\\\":true,\\\"authority_reason\\\":\\\"docs.python.org Built-in Types is the Python Software Foundation's official documentation for the bool type and its relationship to int.\\\",\\\"passage_entailment\\\":false,\\\"entailment_reason\\\":\\\"The passage only states that bool is a subclass of int. It does not mention True, does not say True is an instance of bool, and does not state how isinstance treats subclasses, so on its own it does not refute the proposition about isinstance(True, int); additional premises are required.\\\"},{\\\"claim_index\\\":1,\\\"evidence_index\\\":1,\\\"publisher_authority\\",
+      "raw_sha256": "5a593065ba334da3c8161634521676a833c03864041c3e0ad8c6e52123150610",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 300,
+      "response_excerpt": "=== EVIDENCE ATTESTATION JSON ===\n{\"attestations\":[{\"claim_index\":0,\"evidence_index\":0,\"publisher_authority\":true,\"authority_reason\":\"docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.\",\"passage_entailment\":true,\"entailment_reason\":\"The passage states directly that bool is a subclass of int, which contradicts the proposition that bool is not a subclass of int, so it refutes the claim.\"},{\"claim_index\":0,\"evidence_index\":1,\"publisher_authority\":true,\"authority_reason\":\"docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.\",\"passage_entailment\":true,\"entailment_reason\":\"The passage states verbatim that bool is a subclass of int, which is exactly the replacement proposition, so it supports it.\"},{\"claim_index\":0,\"evidence_index\":2,\"publisher_authority\":true,\"authority_reason\":\"The CPython C API reference on docs.python.org is official Python Software Foundation documentation and authoritatively describes how the bool type is implemented relative to int.\",\"passage_entailment\":true,\"entailment_reason\":\"The passage says Booleans in Python are implemented as a subclass of integers, which directly contradicts the proposition that bool is not a subclass of int.\"},{\"claim_index\":1,\"evidence_index\":0,\"publisher_authority\":true,\"authority_reason\":\"docs.python.org Built-in Types is the Python Software Foundation's official documentation for the bool type and its relationship to int.\",\"passage_entailment\":false,\"entailment_reason\":\"The passage only states that bool is a subclass of int. It does not mention True, does not say True is an instance of bool, and does not state how isinstance treats subclasses, so on its own it does not refute the proposition about isinstance(True, int); additional premises are required.\"},{\"claim_index\":1,\"evidence_index\":1,\"publisher_authority\":true,\"authority_reason\":\"docs.python.org Built-in Functions is the Python Software Foundation's official specification of the isinstance built-in.\",\"passage_entailment\":false,\"entailment_reason\":\"The passage is a truncated definition saying isinstance returns True if the object is an instance of classinfo. It does not mention subclass handling, True, bool, or int, so it cannot by itself establish that isinstance(True, int) is True and does not refute the proposition.\"}]}",
+      "response_sha256": "7d3d5871be481b0a2b9ffd175512bd907e9a23d4c8818761512a8a794da95403",
+      "returncode": 0,
+      "role": "claim-attestation",
+      "sequence": null,
+      "session_ref": "cff2fee2-be51-41b5-9364-1033d360d2f2",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.11691975000000002,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 2408,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 2408,
+          "cache_read_input_tokens": 3219,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 2408,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 2408,
+              "cache_read_input_tokens": 3219,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 1311,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 1311,
+          "output_tokens_details": {
+            "thinking_tokens": 475
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "claim_state": {
+    "claims": {
+      "C-5752e207ed": {
+        "anchor": "so isinstance(True, int) is false",
+        "capture_attestations": [
+          {
+            "authority_reason": "docs.python.org Built-in Types is the Python Software Foundation's official documentation for the bool type and its relationship to int.",
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "entailment_reason": "The passage only states that bool is a subclass of int. It does not mention True, does not say True is an instance of bool, and does not state how isinstance treats subclasses, so on its own it does not refute the proposition about isinstance(True, int); additional premises are required.",
+            "evidence_index": 0,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "passage_entailment": false,
+            "publisher_authority": true,
+            "relation": "refutes_claim",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "authority_reason": "docs.python.org Built-in Functions is the Python Software Foundation's official specification of the isinstance built-in.",
+            "content_sha256": "ac5c3c1e58961d4cd7206d96a8e2e39a7adda5ed60a949a148324f4e71126b9b",
+            "content_type": "text/html",
+            "entailment_reason": "The passage is a truncated definition saying isinstance returns True if the object is an instance of classinfo. It does not mention subclass handling, True, bool, or int, so it cannot by itself establish that isinstance(True, int) is True and does not refute the proposition.",
+            "evidence_index": 1,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/functions.html",
+            "passage_entailment": false,
+            "publisher_authority": true,
+            "relation": "refutes_claim",
+            "status": 200,
+            "text_sha256": "2ffefcc913f4bc270d745b4346e6cb55dad8a732028818a0ff472d060b8d03f6"
+          }
+        ],
+        "capture_provenance": [
+          {
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "error": null,
+            "evidence_index": 0,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "requested_url": "https://docs.python.org/3/library/stdtypes.html#boolean-type-bool",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "content_sha256": "ac5c3c1e58961d4cd7206d96a8e2e39a7adda5ed60a949a148324f4e71126b9b",
+            "content_type": "text/html",
+            "error": null,
+            "evidence_index": 1,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/functions.html",
+            "requested_url": "https://docs.python.org/3/library/functions.html#isinstance",
+            "status": 200,
+            "text_sha256": "2ffefcc913f4bc270d745b4346e6cb55dad8a732028818a0ff472d060b8d03f6"
+          }
+        ],
+        "claim_id": "C-5752e207ed",
+        "evidence": [
+          {
+            "authority_basis": "The official Python documentation defines the bool type's class hierarchy and the instances of bool",
+            "location": "Built-in Types, Boolean Type - bool section, line 333",
+            "publisher": "Python Software Foundation",
+            "quote": "bool is a subclass of int (see Numeric Types — int, float, complex).",
+            "relation": "refutes_claim",
+            "source_kind": "primary",
+            "title": "Built-in Types — Python 3 documentation",
+            "url": "https://docs.python.org/3/builtins/stdtypes.html"
+          },
+          {
+            "authority_basis": "The official Python documentation specifies the semantics of the built-in isinstance function",
+            "location": "Built-in Functions, isinstance(object, classinfo, /) entry, line 272",
+            "publisher": "Python Software Foundation",
+            "quote": "Return True if the object argument is an instance of the classinfo",
+            "relation": "refutes_claim",
+            "source_kind": "primary",
+            "title": "Built-in Functions — Python 3 documentation",
+            "url": "https://docs.python.org/3/builtins/functions.html"
+          }
+        ],
+        "kind": "behavior",
+        "proposition": "In Python, isinstance(True, int) evaluates to false.",
+        "rationale": "isinstance returns True for instances of subclasses, and True is an instance of bool, which is documented as a subclass of int. Therefore isinstance(True, int) is True, not false. No single authoritative passage states the literal expression result, so no replacement is proposed, but the refutation follows directly from the two quoted definitions. Cold evidence attestation did not accept both publisher authority and passage entailment.",
+        "replacement": null,
+        "scope": "external",
+        "verdict": "unverified",
+        "verified_round": 1
+      },
+      "C-a03de03fc2": {
+        "anchor": "Python's bool type is not a subclass of int, so isinstance(True, int) is false.",
+        "capture_attestations": [
+          {
+            "authority_reason": "docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.",
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "entailment_reason": "The passage states directly that bool is a subclass of int, which contradicts the proposition that bool is not a subclass of int, so it refutes the claim.",
+            "evidence_index": 0,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "passage_entailment": true,
+            "publisher_authority": true,
+            "relation": "refutes_claim",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "authority_reason": "docs.python.org is the Python Software Foundation's official documentation; the Built-in Types page is the normative reference for the bool type and its class hierarchy.",
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "entailment_reason": "The passage states verbatim that bool is a subclass of int, which is exactly the replacement proposition, so it supports it.",
+            "evidence_index": 1,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "passage_entailment": true,
+            "publisher_authority": true,
+            "relation": "supports_replacement",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "authority_reason": "The CPython C API reference on docs.python.org is official Python Software Foundation documentation and authoritatively describes how the bool type is implemented relative to int.",
+            "content_sha256": "9377c906e26a5282f336b26bc691f3e66e228235d251714f37a665e3d7f8d2b7",
+            "content_type": "text/html",
+            "entailment_reason": "The passage says Booleans in Python are implemented as a subclass of integers, which directly contradicts the proposition that bool is not a subclass of int.",
+            "evidence_index": 2,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/c-api/bool.html",
+            "passage_entailment": true,
+            "publisher_authority": true,
+            "relation": "refutes_claim",
+            "status": 200,
+            "text_sha256": "37dbe8eae68114a7162bb98fa52acee5d8149a98d594f96607b30bc214fdf660"
+          }
+        ],
+        "capture_provenance": [
+          {
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "error": null,
+            "evidence_index": 0,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "requested_url": "https://docs.python.org/3/library/stdtypes.html#boolean-type-bool",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "content_sha256": "5d8cdd73575b69e49b520b3ed880169467cc53ccf1a95e2c110de7ae7b41c7c7",
+            "content_type": "text/html",
+            "error": null,
+            "evidence_index": 1,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/builtins/stdtypes.html",
+            "requested_url": "https://docs.python.org/3/library/stdtypes.html#boolean-type-bool",
+            "status": 200,
+            "text_sha256": "f1317528b038a7e7a344faec0cb0ba0105b40422fcca723e92ebe734cd028e96"
+          },
+          {
+            "content_sha256": "9377c906e26a5282f336b26bc691f3e66e228235d251714f37a665e3d7f8d2b7",
+            "content_type": "text/html",
+            "error": null,
+            "evidence_index": 2,
+            "fallback_attempted": false,
+            "final_url": "https://docs.python.org/3/c-api/bool.html",
+            "requested_url": "https://docs.python.org/3/c-api/bool.html",
+            "status": 200,
+            "text_sha256": "37dbe8eae68114a7162bb98fa52acee5d8149a98d594f96607b30bc214fdf660"
+          }
+        ],
+        "claim_id": "C-a03de03fc2",
+        "evidence": [
+          {
+            "authority_basis": "The official Python language and standard library documentation defines the built-in bool type and its class hierarchy",
+            "location": "Built-in Types, Boolean Type - bool section, line 333",
+            "publisher": "Python Software Foundation",
+            "quote": "bool is a subclass of int (see Numeric Types — int, float, complex).",
+            "relation": "refutes_claim",
+            "source_kind": "primary",
+            "title": "Built-in Types — Python 3 documentation",
+            "url": "https://docs.python.org/3/builtins/stdtypes.html"
+          },
+          {
+            "authority_basis": "The official Python language and standard library documentation defines the built-in bool type and its class hierarchy",
+            "location": "Built-in Types, Boolean Type - bool section, line 333",
+            "publisher": "Python Software Foundation",
+            "quote": "bool is a subclass of int (see Numeric Types — int, float, complex).",
+            "relation": "supports_replacement",
+            "source_kind": "primary",
+            "title": "Built-in Types — Python 3 documentation",
+            "url": "https://docs.python.org/3/builtins/stdtypes.html"
+          },
+          {
+            "authority_basis": "The official CPython C API reference documents the implementation of the bool type",
+            "location": "Boolean Objects, introductory paragraph, line 2",
+            "publisher": "Python Software Foundation",
+            "quote": "Booleans in Python are implemented as a subclass of integers.",
+            "relation": "refutes_claim",
+            "source_kind": "primary",
+            "title": "Boolean Objects — Python 3 documentation",
+            "url": "https://docs.python.org/3/c-api/bool.html"
+          }
+        ],
+        "kind": "fact",
+        "proposition": "Python's bool type is not a subclass of int.",
+        "rationale": "The official Python documentation states directly that bool is a subclass of int. The plan's premise is the opposite of the documented relationship, and the acceptance criterion that relies on it is built on a false external fact.",
+        "replacement": "Python's bool type is a subclass of int.",
+        "scope": "external",
+        "verdict": "refuted",
+        "verified_round": 1
+      }
+    },
+    "coverage": {
+      "notes": "The plan has two sections. The 'Runtime fact' section contains one conjunction split into two atomic external claims, both refuted by official Python documentation. The 'Acceptance' section is a local implementation decision and was omitted; it depends entirely on the refuted premise, so the plan's acceptance criterion is unsound as written.",
+      "omitted_nonfacts": 1,
+      "prior_assessments": [],
+      "prior_dispositions": [],
+      "sections_scanned": 2
+    },
+    "debt": null,
+    "next_seq": 3,
+    "plan_digest": "a922ddaf7a9b0756",
+    "plan_snapshot": "# Runtime fact\n\nPython's bool type is not a subclass of int, so isinstance(True, int) is false.\n\n# Acceptance\n\nThe implementation may rely on that relationship without a Boolean-specific check.\n",
+    "retired": [],
+    "rounds": 1,
+    "version": 1
+  },
+  "claim_status": "parsed 2 new + 0 targeted retained + 0 frozen",
+  "effort": "medium",
+  "elapsed_ms": 203267,
+  "engine": "claude",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "domain",
+  "lane_attempts": [
+    {
+      "duration_ms": 60982,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 59613,
+      "raw_excerpt": "{\"duration_api_ms\":60490,\"stop_reason\":\"tool_use\",\"session_id\":\"531893b6-985f-4ad4-9da1-ef6618fde3bc\",\"total_cost_usd\":0.34599250000000004,\"usage\":{\"input_tokens\":282,\"cache_creation_input_tokens\":4785,\"cache_read_input_tokens\":71194,\"output_tokens\":4534,\"output_tokens_details\":{\"thinking_tokens\":1130},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":4785,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":56,\"output_tokens\":4069,\"cache_read_input_tokens\":13163,\"cache_creation_input_tokens\":156,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":156},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":2909,\"outputTokens\":13,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":0,\"costUSD\":0.002974,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":282,\"outputTokens\":4534,\"cacheReadInputTokens\":71194,\"cacheCreationInputTokens\":4785,\"webSearchRequests\":0,\"costUSD\":0.3430185,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":1130,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":7,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"lane\\\":\\\"domain\\\",\\\"coverage\\\":[{\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The plan is two sentences: a (false) runtime fact and a permissive acceptance clause. It names no implementation scope, no function or file to change, no executable acceptance evidence, and no fail-closed behavior. It cannot bind future implementation work.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:1-7\\\",\\\"rationale\\\":\\\"Entire plan consists of a runtime fact and a one-line acceptance with no scope, tests, or failure behavior.\\\"}],\\\"finding_ids\\\":[\\\"F2-no-scope-or-acceptance\\\"]},{\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The plan's premise that bool is not an int subclass is contradicted by the repository itself: the comment in validator.py states bool is an int subclass, README requires rejecting booleans, and the current isinstance(value, int) check already accepts True. The external claim register refutes the premise with primary Python documentation.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:3\\\",\\\"rationale\\\":\\\"Plan asserts bool is not a subclass of int and that isinstance(True, int) is false; both are refuted by the claim register.\\\"},{\\\"anchor\\\":\\\"repository/validator.py:2\\\",\\\"rationale\\\":\\\"Repository comment states bool is an int subclass and identifiers must reject booleans, directly contradicting the plan premise.\\\"},{\\\"anchor\\\":\\\"repository/validator.py:3\\\",\\\"rationale\\\":\\\"Current implementation returns isinstance(value, int), which returns True for True/False, so the existing code already violates the requirement.\\\"},{\\\"anchor\\\":\\\"repository/README.md:3\\\",\\\"rationale\\\":\\\"README requires Boolean values to be rejected.\\\"}],\\\"finding_ids\\\":[\\\"F1-false-bool-premise\\\"]},{\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The only rule the plan defines is the identifier type check, and it is wrong: relying on isinstance(value, int) alone will accept True and False because bool subclasses int. The plan explicitly authorizes omitting the Boolean-specific exclusion that is required.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"plan:7\\\",\\\"rationale\\\":\\\"",
+      "raw_sha256": "7516cca091fdfbcb4fca3167fe2975e2f23bb1b68c07c23145e6a63cfc6d24c5",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\"lane\":\"domain\",\"coverage\":[{\"id\":\"artifact-complete\",\"status\":\"finding\",\"summary\":\"The plan is two sentences: a (false) runtime fact and a permissive acceptance clause. It names no implementation scope, no function or file to change, no executable acceptance evidence, and no fail-closed behavior. It cannot bind future implementation work.\",\"evidence\":[{\"anchor\":\"plan:1-7\",\"rationale\":\"Entire plan consists of a runtime fact and a one-line acceptance with no scope, tests, or failure behavior.\"}],\"finding_ids\":[\"F2-no-scope-or-acceptance\"]},{\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The plan's premise that bool is not an int subclass is contradicted by the repository itself: the comment in validator.py states bool is an int subclass, README requires rejecting booleans, and the current isinstance(value, int) check already accepts True. The external claim register refutes the premise with primary Python documentation.\",\"evidence\":[{\"anchor\":\"plan:3\",\"rationale\":\"Plan asserts bool is not a subclass of int and that isinstance(True, int) is false; both are refuted by the claim register.\"},{\"anchor\":\"repository/validator.py:2\",\"rationale\":\"Repository comment states bool is an int subclass and identifiers must reject booleans, directly contradicting the plan premise.\"},{\"anchor\":\"repository/validator.py:3\",\"rationale\":\"Current implementation returns isinstance(value, int), which returns True for True/False, so the existing code already violates the requirement.\"},{\"anchor\":\"repository/README.md:3\",\"rationale\":\"README requires Boolean values to be rejected.\"}],\"finding_ids\":[\"F1-false-bool-premise\"]},{\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The only rule the plan defines is the identifier type check, and it is wrong: relying on isinstance(value, int) alone will accept True and False because bool subclasses int. The plan explicitly authorizes omitting the Boolean-specific exclusion that is required.\",\"evidence\":[{\"anchor\":\"plan:7\",\"rationale\":\"Acceptance permits the implementation to skip a Boolean-specific check, which yields incorrect acceptance of True/False.\"},{\"anchor\":\"repository/validator.py:3\",\"rationale\":\"The transformation as it exists returns isinstance(value, int) and therefore accepts booleans.\"}],\"finding_ids\":[\"F1-false-bool-premise\"]},{\"id\":\"consumers\",\"status\":\"finding\",\"summary\":\"Consumers of accepts_identifier are promised by README that booleans are rejected. Under the plan's acceptance they would receive True for True/False, breaking the documented contract.\",\"evidence\":[{\"anchor\":\"repository/README.md:3\",\"rationale\":\"Consumer-facing contract: identifiers are integers but booleans must be rejected.\"},{\"anchor\":\"plan:7\",\"rationale\":\"Plan authorizes an implementation that violates that contract.\"}],\"finding_ids\":[\"F1-false-bool-premise\"]},{\"id\":\"failure-recovery\",\"status\":\"finding\",\"summary\":\"The plan states no fail-closed behavior. For a validator, the safe default is to reject ambiguous or Boolean input; the plan's acceptance instead fails open by permitting booleans through.\",\"evidence\":[{\"anchor\":\"plan:5-7\",\"rationale\":\"Acceptance section contains no statement of rejection behavior or fail-closed default.\"}],\"finding_ids\":[\"F2-no-scope-or-acceptance\"]},{\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"No executable acceptance evidence is defined. There are no test cases naming accepts_identifier(True), accepts_identifier(False), accepts_identifier(1), or non-int inputs, and the repository contains no test file.\",\"evidence\":[{\"anchor\":\"plan:5-7\",\"rationale\":\"Acceptance is a permission statement, not a test or verifiable criterion.\"},{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"Only source file; no tests exist in the repository to be extended.\"}],\"finding_ids\":[\"F2-no-scope-or-acceptance\"]},{\"id\":\"docs-operations\",\"status\":\"covered\",\"summary\":\"README already states the correct requirement (reject booleans) and needs no change; there are no operational procedures in scope. The",
+      "response_sha256": "de884e3ad6997f60772897378bc8a0277b100ca62f6a0362aa2fd19bcc4c5bd3",
+      "returncode": 0,
+      "role": "census-domain",
+      "sequence": null,
+      "session_ref": "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.34599250000000004,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 4785,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 4785,
+          "cache_read_input_tokens": 71194,
+          "inference_geo": "not_available",
+          "input_tokens": 282,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 156,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 156,
+              "cache_read_input_tokens": 13163,
+              "input_tokens": 56,
+              "model": null,
+              "output_tokens": 4069,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 4534,
+          "output_tokens_details": {
+            "thinking_tokens": 1130
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "plan:1-7"
+        ],
+        "finding_ids": [
+          "F2-no-scope-or-acceptance"
+        ],
+        "id": "artifact-complete",
+        "status": "finding",
+        "summary": "The plan is two sentences: a (false) runtime fact and a permissive acceptance clause. It names no implementation scope, no function or file to change, no executable acceptance evidence, and no fail-closed behavior. It cannot bind future implementation work."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:2",
+          "repository/validator.py:3",
+          "repository/README.md:3"
+        ],
+        "finding_ids": [
+          "F1-false-bool-premise"
+        ],
+        "id": "repository-premises",
+        "status": "finding",
+        "summary": "The plan's premise that bool is not an int subclass is contradicted by the repository itself: the comment in validator.py states bool is an int subclass, README requires rejecting booleans, and the current isinstance(value, int) check already accepts True. The external claim register refutes the premise with primary Python documentation."
+      },
+      {
+        "evidence": [
+          "plan:7",
+          "repository/validator.py:3"
+        ],
+        "finding_ids": [
+          "F1-false-bool-premise"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "The only rule the plan defines is the identifier type check, and it is wrong: relying on isinstance(value, int) alone will accept True and False because bool subclasses int. The plan explicitly authorizes omitting the Boolean-specific exclusion that is required."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "plan:7"
+        ],
+        "finding_ids": [
+          "F1-false-bool-premise"
+        ],
+        "id": "consumers",
+        "status": "finding",
+        "summary": "Consumers of accepts_identifier are promised by README that booleans are rejected. Under the plan's acceptance they would receive True for True/False, breaking the documented contract."
+      },
+      {
+        "evidence": [
+          "plan:5-7"
+        ],
+        "finding_ids": [
+          "F2-no-scope-or-acceptance"
+        ],
+        "id": "failure-recovery",
+        "status": "finding",
+        "summary": "The plan states no fail-closed behavior. For a validator, the safe default is to reject ambiguous or Boolean input; the plan's acceptance instead fails open by permitting booleans through."
+      },
+      {
+        "evidence": [
+          "plan:5-7",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "F2-no-scope-or-acceptance"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "No executable acceptance evidence is defined. There are no test cases naming accepts_identifier(True), accepts_identifier(False), accepts_identifier(1), or non-int inputs, and the repository contains no test file."
+      },
+      {
+        "evidence": [
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [],
+        "id": "docs-operations",
+        "status": "covered",
+        "summary": "README already states the correct requirement (reject booleans) and needs no change; there are no operational procedures in scope. The plan's contradiction with README is handled under consistency and repository-premises."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:2",
+          "repository/README.md:3"
+        ],
+        "finding_ids": [
+          "F1-false-bool-premise"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "The plan's runtime fact and acceptance are internally consistent with each other but inconsistent with the repository comment and README, which both assert the opposite. The plan is authoritative in one place only (line 3, derived at line 7), so there is no duplicate-authority defect; the defect is the conflict with repository contracts."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The change is a one-line validator fix plus tests; the plan's brevity is proportionate in size, though not in content. No over-scoping is present."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "plan:3",
+          "plan:7",
+          "repository/validator.py:2",
+          "repository/validator.py:3",
+          "repository/README.md:3"
+        ],
+        "id": "F1-false-bool-premise",
+        "remedy": "Rewrite plan:3 to the corrected fact: bool is a subclass of int, so isinstance(True, int) is True. Rewrite plan:7 so the acceptance requires an explicit Boolean exclusion in accepts_identifier (e.g., isinstance(value, int) and not isinstance(value, bool)), and state that the implementation must reject True and False. Update both plan sites together so neither retains the old rule.",
+        "severity": "FATAL",
+        "summary": "The plan's foundational runtime fact is false. In Python, bool is a subclass of int and isinstance(True, int) is True (refuted by primary Python documentation in the claim register, and contradicted by the repository's own comment). Because the acceptance clause at plan:7 derives directly from this fact, the plan authorizes leaving validator.py as-is, which accepts True and False as identifiers in violation of README. Implementing this plan would lock in the existing bug."
+      },
+      {
+        "evidence": [
+          "plan:1-7",
+          "repository/validator.py:1-3"
+        ],
+        "id": "F2-no-scope-or-acceptance",
+        "remedy": "Add an implementation scope naming validator.py accepts_identifier as the sole change site. Define executable acceptance: a test module asserting accepts_identifier(True) is False, accepts_identifier(False) is False, accepts_identifier(0) and accepts_identifier(1) are True, and a non-int such as \"1\" is False, run via pytest. State fail-closed behavior: any value that is not a strict int (excluding bool) is rejected.",
+        "severity": "BLOCKER",
+        "summary": "The plan names no implementation scope, no executable acceptance evidence, and no fail-closed behavior. It does not identify validator.py or accepts_identifier as the change target, defines no test cases, and does not state that ambiguous or Boolean input must be rejected. A vague permission clause cannot bind implementation."
+      }
+    ],
+    "lane": "domain"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+  "mode": "plan",
+  "model": "claude-fable-5-1",
+  "patch_applied": false,
+  "plan_digest": "a922ddaf7a9b0756dd027532d8f01e56b4535b362c7e106de965fe44a3b4c387",
+  "plan_text": "# Runtime fact\n\nPython's bool type is not a subclass of int, so isinstance(True, int) is false.\n\n# Acceptance\n\nThe implementation may rely on that relationship without a Boolean-specific check.\n",
+  "proposal": {
+    "addressed_finding_ids": [
+      "claim:C-a03de03fc2",
+      "claim:C-5752e207ed"
+    ],
+    "edits": [
+      {
+        "new_text": "Python's bool type is a subclass of int, so isinstance(True, int) is true.",
+        "old_text": "Python's bool type is not a subclass of int, so isinstance(True, int) is false.",
+        "operation": "replace",
+        "path": null,
+        "target": "plan"
+      },
+      {
+        "new_text": "Because of that relationship, the implementation must not rely on isinstance(value, int) alone; it must include a Boolean-specific exclusion so that True and False are rejected as identifiers.",
+        "old_text": "The implementation may rely on that relationship without a Boolean-specific check.",
+        "operation": "replace",
+        "path": null,
+        "target": "plan"
+      }
+    ],
+    "limitations": [
+      "The patch is unapplied and unverified; no code was executed and no tests were run.",
+      "The second edit touches the acceptance sentence because it derives from the refuted fact; if the correction scope is strictly limited to the claim sentence, drop the second edit, but the acceptance would then still authorize omitting the Boolean check.",
+      "The plan still names no implementation file, function, or executable test; those structural gaps are outside the supplied claim targets and remain open."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "Assert accepts_identifier(True) is False and accepts_identifier(False) is False.",
+      "Assert accepts_identifier(0) is True and accepts_identifier(1) is True.",
+      "Assert accepts_identifier(\"1\") is False and accepts_identifier(1.0) is False.",
+      "Assert isinstance(True, int) is True and issubclass(bool, int) is True as a guard documenting the corrected runtime fact."
+    ],
+    "summary": "Candidate patch for the two refuted claims. The runtime-fact sentence is replaced with the register's proposed replacement for C-a03de03fc2 (bool is a subclass of int) and the dependent consequence for C-5752e207ed is corrected so it no longer asserts isinstance(True, int) is false. Because the acceptance sentence derives directly from that relationship, it is rewritten as the dependent site so it does not continue to authorize omitting a Boolean-specific check, preserving the repository's governing requirement that identifiers reject Boolean values (README.md line 3, validator.py line 2). Replacement wording is authored from the supplied claim register and repository text; it has not been executed or otherwise verified.",
+    "unaddressed": []
+  },
+  "proposal_attempts": [
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--resume",
+        "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+        "--output-format",
+        "json",
+        "--model",
+        "claude-fable-5-1",
+        "--effort",
+        "medium",
+        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Grep,Glob",
+        "--allowedTools",
+        "Read,Grep,Glob"
+      ],
+      "duration_ms": 17197,
+      "error": false,
+      "failure_detail": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "raw": {
+        "bytes": 6551,
+        "excerpt": "{\"duration_api_ms\":15727,\"stop_reason\":\"tool_use\",\"session_id\":\"531893b6-985f-4ad4-9da1-ef6618fde3bc\",\"total_cost_usd\":0.3553,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":14349,\"cache_read_input_tokens\":0,\"output_tokens\":1366,\"output_tokens_details\":{\"thinking_tokens\":384},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":14349,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1366,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":14349,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":14349},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1366,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":14349,\"webSearchRequests\":0,\"costUSD\":0.3553,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":384,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for the two refuted claims. The runtime-fact sentence is replaced with the register's proposed replacement for C-a03de03fc2 (bool is a subclass of int) and the dependent consequence for C-5752e207ed is corrected so it no longer asserts isinstance(True, int) is false. Because the acceptance sentence derives directly from that relationship, it is rewritten as the dependent site so it does not continue to authorize omitting a Boolean-specific check, preserving the repository's governing requirement that identifiers reject Boolean values (README.md line 3, validator.py line 2). Replacement wording is authored from the supplied claim register and repository text; it has not been executed or otherwise verified.\\\",\\\"addressed_finding_ids\\\":[\\\"claim:C-a03de03fc2\\\",\\\"claim:C-5752e207ed\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\\\",\\\"new_text\\\":\\\"Python's bool type is a subclass of int, so isinstance(True, int) is true.\\\"},{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"The implementation may rely on that relationship without a Boolean-specific check.\\\",\\\"new_text\\\":\\\"Because of that relationship, the implementation must not rely on isinstance(value, int) alone; it must include a Boolean-specific exclusion so that True and False are rejected as identifiers.\\\"}],\\\"suggested_tests\\\":[\\\"Assert accepts_identifier(True) is False and accepts_identifier(False) is False.\\\",\\\"Assert accepts_identifier(0) is True and accepts_identifier(1) is True.\\\",\\\"Assert accepts_identifier(\\\\\\\"1\\\\\\\") is False and accepts_identifier(1.0) is False.\\\",\\\"Assert isinstance(True, int) is True and issubclass(bool, int) is True as a guard documenting the corrected runtime fact.\\\"],\\\"limitations\\\":[\\\"The patch is unapplied and unverified; no code was executed and no tests were run.\\\",\\\"The second edit touches the acceptance sentence because it derives from the refuted fact; if the correction scope is strictly limited to the claim sentence, drop the second edit, but the acceptance would then still authorize omitting the Boolean check.\\\",\\\"The plan still names no implementation file, function, or executable test; those structural gaps are outside the supplied claim targets and remain open.\\",
+        "sha256": "05c02b33a9c1971569d968d5cb6198ed01eec545960636efe0e3ebf1b238f33a"
+      },
+      "response": {
+        "bytes": 2359,
+        "excerpt": "{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Candidate patch for the two refuted claims. The runtime-fact sentence is replaced with the register's proposed replacement for C-a03de03fc2 (bool is a subclass of int) and the dependent consequence for C-5752e207ed is corrected so it no longer asserts isinstance(True, int) is false. Because the acceptance sentence derives directly from that relationship, it is rewritten as the dependent site so it does not continue to authorize omitting a Boolean-specific check, preserving the repository's governing requirement that identifiers reject Boolean values (README.md line 3, validator.py line 2). Replacement wording is authored from the supplied claim register and repository text; it has not been executed or otherwise verified.\",\"addressed_finding_ids\":[\"claim:C-a03de03fc2\",\"claim:C-5752e207ed\"],\"unaddressed\":[],\"edits\":[{\"target\":\"plan\",\"operation\":\"replace\",\"path\":null,\"old_text\":\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\",\"new_text\":\"Python's bool type is a subclass of int, so isinstance(True, int) is true.\"},{\"target\":\"plan\",\"operation\":\"replace\",\"path\":null,\"old_text\":\"The implementation may rely on that relationship without a Boolean-specific check.\",\"new_text\":\"Because of that relationship, the implementation must not rely on isinstance(value, int) alone; it must include a Boolean-specific exclusion so that True and False are rejected as identifiers.\"}],\"suggested_tests\":[\"Assert accepts_identifier(True) is False and accepts_identifier(False) is False.\",\"Assert accepts_identifier(0) is True and accepts_identifier(1) is True.\",\"Assert accepts_identifier(\\\"1\\\") is False and accepts_identifier(1.0) is False.\",\"Assert isinstance(True, int) is True and issubclass(bool, int) is True as a guard documenting the corrected runtime fact.\"],\"limitations\":[\"The patch is unapplied and unverified; no code was executed and no tests were run.\",\"The second edit touches the acceptance sentence because it derives from the refuted fact; if the correction scope is strictly limited to the claim sentence, drop the second edit, but the acceptance would then still authorize omitting the Boolean check.\",\"The plan still names no implementation file, function, or executable test; those structural gaps are outside the supplied claim targets and remain open.\"]}",
+        "sha256": "feb4db42250a4a8063827f3b4b77b7448d50e7c7902b5c1e56eae5eef14985a0"
+      },
+      "returncode": 0,
+      "role": "proposal",
+      "session_ref": "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+      "stderr": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "usage": {
+        "cost_usd": 0.3553,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 14349,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 14349,
+          "cache_read_input_tokens": 0,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 14349,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 14349,
+              "cache_read_input_tokens": 0,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 1366,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 1366,
+          "output_tokens_details": {
+            "thinking_tokens": 384
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null
+    }
+  ],
+  "proposal_duration_ms": 17197,
+  "proposal_raw": {
+    "bytes": 6551,
+    "excerpt": "{\"duration_api_ms\":15727,\"stop_reason\":\"tool_use\",\"session_id\":\"531893b6-985f-4ad4-9da1-ef6618fde3bc\",\"total_cost_usd\":0.3553,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":14349,\"cache_read_input_tokens\":0,\"output_tokens\":1366,\"output_tokens_details\":{\"thinking_tokens\":384},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":14349,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":1366,\"cache_read_input_tokens\":0,\"cache_creation_input_tokens\":14349,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":14349},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":1366,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":14349,\"webSearchRequests\":0,\"costUSD\":0.3553,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":384,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for the two refuted claims. The runtime-fact sentence is replaced with the register's proposed replacement for C-a03de03fc2 (bool is a subclass of int) and the dependent consequence for C-5752e207ed is corrected so it no longer asserts isinstance(True, int) is false. Because the acceptance sentence derives directly from that relationship, it is rewritten as the dependent site so it does not continue to authorize omitting a Boolean-specific check, preserving the repository's governing requirement that identifiers reject Boolean values (README.md line 3, validator.py line 2). Replacement wording is authored from the supplied claim register and repository text; it has not been executed or otherwise verified.\\\",\\\"addressed_finding_ids\\\":[\\\"claim:C-a03de03fc2\\\",\\\"claim:C-5752e207ed\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"Python's bool type is not a subclass of int, so isinstance(True, int) is false.\\\",\\\"new_text\\\":\\\"Python's bool type is a subclass of int, so isinstance(True, int) is true.\\\"},{\\\"target\\\":\\\"plan\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":null,\\\"old_text\\\":\\\"The implementation may rely on that relationship without a Boolean-specific check.\\\",\\\"new_text\\\":\\\"Because of that relationship, the implementation must not rely on isinstance(value, int) alone; it must include a Boolean-specific exclusion so that True and False are rejected as identifiers.\\\"}],\\\"suggested_tests\\\":[\\\"Assert accepts_identifier(True) is False and accepts_identifier(False) is False.\\\",\\\"Assert accepts_identifier(0) is True and accepts_identifier(1) is True.\\\",\\\"Assert accepts_identifier(\\\\\\\"1\\\\\\\") is False and accepts_identifier(1.0) is False.\\\",\\\"Assert isinstance(True, int) is True and issubclass(bool, int) is True as a guard documenting the corrected runtime fact.\\\"],\\\"limitations\\\":[\\\"The patch is unapplied and unverified; no code was executed and no tests were run.\\\",\\\"The second edit touches the acceptance sentence because it derives from the refuted fact; if the correction scope is strictly limited to the claim sentence, drop the second edit, but the acceptance would then still authorize omitting the Boolean check.\\\",\\\"The plan still names no implementation file, function, or executable test; those structural gaps are outside the supplied claim targets and remain open.\\",
+    "sha256": "05c02b33a9c1971569d968d5cb6198ed01eec545960636efe0e3ebf1b238f33a"
+  },
+  "proposal_resume_argv": [
+    "claude",
+    "-p",
+    "--resume",
+    "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+    "--output-format",
+    "json",
+    "--model",
+    "claude-fable-5-1",
+    "--effort",
+    "medium",
+    "--safe-mode",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--tools",
+    "Read,Grep,Glob",
+    "--allowedTools",
+    "Read,Grep,Glob"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "ac32d4b3edc9908484eb0b55d78bb5f9dcde86d3dbd73430fd5cca22fcc72595",
+  "proposal_session_ref": "531893b6-985f-4ad4-9da1-ef6618fde3bc",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cost_usd": 0.3553,
+    "tokens": {
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 14349,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "cache_creation_input_tokens": 14349,
+      "cache_read_input_tokens": 0,
+      "inference_geo": "not_available",
+      "input_tokens": 2,
+      "iterations": [
+        {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 14349,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 14349,
+          "cache_read_input_tokens": 0,
+          "input_tokens": 2,
+          "model": null,
+          "output_tokens": 1366,
+          "type": "message"
+        }
+      ],
+      "output_tokens": 1366,
+      "output_tokens_details": {
+        "thinking_tokens": 384
+      },
+      "server_tool_use": {
+        "web_fetch_requests": 0,
+        "web_search_requests": 0
+      },
+      "service_tier": "standard",
+      "speed": "standard"
+    }
+  },
+  "qualification_failure": null,
+  "qualified": true,
+  "scenario": "plan-verified",
+  "schema_version": 1,
+  "source_commit": "6ede21b99412bf4c78f7665ef6a2db4d6ff9a123",
+  "target_ids": [
+    "claim:C-a03de03fc2",
+    "claim:C-5752e207ed"
+  ],
+  "tests_executed_by_proposal": false
+}

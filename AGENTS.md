@@ -1,5 +1,10 @@
 # Repository agent instructions
 
+Reviewer-authored patch proposals follow docs/reviewer-patch-proposal-plan.md and
+remain under qualification. `PROPOSE_PATCH_DEFAULT` is false; omission and explicit
+false are disabled, and explicit true is reserved for the qualification harness.
+Do not publish delivered/default-on wording before the plan's pre-flip gates pass.
+
 Issue #126 follows docs/claim-admission-126-plan.md. Account explicitly for
 repository preparation before claim admission, preserve complete model and
 capture reserves, and retain local admission diagnostics without falsely

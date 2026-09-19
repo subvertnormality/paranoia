@@ -1,0 +1,389 @@
+{
+  "effort": "medium",
+  "elapsed_ms": 47407,
+  "engine": "claude",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "behaviour",
+  "lane_attempts": [
+    {
+      "duration_ms": 39050,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 37652,
+      "raw_excerpt": "{\"duration_api_ms\":38364,\"stop_reason\":\"tool_use\",\"session_id\":\"a608ad8e-337e-469b-8d99-76fdf83ea0ca\",\"total_cost_usd\":0.25618975,\"usage\":{\"input_tokens\":114,\"cache_creation_input_tokens\":4754,\"cache_read_input_tokens\":33879,\"output_tokens\":2966,\"output_tokens_details\":{\"thinking_tokens\":263},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":4754,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":56,\"output_tokens\":2704,\"cache_read_input_tokens\":12964,\"cache_creation_input_tokens\":326,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":326},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":3135,\"outputTokens\":13,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":0,\"costUSD\":0.0032,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":114,\"outputTokens\":2966,\"cacheReadInputTokens\":33879,\"cacheCreationInputTokens\":4754,\"webSearchRequests\":0,\"costUSD\":0.25298975,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":263,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":5,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"lane\\\":\\\"behaviour\\\",\\\"coverage\\\":[{\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The committed fixture is fully present: one validator module and one README. Nothing is truncated or missing from the working tree; the whole artifact was read in full.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/validator.py:1-3\\\",\\\"rationale\\\":\\\"Entire validator module, three lines, read in full.\\\"},{\\\"anchor\\\":\\\"repository/README.md:1-3\\\",\\\"rationale\\\":\\\"Entire README, read in full; it is the only stated contract.\\\"}],\\\"finding_ids\\\":[]},{\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The README premise is that identifiers are integers and Booleans must be rejected. The code comment restates that premise, but the implementation contradicts it: isinstance(True, int) is True in Python, so Booleans are accepted.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/README.md:3\\\",\\\"rationale\\\":\\\"Stated contract: Boolean values must be rejected by the identifier validator.\\\"},{\\\"anchor\\\":\\\"repository/validator.py:2-3\\\",\\\"rationale\\\":\\\"Comment acknowledges bool is an int subclass and says booleans must be rejected, yet the return expression is a bare isinstance(value, int), which accepts True and False.\\\"}],\\\"finding_ids\\\":[\\\"bool-accepted-as-identifier\\\"]},{\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"The single transformation is value -> bool acceptance. It maps True and False to accepted, which is the wrong output for the documented rule. Non-bool ints and non-ints behave correctly.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/validator.py:3\\\",\\\"rationale\\\":\\\"isinstance(value, int) returns True for bool instances because bool subclasses int; no exclusion is applied.\\\"}],\\\"finding_ids\\\":[\\\"bool-accepted-as-identifier\\\"]},{\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"There are no in-repository callers of accepts_identifier; the function is the fixture's only public surface. Any external consumer relying on the README contract would receive Booleans as valid identifiers, which is the root finding already reported under premises and transforma",
+      "raw_sha256": "dcbcec9bb8cd66ded30f9464892ed623e2134f7300554e3f3f5dd57361a379e9",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\"lane\":\"behaviour\",\"coverage\":[{\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"The committed fixture is fully present: one validator module and one README. Nothing is truncated or missing from the working tree; the whole artifact was read in full.\",\"evidence\":[{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"Entire validator module, three lines, read in full.\"},{\"anchor\":\"repository/README.md:1-3\",\"rationale\":\"Entire README, read in full; it is the only stated contract.\"}],\"finding_ids\":[]},{\"id\":\"repository-premises\",\"status\":\"finding\",\"summary\":\"The README premise is that identifiers are integers and Booleans must be rejected. The code comment restates that premise, but the implementation contradicts it: isinstance(True, int) is True in Python, so Booleans are accepted.\",\"evidence\":[{\"anchor\":\"repository/README.md:3\",\"rationale\":\"Stated contract: Boolean values must be rejected by the identifier validator.\"},{\"anchor\":\"repository/validator.py:2-3\",\"rationale\":\"Comment acknowledges bool is an int subclass and says booleans must be rejected, yet the return expression is a bare isinstance(value, int), which accepts True and False.\"}],\"finding_ids\":[\"bool-accepted-as-identifier\"]},{\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"The single transformation is value -> bool acceptance. It maps True and False to accepted, which is the wrong output for the documented rule. Non-bool ints and non-ints behave correctly.\",\"evidence\":[{\"anchor\":\"repository/validator.py:3\",\"rationale\":\"isinstance(value, int) returns True for bool instances because bool subclasses int; no exclusion is applied.\"}],\"finding_ids\":[\"bool-accepted-as-identifier\"]},{\"id\":\"consumers\",\"status\":\"covered\",\"summary\":\"There are no in-repository callers of accepts_identifier; the function is the fixture's only public surface. Any external consumer relying on the README contract would receive Booleans as valid identifiers, which is the root finding already reported under premises and transformations.\",\"evidence\":[{\"anchor\":\"repository/validator.py:1\",\"rationale\":\"Only definition in the repository; grep of the tree shows no call sites beyond the definition itself.\"}],\"finding_ids\":[]},{\"id\":\"failure-recovery\",\"status\":\"not_applicable\",\"summary\":\"The validator is a pure predicate with no I/O, state, or error paths; there is nothing to recover from. Stakes are a trusted single operator with static repository bytes, so no failure-mode hardening is warranted.\",\"evidence\":[{\"anchor\":\"repository/validator.py:1-3\",\"rationale\":\"Pure function, no exceptions raised or handled, no external resources.\"}],\"finding_ids\":[]},{\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"No tests exist anywhere in the repository. The one behaviour the README singles out, rejection of Booleans, is exactly the behaviour the code gets wrong, and a two-line test would have caught it. No test result was observed; this is from inspecting the tree.\",\"evidence\":[{\"anchor\":\"repository/README.md:3\",\"rationale\":\"The documented acceptance criterion (reject Booleans) has no executable check anywhere in the tree.\"},{\"anchor\":\"repository/validator.py:3\",\"rationale\":\"The untested line is the one that violates the criterion.\"}],\"finding_ids\":[\"no-boolean-rejection-test\"]},{\"id\":\"docs-operations\",\"status\":\"covered\",\"summary\":\"The README is a single accurate sentence stating the contract. It is not wrong; the code is. No operational documentation is needed for a pure predicate fixture.\",\"evidence\":[{\"anchor\":\"repository/README.md:1-3\",\"rationale\":\"Documentation correctly states the intended rule; the defect is in the implementation, not the docs.\"}],\"finding_ids\":[]},{\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"README, inline comment, and implementation assert the same contract at three sites, and the implementation disagrees with the other two. The repair must change the return expression so all three sites agree; the comment and README already state the correct rule.\",\"evidence\":[{\"anchor\"",
+      "response_sha256": "20f73c6b57ee06f2f62840e78ef2e224f8fdec074a94a95549d340ab57249959",
+      "returncode": 0,
+      "role": "census-behaviour",
+      "sequence": null,
+      "session_ref": "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.25618975,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 4754,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 4754,
+          "cache_read_input_tokens": 33879,
+          "inference_geo": "not_available",
+          "input_tokens": 114,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 326,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 326,
+              "cache_read_input_tokens": 12964,
+              "input_tokens": 56,
+              "model": null,
+              "output_tokens": 2704,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 2966,
+          "output_tokens_details": {
+            "thinking_tokens": 263
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "repository/validator.py:1-3",
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [],
+        "id": "artifact-complete",
+        "status": "covered",
+        "summary": "The committed fixture is fully present: one validator module and one README. Nothing is truncated or missing from the working tree; the whole artifact was read in full."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:2-3"
+        ],
+        "finding_ids": [
+          "bool-accepted-as-identifier"
+        ],
+        "id": "repository-premises",
+        "status": "finding",
+        "summary": "The README premise is that identifiers are integers and Booleans must be rejected. The code comment restates that premise, but the implementation contradicts it: isinstance(True, int) is True in Python, so Booleans are accepted."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:3"
+        ],
+        "finding_ids": [
+          "bool-accepted-as-identifier"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "The single transformation is value -> bool acceptance. It maps True and False to accepted, which is the wrong output for the documented rule. Non-bool ints and non-ints behave correctly."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1"
+        ],
+        "finding_ids": [],
+        "id": "consumers",
+        "status": "covered",
+        "summary": "There are no in-repository callers of accepts_identifier; the function is the fixture's only public surface. Any external consumer relying on the README contract would receive Booleans as valid identifiers, which is the root finding already reported under premises and transformations."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "failure-recovery",
+        "status": "not_applicable",
+        "summary": "The validator is a pure predicate with no I/O, state, or error paths; there is nothing to recover from. Stakes are a trusted single operator with static repository bytes, so no failure-mode hardening is warranted."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:3"
+        ],
+        "finding_ids": [
+          "no-boolean-rejection-test"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "No tests exist anywhere in the repository. The one behaviour the README singles out, rejection of Booleans, is exactly the behaviour the code gets wrong, and a two-line test would have caught it. No test result was observed; this is from inspecting the tree."
+      },
+      {
+        "evidence": [
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [],
+        "id": "docs-operations",
+        "status": "covered",
+        "summary": "The README is a single accurate sentence stating the contract. It is not wrong; the code is. No operational documentation is needed for a pure predicate fixture."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:2",
+          "repository/validator.py:3"
+        ],
+        "finding_ids": [
+          "bool-accepted-as-identifier"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "README, inline comment, and implementation assert the same contract at three sites, and the implementation disagrees with the other two. The repair must change the return expression so all three sites agree; the comment and README already state the correct rule."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The fixture is minimal and appropriately so: one function, one sentence of contract. No over-engineering present. The correct fix is a single added clause, not a type-validation framework."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "repository/validator.py:3",
+          "repository/validator.py:2",
+          "repository/README.md:3"
+        ],
+        "id": "bool-accepted-as-identifier",
+        "remedy": "Change the return to `return isinstance(value, int) and not isinstance(value, bool)`. README and the comment already state the correct rule and need no change. Add the test described in the companion finding so the three sites cannot drift again.",
+        "severity": "BLOCKER",
+        "summary": "accepts_identifier(True) and accepts_identifier(False) return True. In Python, bool is a subclass of int, so isinstance(True, int) is True. The README requires Boolean values to be rejected, and the inline comment says the same, but the return expression applies no bool exclusion. The fixture therefore fails its only stated requirement."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:1-3"
+        ],
+        "id": "no-boolean-rejection-test",
+        "remedy": "Add a minimal test module asserting accepts_identifier(1) is True, accepts_identifier(True) is False, accepts_identifier(False) is False, and accepts_identifier('1') is False.",
+        "severity": "MINOR",
+        "summary": "The repository contains no tests. The README's one explicit requirement, Boolean rejection, is unverified by any executable check, which is why the implementation defect shipped. This is inspection of the tree, not an observed test run."
+      }
+    ],
+    "lane": "behaviour"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+  "model": "claude-fable-5-1",
+  "patch_applied": false,
+  "proposal": {
+    "addressed_finding_ids": [
+      "structural:probe-D1"
+    ],
+    "edits": [
+      {
+        "new_text": "    return isinstance(value, int) and not isinstance(value, bool)\n",
+        "old_text": "    return isinstance(value, int)\n",
+        "operation": "replace",
+        "path": "validator.py",
+        "target": "repository"
+      }
+    ],
+    "limitations": [
+      "Patch was not applied, executed, or tested; correctness is asserted from reading validator.py and README.md only.",
+      "No test module exists in the repository; suggested tests are not added by this patch because the target finding is scoped to the validator behaviour."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "assert accepts_identifier(1) is True",
+      "assert accepts_identifier(0) is True",
+      "assert accepts_identifier(True) is False",
+      "assert accepts_identifier(False) is False",
+      "assert accepts_identifier('1') is False",
+      "assert accepts_identifier(1.0) is False"
+    ],
+    "summary": "Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.",
+    "unaddressed": []
+  },
+  "proposal_attempts": [
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--resume",
+        "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+        "--output-format",
+        "json",
+        "--model",
+        "claude-fable-5-1",
+        "--effort",
+        "medium",
+        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Grep,Glob",
+        "--allowedTools",
+        "Read,Grep,Glob"
+      ],
+      "duration_ms": 8320,
+      "error": false,
+      "failure_detail": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "raw": {
+        "bytes": 4436,
+        "excerpt": "{\"duration_api_ms\":6735,\"stop_reason\":\"tool_use\",\"session_id\":\"a608ad8e-337e-469b-8d99-76fdf83ea0ca\",\"total_cost_usd\":0.18154525,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":7430,\"cache_read_input_tokens\":6301,\"output_tokens\":627,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":7430,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":627,\"cache_read_input_tokens\":6301,\"cache_creation_input_tokens\":7430,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7430},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":627,\"cacheReadInputTokens\":6301,\"cacheCreationInputTokens\":7430,\"webSearchRequests\":0,\"costUSD\":0.18154525,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"validator.py\\\",\\\"old_text\\\":\\\"    return isinstance(value, int)\\\\n\\\",\\\"new_text\\\":\\\"    return isinstance(value, int) and not isinstance(value, bool)\\\\n\\\"}],\\\"suggested_tests\\\":[\\\"assert accepts_identifier(1) is True\\\",\\\"assert accepts_identifier(0) is True\\\",\\\"assert accepts_identifier(True) is False\\\",\\\"assert accepts_identifier(False) is False\\\",\\\"assert accepts_identifier('1') is False\\\",\\\"assert accepts_identifier(1.0) is False\\\"],\\\"limitations\\\":[\\\"Patch was not applied, executed, or tested; correctness is asserted from reading validator.py and README.md only.\\\",\\\"No test module exists in the repository; suggested tests are not added by this patch because the target finding is scoped to the validator behaviour.\\\"]}\",\"structured_output\":{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.\",\"addressed_finding_ids\":[\"structural:probe-D1\"],\"unaddressed\":[],\"edits\":[{\"target\":\"repository\",\"operation\":\"replace\",\"path\":\"validator.py\",\"old_text\":\"    return isinstance(value, int)\\n\",\"new_text\":\"    return isinstance(value, int) and not isinstance(value, bool)\\n\"}],\"suggested_tests\":[\"assert accepts_identifier(1) is True\",\"assert accepts_identifier(0) is True\",\"assert accepts_identifier(True) is False\",\"assert accepts_identifier(False) is False\",\"assert accepts_identifier('1') is False\",\"assert accepts_identifier(1.0) is False\"],\"limitations\":",
+        "sha256": "6d1d28883c764d87f12628de4de3a7ab6b1d32092021e0e1d0a0921a69a3de45"
+      },
+      "response": {
+        "bytes": 1309,
+        "excerpt": "{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.\",\"addressed_finding_ids\":[\"structural:probe-D1\"],\"unaddressed\":[],\"edits\":[{\"target\":\"repository\",\"operation\":\"replace\",\"path\":\"validator.py\",\"old_text\":\"    return isinstance(value, int)\\n\",\"new_text\":\"    return isinstance(value, int) and not isinstance(value, bool)\\n\"}],\"suggested_tests\":[\"assert accepts_identifier(1) is True\",\"assert accepts_identifier(0) is True\",\"assert accepts_identifier(True) is False\",\"assert accepts_identifier(False) is False\",\"assert accepts_identifier('1') is False\",\"assert accepts_identifier(1.0) is False\"],\"limitations\":[\"Patch was not applied, executed, or tested; correctness is asserted from reading validator.py and README.md only.\",\"No test module exists in the repository; suggested tests are not added by this patch because the target finding is scoped to the validator behaviour.\"]}",
+        "sha256": "2ba58b2c7efc7777da794ff213c606dc73b7ea62ce8471a0fbed0b0f648c3fa8"
+      },
+      "returncode": 0,
+      "role": "proposal",
+      "session_ref": "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+      "stderr": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "usage": {
+        "cost_usd": 0.18154525,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7430,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 7430,
+          "cache_read_input_tokens": 6301,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 7430,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 7430,
+              "cache_read_input_tokens": 6301,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 627,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 627,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null
+    }
+  ],
+  "proposal_duration_ms": 8320,
+  "proposal_raw": {
+    "bytes": 4436,
+    "excerpt": "{\"duration_api_ms\":6735,\"stop_reason\":\"tool_use\",\"session_id\":\"a608ad8e-337e-469b-8d99-76fdf83ea0ca\",\"total_cost_usd\":0.18154525,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":7430,\"cache_read_input_tokens\":6301,\"output_tokens\":627,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":7430,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":627,\"cache_read_input_tokens\":6301,\"cache_creation_input_tokens\":7430,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7430},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":627,\"cacheReadInputTokens\":6301,\"cacheCreationInputTokens\":7430,\"webSearchRequests\":0,\"costUSD\":0.18154525,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"validator.py\\\",\\\"old_text\\\":\\\"    return isinstance(value, int)\\\\n\\\",\\\"new_text\\\":\\\"    return isinstance(value, int) and not isinstance(value, bool)\\\\n\\\"}],\\\"suggested_tests\\\":[\\\"assert accepts_identifier(1) is True\\\",\\\"assert accepts_identifier(0) is True\\\",\\\"assert accepts_identifier(True) is False\\\",\\\"assert accepts_identifier(False) is False\\\",\\\"assert accepts_identifier('1') is False\\\",\\\"assert accepts_identifier(1.0) is False\\\"],\\\"limitations\\\":[\\\"Patch was not applied, executed, or tested; correctness is asserted from reading validator.py and README.md only.\\\",\\\"No test module exists in the repository; suggested tests are not added by this patch because the target finding is scoped to the validator behaviour.\\\"]}\",\"structured_output\":{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Candidate patch for structural:probe-D1: accepts_identifier currently returns isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3 and the inline comment. The patch adds an explicit bool exclusion so Booleans are rejected while non-bool integers remain accepted. README and comment already state the correct rule and are unchanged. The patch is unapplied and unverified.\",\"addressed_finding_ids\":[\"structural:probe-D1\"],\"unaddressed\":[],\"edits\":[{\"target\":\"repository\",\"operation\":\"replace\",\"path\":\"validator.py\",\"old_text\":\"    return isinstance(value, int)\\n\",\"new_text\":\"    return isinstance(value, int) and not isinstance(value, bool)\\n\"}],\"suggested_tests\":[\"assert accepts_identifier(1) is True\",\"assert accepts_identifier(0) is True\",\"assert accepts_identifier(True) is False\",\"assert accepts_identifier(False) is False\",\"assert accepts_identifier('1') is False\",\"assert accepts_identifier(1.0) is False\"],\"limitations\":",
+    "sha256": "6d1d28883c764d87f12628de4de3a7ab6b1d32092021e0e1d0a0921a69a3de45"
+  },
+  "proposal_resume_argv": [
+    "claude",
+    "-p",
+    "--resume",
+    "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+    "--output-format",
+    "json",
+    "--model",
+    "claude-fable-5-1",
+    "--effort",
+    "medium",
+    "--safe-mode",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--tools",
+    "Read,Grep,Glob",
+    "--allowedTools",
+    "Read,Grep,Glob"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "a91be219ea82651d5e831bd071c0a5e2603acc75afb91ede48e08d4f73d26476",
+  "proposal_session_ref": "a608ad8e-337e-469b-8d99-76fdf83ea0ca",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cost_usd": 0.18154525,
+    "tokens": {
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 7430,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "cache_creation_input_tokens": 7430,
+      "cache_read_input_tokens": 6301,
+      "inference_geo": "not_available",
+      "input_tokens": 2,
+      "iterations": [
+        {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7430,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 7430,
+          "cache_read_input_tokens": 6301,
+          "input_tokens": 2,
+          "model": null,
+          "output_tokens": 627,
+          "type": "message"
+        }
+      ],
+      "output_tokens": 627,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_fetch_requests": 0,
+        "web_search_requests": 0
+      },
+      "service_tier": "standard",
+      "speed": "standard"
+    }
+  },
+  "qualification_failure": null,
+  "qualified": true,
+  "schema_version": 1,
+  "source_commit": "98086be50b44b779b87b95c2e578715ecf26127f",
+  "tests_executed_by_proposal": false
+}

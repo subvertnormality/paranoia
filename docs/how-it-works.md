@@ -1,5 +1,10 @@
 # How Paranoia Local works
 
+> Reviewer-authored patch proposals are under qualification under
+> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
+> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
+> while explicit true is reserved for the qualification harness.
+
 This guide explains the behavior behind the public tools. Start with the
 [README](../README.md) for installation or the [tool reference](tool-reference.md)
 for exact inputs.

@@ -27,6 +27,7 @@ def test_collect_joins_all_lanes_in_order_and_carries_context():
     assert set(completed) == set(lanes)
     assert [row["lane"] for row in result.manifests] == list(lanes)
     assert result.member_coverage == {"class": ["member"]}
+    assert [row.lane for row in result.lane_results] == list(lanes)
     assert trace.get() == "missing"
 
 
@@ -45,3 +46,13 @@ def test_namespace_preserves_finding_coverage_and_assessment_bindings():
     assert sources.source_ids == ["integrity:F1"]
     assert sources.assessment_findings == {"C1": "integrity:F1"}
     assert sources.source_evidence == {"integrity:F1": ["repository/a:1"]}
+
+
+def test_namespace_retains_successful_author_only_in_transient_result():
+    manifest = {"findings": [], "coverage": [], "class_assessments": []}
+    row = census.namespace_lane(
+        "behaviour", manifest, [], [], {},
+        session_ref="session-1", engine_name="codex",
+    )
+    assert row.author == census.AuthorHandle("behaviour", "session-1", "codex")
+    assert "session" not in row.manifest

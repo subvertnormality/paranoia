@@ -35,6 +35,8 @@ ROLE_DISCOVERY = "evidence-discovery"
 ROLE_BINDING = "evidence-binding"
 ROLE_REPOSITORY = "evidence-repository"
 ROLE_TEXT = "evidence-text"
+ROLE_PROPOSAL = "patch-proposal"
+ROLE_PROPOSAL = "patch-proposal"
 EVIDENCE_ROLES = frozenset({ROLE_DISCOVERY, ROLE_BINDING, ROLE_REPOSITORY, ROLE_TEXT})
 
 MIN_CODEX_VERSION = (0, 144, 6)
@@ -211,6 +213,120 @@ class Engine(ABC):
             ),
             engine=self.name, role=self.role, model=model, effort=effort,
             web_search=web_search, requested_timeout_sec=timeout or DEFAULT_TIMEOUT_SEC,
+            operation="resume", requested_session=session_ref, injected=runner is not None,
+            prompt=prompt, schema=response_schema,
+        )
+
+    def build_proposal_resume_argv(
+        self, session_ref: str, cwd: Path, model: str, effort: str,
+    ) -> list[str]:
+        """Build the stricter read-only, no-web proposal continuation route."""
+        if self.name == "claude":
+            return [
+                self.binary, "-p", "--resume", session_ref,
+                "--output-format", "json", "--model", model, "--effort", effort,
+                "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
+                "--tools", "Read,Grep,Glob", "--allowedTools", "Read,Grep,Glob",
+            ]
+        argv = self.build_resume_argv(session_ref, cwd, model, effort, False)
+        filtered: list[str] = []
+        position = 0
+        while position < len(argv):
+            if (
+                argv[position] == "-c" and position + 1 < len(argv)
+                and (
+                    argv[position + 1].startswith("sandbox_mode=")
+                    or argv[position + 1].startswith("web_search=")
+                    or argv[position + 1].startswith("tools.web_search=")
+                )
+            ):
+                position += 2
+                continue
+            filtered.append(argv[position])
+            position += 1
+        insert = len(filtered) - 1 if filtered and filtered[-1] == "-" else len(filtered)
+        additions = ["-c", 'web_search="disabled"', "-c", 'sandbox_mode="read-only"']
+        if 'approval_policy="never"' not in filtered:
+            additions = ["-c", 'approval_policy="never"', *additions]
+        argv = [*filtered[:insert], *additions, *filtered[insert:]]
+        sandbox_values = [
+            argv[index + 1] for index, value in enumerate(argv[:-1])
+            if value == "-c" and argv[index + 1].startswith("sandbox_mode=")
+        ]
+        if sandbox_values != ['sandbox_mode="read-only"']:
+            raise RuntimeError("proposal Codex continuation is not exclusively read-only")
+        return argv
+
+    def resume_proposal(
+        self, session_ref: str, prompt: str, cwd: Path, model: str, effort: str,
+        *, runner: Runner | None = None, timeout: int | None = None,
+        on_progress: Callable[[str], None] | None = None,
+        response_schema: dict[str, Any] | None = None,
+    ) -> Review:
+        argv = self.build_proposal_resume_argv(session_ref, cwd, model, effort)
+        return telemetry.observe(
+            lambda: self._execute(
+                argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+            ),
+            engine=self.name, role=ROLE_PROPOSAL, model=model, effort=effort,
+            web_search=False, requested_timeout_sec=timeout or DEFAULT_TIMEOUT_SEC,
+            operation="resume", requested_session=session_ref, injected=runner is not None,
+            prompt=prompt, schema=response_schema,
+        )
+
+    def build_proposal_resume_argv(
+        self, session_ref: str, cwd: Path, model: str, effort: str,
+    ) -> list[str]:
+        """Build the stricter read-only, no-web proposal continuation route."""
+        if self.name == "claude":
+            return [
+                self.binary, "-p", "--resume", session_ref,
+                "--output-format", "json", "--model", model, "--effort", effort,
+                "--safe-mode", "--setting-sources", "", "--strict-mcp-config",
+                "--tools", "Read,Grep,Glob", "--allowedTools", "Read,Grep,Glob",
+            ]
+        argv = self.build_resume_argv(session_ref, cwd, model, effort, False)
+        filtered: list[str] = []
+        position = 0
+        while position < len(argv):
+            if (
+                argv[position] == "-c" and position + 1 < len(argv)
+                and (
+                    argv[position + 1].startswith("sandbox_mode=")
+                    or argv[position + 1].startswith("web_search=")
+                    or argv[position + 1].startswith("tools.web_search=")
+                )
+            ):
+                position += 2
+                continue
+            filtered.append(argv[position])
+            position += 1
+        insert = len(filtered) - 1 if filtered and filtered[-1] == "-" else len(filtered)
+        additions = ["-c", 'web_search="disabled"', "-c", 'sandbox_mode="read-only"']
+        if 'approval_policy="never"' not in filtered:
+            additions = ["-c", 'approval_policy="never"', *additions]
+        argv = [*filtered[:insert], *additions, *filtered[insert:]]
+        sandbox_values = [
+            argv[index + 1] for index, value in enumerate(argv[:-1])
+            if value == "-c" and argv[index + 1].startswith("sandbox_mode=")
+        ]
+        if sandbox_values != ['sandbox_mode="read-only"']:
+            raise RuntimeError("proposal Codex continuation is not exclusively read-only")
+        return argv
+
+    def resume_proposal(
+        self, session_ref: str, prompt: str, cwd: Path, model: str, effort: str,
+        *, runner: Runner | None = None, timeout: int | None = None,
+        on_progress: Callable[[str], None] | None = None,
+        response_schema: dict[str, Any] | None = None,
+    ) -> Review:
+        argv = self.build_proposal_resume_argv(session_ref, cwd, model, effort)
+        return telemetry.observe(
+            lambda: self._execute(
+                argv, prompt, cwd, runner, timeout, on_progress, response_schema,
+            ),
+            engine=self.name, role=ROLE_PROPOSAL, model=model, effort=effort,
+            web_search=False, requested_timeout_sec=timeout or DEFAULT_TIMEOUT_SEC,
             operation="resume", requested_session=session_ref, injected=runner is not None,
             prompt=prompt, schema=response_schema,
         )

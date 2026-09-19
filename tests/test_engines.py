@@ -255,6 +255,14 @@ class TestCodexArgv:
         bound_resume = binding.build_resume_argv("s", Path("/launch"), "m", "high", False)
         assert 'sandbox_mode="read-only"' in bound_resume
 
+    def test_proposal_resume_overrides_repository_role_to_literal_read_only(self) -> None:
+        engine = engines.get_engine("codex").for_role(engines.ROLE_REPOSITORY)
+        argv = engine.build_proposal_resume_argv("session", Path("/repo"), "m", "high")
+        assert argv.count('sandbox_mode="read-only"') == 1
+        assert 'sandbox_mode="workspace-write"' not in argv
+        assert 'web_search="disabled"' in argv
+        assert 'approval_policy="never"' in argv
+
     def test_parse_output_extracts_final_message_and_thread(self) -> None:
         e = engines.get_engine("codex")
         review = e.parse_output(CODEX_JSONL)
@@ -340,6 +348,16 @@ class TestClaudeArgv:
         discovery_tools = expected[engines.ROLE_DISCOVERY]
         assert "WebFetch" not in discovery_tools
         assert "Read" not in discovery_tools
+
+    def test_proposal_resume_is_safe_mode_with_only_repository_read_tools(self) -> None:
+        engine = engines.get_engine("claude").for_role(engines.ROLE_REPOSITORY)
+        argv = engine.build_proposal_resume_argv("session", Path("/repo"), "m", "medium")
+        assert "--safe-mode" in argv
+        assert argv[argv.index("--setting-sources") + 1] == ""
+        assert argv[argv.index("--tools") + 1] == "Read,Grep,Glob"
+        assert argv[argv.index("--allowedTools") + 1] == "Read,Grep,Glob"
+        assert "WebSearch" not in argv and "WebFetch" not in argv
+        assert "Write" not in argv and "Edit" not in argv
 
     def test_required_evidence_tool_denial_is_a_capability_failure(self) -> None:
         discovery = engines.get_engine("claude").for_role(engines.ROLE_DISCOVERY)

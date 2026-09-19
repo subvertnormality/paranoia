@@ -1,0 +1,391 @@
+{
+  "effort": "medium",
+  "elapsed_ms": 47150,
+  "engine": "claude",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "behaviour",
+  "lane_attempts": [
+    {
+      "duration_ms": 34848,
+      "engine": "claude",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": 33513,
+      "raw_excerpt": "{\"duration_api_ms\":34452,\"stop_reason\":\"tool_use\",\"session_id\":\"99b1ca17-2573-4858-8345-714acff37923\",\"total_cost_usd\":0.244371,\"usage\":{\"input_tokens\":114,\"cache_creation_input_tokens\":4887,\"cache_read_input_tokens\":33928,\"output_tokens\":2676,\"output_tokens_details\":{\"thinking_tokens\":392},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":4887,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":56,\"output_tokens\":2350,\"cache_read_input_tokens\":13010,\"cache_creation_input_tokens\":413,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":413},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-haiku-4-5-20251001\":{\"inputTokens\":3139,\"outputTokens\":14,\"cacheReadInputTokens\":0,\"cacheCreationInputTokens\":0,\"webSearchRequests\":0,\"costUSD\":0.003209,\"contextWindow\":200000,\"maxOutputTokens\":32000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-haiku-4-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"},\"claude-fable-5-1\":{\"inputTokens\":114,\"outputTokens\":2676,\"cacheReadInputTokens\":33928,\"cacheCreationInputTokens\":4887,\"webSearchRequests\":0,\"costUSD\":0.241162,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":392,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":6,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"lane\\\":\\\"behaviour\\\",\\\"coverage\\\":[{\\\"id\\\":\\\"artifact-complete\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The committed fixture consists of README.md, policy.py, and api.py at commit 6772da7; all three were read in full and nothing referenced by the README is missing.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/README.md:1-3\\\",\\\"rationale\\\":\\\"The README names exactly the two modules present in the tree.\\\"}],\\\"finding_ids\\\":[]},{\\\"id\\\":\\\"repository-premises\\\",\\\"status\\\":\\\"covered\\\",\\\"summary\\\":\\\"The README's stated contract is that both modules reject Boolean identifiers; this is the premise all behaviour is judged against, and it is unambiguous.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/README.md:3\\\",\\\"rationale\\\":\\\"Single normative sentence defining the boundary both modules must enforce.\\\"}],\\\"finding_ids\\\":[]},{\\\"id\\\":\\\"transformations\\\",\\\"status\\\":\\\"finding\\\",\\\"summary\\\":\\\"Both predicates rely on isinstance(value, int). Because bool subclasses int in Python, True and False satisfy the check, so policy.permitted(True) returns True and api.decode_identifier(False) returns False rather than None. Neither site rejects Booleans.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/policy.py:1-2\\\",\\\"rationale\\\":\\\"isinstance(True, int) is True, so permitted admits Booleans.\\\"},{\\\"anchor\\\":\\\"repository/api.py:1-2\\\",\\\"rationale\\\":\\\"Same subclass gap; Booleans are returned as identifiers instead of None.\\\"}],\\\"finding_ids\\\":[\\\"bool-subclass-of-int-accepted\\\"]},{\\\"id\\\":\\\"consumers\\\",\\\"status\\\":\\\"not_applicable\\\",\\\"summary\\\":\\\"No callers of permitted or decode_identifier exist in the repository; the fixture has no consumer layer to trace.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/policy.py:1\\\",\\\"rationale\\\":\\\"Only definition; no call sites anywhere in the tree.\\\"}],\\\"finding_ids\\\":[]},{\\\"id\\\":\\\"failure-recovery\\\",\\\"status\\\":\\\"not_applicable\\\",\\\"summary\\\":\\\"The functions are pure predicates with no I/O, state, or error paths; there is no failure mode to recover from beyond the incorrect accept decision already reported.\\\",\\\"evidence\\\":[{\\\"anchor\\\":\\\"repository/api.py:2\\\",\\\"rationale\\\":\\\"Single expressio",
+      "raw_sha256": "7ae4df415b1c59c5a4019c5f574280bb5145bd8c9310952f3583ac2fc41c4fd8",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\"lane\":\"behaviour\",\"coverage\":[{\"id\":\"artifact-complete\",\"status\":\"covered\",\"summary\":\"The committed fixture consists of README.md, policy.py, and api.py at commit 6772da7; all three were read in full and nothing referenced by the README is missing.\",\"evidence\":[{\"anchor\":\"repository/README.md:1-3\",\"rationale\":\"The README names exactly the two modules present in the tree.\"}],\"finding_ids\":[]},{\"id\":\"repository-premises\",\"status\":\"covered\",\"summary\":\"The README's stated contract is that both modules reject Boolean identifiers; this is the premise all behaviour is judged against, and it is unambiguous.\",\"evidence\":[{\"anchor\":\"repository/README.md:3\",\"rationale\":\"Single normative sentence defining the boundary both modules must enforce.\"}],\"finding_ids\":[]},{\"id\":\"transformations\",\"status\":\"finding\",\"summary\":\"Both predicates rely on isinstance(value, int). Because bool subclasses int in Python, True and False satisfy the check, so policy.permitted(True) returns True and api.decode_identifier(False) returns False rather than None. Neither site rejects Booleans.\",\"evidence\":[{\"anchor\":\"repository/policy.py:1-2\",\"rationale\":\"isinstance(True, int) is True, so permitted admits Booleans.\"},{\"anchor\":\"repository/api.py:1-2\",\"rationale\":\"Same subclass gap; Booleans are returned as identifiers instead of None.\"}],\"finding_ids\":[\"bool-subclass-of-int-accepted\"]},{\"id\":\"consumers\",\"status\":\"not_applicable\",\"summary\":\"No callers of permitted or decode_identifier exist in the repository; the fixture has no consumer layer to trace.\",\"evidence\":[{\"anchor\":\"repository/policy.py:1\",\"rationale\":\"Only definition; no call sites anywhere in the tree.\"}],\"finding_ids\":[]},{\"id\":\"failure-recovery\",\"status\":\"not_applicable\",\"summary\":\"The functions are pure predicates with no I/O, state, or error paths; there is no failure mode to recover from beyond the incorrect accept decision already reported.\",\"evidence\":[{\"anchor\":\"repository/api.py:2\",\"rationale\":\"Single expression, no exceptions or side effects.\"}],\"finding_ids\":[]},{\"id\":\"tests-acceptance\",\"status\":\"finding\",\"summary\":\"The repository contains no tests. The README contract has no executable acceptance check, which is why the Boolean gap ships unnoticed at both sites.\",\"evidence\":[{\"anchor\":\"repository/README.md:3\",\"rationale\":\"The contract is stated only in prose with no test asserting it.\"}],\"finding_ids\":[\"no-boolean-rejection-tests\"]},{\"id\":\"docs-operations\",\"status\":\"covered\",\"summary\":\"The README is accurate as a requirement statement; the defect is in code not documentation. No operational docs apply to a pure-function fixture.\",\"evidence\":[{\"anchor\":\"repository/README.md:1-3\",\"rationale\":\"Doc correctly states the intended boundary.\"}],\"finding_ids\":[]},{\"id\":\"consistency\",\"status\":\"finding\",\"summary\":\"policy.py and api.py independently assert the same identifier rule and are consistently wrong in the same way; the README asserts the opposite. Fixing one module alone would leave the rule contradicted at the other.\",\"evidence\":[{\"anchor\":\"repository/policy.py:2\",\"rationale\":\"Co-asserting site of the identifier rule.\"},{\"anchor\":\"repository/api.py:2\",\"rationale\":\"Second co-asserting site; both must change together.\"},{\"anchor\":\"repository/README.md:3\",\"rationale\":\"Contract that both sites currently contradict.\"}],\"finding_ids\":[\"bool-subclass-of-int-accepted\"]},{\"id\":\"proportionality\",\"status\":\"covered\",\"summary\":\"The fixture is minimal and the required repair is a one-line guard per file; no over-engineering is present or proposed.\",\"evidence\":[{\"anchor\":\"repository/policy.py:1-2\",\"rationale\":\"Two-line module; repair adds a single bool exclusion.\"}],\"finding_ids\":[]}],\"findings\":[{\"id\":\"bool-subclass-of-int-accepted\",\"severity\":\"BLOCKER\",\"summary\":\"Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool is a subclass of int. This directly violates the README requirement that both modules reject Boolean identifiers. permitted(Tr",
+      "response_sha256": "49d00d8c2f824606495a7f9c159a1ac20d9a7cc740f45e7d625fcc1585434e6b",
+      "returncode": 0,
+      "role": "census-behaviour",
+      "sequence": null,
+      "session_ref": "99b1ca17-2573-4858-8345-714acff37923",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cost_usd": 0.244371,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 4887,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 4887,
+          "cache_read_input_tokens": 33928,
+          "inference_geo": "not_available",
+          "input_tokens": 114,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 413,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 413,
+              "cache_read_input_tokens": 13010,
+              "input_tokens": 56,
+              "model": null,
+              "output_tokens": 2350,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 2676,
+          "output_tokens_details": {
+            "thinking_tokens": 392
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [],
+        "id": "artifact-complete",
+        "status": "covered",
+        "summary": "The committed fixture consists of README.md, policy.py, and api.py at commit 6772da7; all three were read in full and nothing referenced by the README is missing."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "finding_ids": [],
+        "id": "repository-premises",
+        "status": "covered",
+        "summary": "The README's stated contract is that both modules reject Boolean identifiers; this is the premise all behaviour is judged against, and it is unambiguous."
+      },
+      {
+        "evidence": [
+          "repository/policy.py:1-2",
+          "repository/api.py:1-2"
+        ],
+        "finding_ids": [
+          "bool-subclass-of-int-accepted"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "Both predicates rely on isinstance(value, int). Because bool subclasses int in Python, True and False satisfy the check, so policy.permitted(True) returns True and api.decode_identifier(False) returns False rather than None. Neither site rejects Booleans."
+      },
+      {
+        "evidence": [
+          "repository/policy.py:1"
+        ],
+        "finding_ids": [],
+        "id": "consumers",
+        "status": "not_applicable",
+        "summary": "No callers of permitted or decode_identifier exist in the repository; the fixture has no consumer layer to trace."
+      },
+      {
+        "evidence": [
+          "repository/api.py:2"
+        ],
+        "finding_ids": [],
+        "id": "failure-recovery",
+        "status": "not_applicable",
+        "summary": "The functions are pure predicates with no I/O, state, or error paths; there is no failure mode to recover from beyond the incorrect accept decision already reported."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "finding_ids": [
+          "no-boolean-rejection-tests"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "The repository contains no tests. The README contract has no executable acceptance check, which is why the Boolean gap ships unnoticed at both sites."
+      },
+      {
+        "evidence": [
+          "repository/README.md:1-3"
+        ],
+        "finding_ids": [],
+        "id": "docs-operations",
+        "status": "covered",
+        "summary": "The README is accurate as a requirement statement; the defect is in code not documentation. No operational docs apply to a pure-function fixture."
+      },
+      {
+        "evidence": [
+          "repository/policy.py:2",
+          "repository/api.py:2",
+          "repository/README.md:3"
+        ],
+        "finding_ids": [
+          "bool-subclass-of-int-accepted"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "policy.py and api.py independently assert the same identifier rule and are consistently wrong in the same way; the README asserts the opposite. Fixing one module alone would leave the rule contradicted at the other."
+      },
+      {
+        "evidence": [
+          "repository/policy.py:1-2"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The fixture is minimal and the required repair is a one-line guard per file; no over-engineering is present or proposed."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/policy.py:2",
+          "repository/api.py:2"
+        ],
+        "id": "bool-subclass-of-int-accepted",
+        "remedy": "In both policy.py and api.py, exclude bool explicitly, e.g. isinstance(value, int) and not isinstance(value, bool) (or type(value) is int if subclasses of int are also unwanted). Apply the change at both sites in the same commit so the README rule is enforced consistently.",
+        "severity": "BLOCKER",
+        "summary": "Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool is a subclass of int. This directly violates the README requirement that both modules reject Boolean identifiers. permitted(True) returns True; decode_identifier(True) returns True instead of None."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "id": "no-boolean-rejection-tests",
+        "remedy": "Add a small test that asserts permitted(True) is False, permitted(False) is False, decode_identifier(True) is None, decode_identifier(False) is None, and that a plain int still passes in both modules.",
+        "severity": "MINOR",
+        "summary": "No test asserts the README contract, so the Boolean gap has no executable check at either site."
+      }
+    ],
+    "lane": "behaviour"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "99b1ca17-2573-4858-8345-714acff37923",
+  "model": "claude-fable-5-1",
+  "patch_applied": false,
+  "proposal": {
+    "addressed_finding_ids": [
+      "structural:probe-D1"
+    ],
+    "edits": [
+      {
+        "new_text": "def permitted(value):\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\n    return isinstance(value, int) and not isinstance(value, bool)\n",
+        "old_text": "def permitted(value):\n    return isinstance(value, int)\n",
+        "operation": "replace",
+        "path": "policy.py",
+        "target": "repository"
+      },
+      {
+        "new_text": "def decode_identifier(value):\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\n    if isinstance(value, bool) or not isinstance(value, int):\n        return None\n    return value\n",
+        "old_text": "def decode_identifier(value):\n    return value if isinstance(value, int) else None\n",
+        "operation": "replace",
+        "path": "api.py",
+        "target": "repository"
+      }
+    ],
+    "limitations": [
+      "Patch is unapplied and unexecuted; no test run or import check was performed.",
+      "Other int subclasses (e.g. IntEnum) remain accepted; only bool is excluded, matching the README's stated scope.",
+      "No test file is added by this patch; the suggested assertions are for the caller to place in their harness."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "assert permitted(True) is False and permitted(False) is False",
+      "assert permitted(0) is True and permitted(7) is True and permitted('7') is False",
+      "assert decode_identifier(True) is None and decode_identifier(False) is None",
+      "assert decode_identifier(0) == 0 and decode_identifier(42) == 42 and decode_identifier('42') is None"
+    ],
+    "summary": "Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothing was executed or verified.",
+    "unaddressed": []
+  },
+  "proposal_attempts": [
+    {
+      "argv": [
+        "claude",
+        "-p",
+        "--resume",
+        "99b1ca17-2573-4858-8345-714acff37923",
+        "--output-format",
+        "json",
+        "--model",
+        "claude-fable-5-1",
+        "--effort",
+        "medium",
+        "--safe-mode",
+        "--setting-sources",
+        "",
+        "--strict-mcp-config",
+        "--tools",
+        "Read,Grep,Glob",
+        "--allowedTools",
+        "Read,Grep,Glob"
+      ],
+      "duration_ms": 12264,
+      "error": false,
+      "failure_detail": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "raw": {
+        "bytes": 5655,
+        "excerpt": "{\"duration_api_ms\":10060,\"stop_reason\":\"tool_use\",\"session_id\":\"99b1ca17-2573-4858-8345-714acff37923\",\"total_cost_usd\":0.18576525,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":7076,\"cache_read_input_tokens\":6301,\"output_tokens\":853,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":7076,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":853,\"cache_read_input_tokens\":6301,\"cache_creation_input_tokens\":7076,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7076},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":853,\"cacheReadInputTokens\":6301,\"cacheCreationInputTokens\":7076,\"webSearchRequests\":0,\"costUSD\":0.18576525,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothing was executed or verified.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"policy.py\\\",\\\"old_text\\\":\\\"def permitted(value):\\\\n    return isinstance(value, int)\\\\n\\\",\\\"new_text\\\":\\\"def permitted(value):\\\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\\\n    return isinstance(value, int) and not isinstance(value, bool)\\\\n\\\"},{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"api.py\\\",\\\"old_text\\\":\\\"def decode_identifier(value):\\\\n    return value if isinstance(value, int) else None\\\\n\\\",\\\"new_text\\\":\\\"def decode_identifier(value):\\\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\\\n    if isinstance(value, bool) or not isinstance(value, int):\\\\n        return None\\\\n    return value\\\\n\\\"}],\\\"suggested_tests\\\":[\\\"assert permitted(True) is False and permitted(False) is False\\\",\\\"assert permitted(0) is True and permitted(7) is True and permitted('7') is False\\\",\\\"assert decode_identifier(True) is None and decode_identifier(False) is None\\\",\\\"assert decode_identifier(0) == 0 and decode_identifier(42) == 42 and decode_identifier('42') is None\\\"],\\\"limitations\\\":[\\\"Patch is unapplied and unexecuted; no test run or import check was performed.\\\",\\\"Other int subclasses (e.g. IntEnum) remain accepted; only bool is excluded, matching the README's stated scope.\\\",\\\"No test file is added by this patch; the suggested assertions are for the caller to place in their harness.\\\"]}\",\"structured_output\":{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothin",
+        "sha256": "89aa598b1cf5313b6c03782f4b6dda9f7bccd8ef633bb16092ee6466ff17c46b"
+      },
+      "response": {
+        "bytes": 1903,
+        "excerpt": "{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothing was executed or verified.\",\"addressed_finding_ids\":[\"structural:probe-D1\"],\"unaddressed\":[],\"edits\":[{\"target\":\"repository\",\"operation\":\"replace\",\"path\":\"policy.py\",\"old_text\":\"def permitted(value):\\n    return isinstance(value, int)\\n\",\"new_text\":\"def permitted(value):\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\n    return isinstance(value, int) and not isinstance(value, bool)\\n\"},{\"target\":\"repository\",\"operation\":\"replace\",\"path\":\"api.py\",\"old_text\":\"def decode_identifier(value):\\n    return value if isinstance(value, int) else None\\n\",\"new_text\":\"def decode_identifier(value):\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\n    if isinstance(value, bool) or not isinstance(value, int):\\n        return None\\n    return value\\n\"}],\"suggested_tests\":[\"assert permitted(True) is False and permitted(False) is False\",\"assert permitted(0) is True and permitted(7) is True and permitted('7') is False\",\"assert decode_identifier(True) is None and decode_identifier(False) is None\",\"assert decode_identifier(0) == 0 and decode_identifier(42) == 42 and decode_identifier('42') is None\"],\"limitations\":[\"Patch is unapplied and unexecuted; no test run or import check was performed.\",\"Other int subclasses (e.g. IntEnum) remain accepted; only bool is excluded, matching the README's stated scope.\",\"No test file is added by this patch; the suggested assertions are for the caller to place in their harness.\"]}",
+        "sha256": "b871fb762facea26e94e0172fe0d0de3dc6a25d2ae72ac554fcb02cb6026e3ae"
+      },
+      "returncode": 0,
+      "role": "proposal",
+      "session_ref": "99b1ca17-2573-4858-8345-714acff37923",
+      "stderr": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "usage": {
+        "cost_usd": 0.18576525,
+        "tokens": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7076,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 7076,
+          "cache_read_input_tokens": 6301,
+          "inference_geo": "not_available",
+          "input_tokens": 2,
+          "iterations": [
+            {
+              "cache_creation": {
+                "ephemeral_1h_input_tokens": 7076,
+                "ephemeral_5m_input_tokens": 0
+              },
+              "cache_creation_input_tokens": 7076,
+              "cache_read_input_tokens": 6301,
+              "input_tokens": 2,
+              "model": null,
+              "output_tokens": 853,
+              "type": "message"
+            }
+          ],
+          "output_tokens": 853,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_fetch_requests": 0,
+            "web_search_requests": 0
+          },
+          "service_tier": "standard",
+          "speed": "standard"
+        }
+      },
+      "validation_issue": null
+    }
+  ],
+  "proposal_duration_ms": 12264,
+  "proposal_raw": {
+    "bytes": 5655,
+    "excerpt": "{\"duration_api_ms\":10060,\"stop_reason\":\"tool_use\",\"session_id\":\"99b1ca17-2573-4858-8345-714acff37923\",\"total_cost_usd\":0.18576525,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":7076,\"cache_read_input_tokens\":6301,\"output_tokens\":853,\"output_tokens_details\":{\"thinking_tokens\":0},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":7076,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":853,\"cache_read_input_tokens\":6301,\"cache_creation_input_tokens\":7076,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":7076},\"type\":\"message\",\"model\":null}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-fable-5-1\":{\"inputTokens\":2,\"outputTokens\":853,\"cacheReadInputTokens\":6301,\"cacheCreationInputTokens\":7076,\"webSearchRequests\":0,\"costUSD\":0.18576525,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":0,\"canonicalModel\":\"claude-fable-5-1\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":2,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"{\\\"schema_version\\\":1,\\\"status\\\":\\\"proposed\\\",\\\"summary\\\":\\\"Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothing was executed or verified.\\\",\\\"addressed_finding_ids\\\":[\\\"structural:probe-D1\\\"],\\\"unaddressed\\\":[],\\\"edits\\\":[{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"policy.py\\\",\\\"old_text\\\":\\\"def permitted(value):\\\\n    return isinstance(value, int)\\\\n\\\",\\\"new_text\\\":\\\"def permitted(value):\\\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\\\n    return isinstance(value, int) and not isinstance(value, bool)\\\\n\\\"},{\\\"target\\\":\\\"repository\\\",\\\"operation\\\":\\\"replace\\\",\\\"path\\\":\\\"api.py\\\",\\\"old_text\\\":\\\"def decode_identifier(value):\\\\n    return value if isinstance(value, int) else None\\\\n\\\",\\\"new_text\\\":\\\"def decode_identifier(value):\\\\n    # bool is a subclass of int; README requires Boolean identifiers be rejected.\\\\n    if isinstance(value, bool) or not isinstance(value, int):\\\\n        return None\\\\n    return value\\\\n\\\"}],\\\"suggested_tests\\\":[\\\"assert permitted(True) is False and permitted(False) is False\\\",\\\"assert permitted(0) is True and permitted(7) is True and permitted('7') is False\\\",\\\"assert decode_identifier(True) is None and decode_identifier(False) is None\\\",\\\"assert decode_identifier(0) == 0 and decode_identifier(42) == 42 and decode_identifier('42') is None\\\"],\\\"limitations\\\":[\\\"Patch is unapplied and unexecuted; no test run or import check was performed.\\\",\\\"Other int subclasses (e.g. IntEnum) remain accepted; only bool is excluded, matching the README's stated scope.\\\",\\\"No test file is added by this patch; the suggested assertions are for the caller to place in their harness.\\\"]}\",\"structured_output\":{\"schema_version\":1,\"status\":\"proposed\",\"summary\":\"Unapplied candidate patch for structural:probe-D1. Both policy.permitted and api.decode_identifier use isinstance(value, int), which accepts True and False because bool subclasses int, contradicting README.md line 3. The patch excludes bool at both co-asserting sites in the same change so the README rule is enforced consistently. No files were modified and nothin",
+    "sha256": "89aa598b1cf5313b6c03782f4b6dda9f7bccd8ef633bb16092ee6466ff17c46b"
+  },
+  "proposal_resume_argv": [
+    "claude",
+    "-p",
+    "--resume",
+    "99b1ca17-2573-4858-8345-714acff37923",
+    "--output-format",
+    "json",
+    "--model",
+    "claude-fable-5-1",
+    "--effort",
+    "medium",
+    "--safe-mode",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--tools",
+    "Read,Grep,Glob",
+    "--allowedTools",
+    "Read,Grep,Glob"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "a91be219ea82651d5e831bd071c0a5e2603acc75afb91ede48e08d4f73d26476",
+  "proposal_session_ref": "99b1ca17-2573-4858-8345-714acff37923",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cost_usd": 0.18576525,
+    "tokens": {
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 7076,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "cache_creation_input_tokens": 7076,
+      "cache_read_input_tokens": 6301,
+      "inference_geo": "not_available",
+      "input_tokens": 2,
+      "iterations": [
+        {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7076,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 7076,
+          "cache_read_input_tokens": 6301,
+          "input_tokens": 2,
+          "model": null,
+          "output_tokens": 853,
+          "type": "message"
+        }
+      ],
+      "output_tokens": 853,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_fetch_requests": 0,
+        "web_search_requests": 0
+      },
+      "service_tier": "standard",
+      "speed": "standard"
+    }
+  },
+  "qualification_failure": null,
+  "qualified": true,
+  "scenario": "cross-file",
+  "schema_version": 1,
+  "source_commit": "6772da7ceb51e420fc21c6d43ee7e21bccd3c720",
+  "tests_executed_by_proposal": false
+}

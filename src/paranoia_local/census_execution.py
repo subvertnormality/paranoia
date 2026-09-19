@@ -14,17 +14,27 @@ from . import review_census as rc, telemetry
 
 
 @dataclass(frozen=True)
+class AuthorHandle:
+    """Transient successful fresh-lane ownership; never persisted in manifests."""
+    lane: str
+    session_ref: str
+    engine_name: str
+
+
+@dataclass(frozen=True)
 class LaneResult:
     lane: str
     manifest: dict[str, Any]
     attempts: list[rc.Attempt]
     rejected_payloads: list[dict[str, Any]]
     member_coverage: dict[str, list[str]]
+    author: AuthorHandle | None = None
 
 
 def namespace_lane(
     lane: str, manifest: dict[str, Any], attempts: list[rc.Attempt],
     rejected_payloads: list[dict[str, Any]], member_coverage: dict[str, list[str]],
+    *, session_ref: str | None = None, engine_name: str | None = None,
 ) -> LaneResult:
     """Give validated response-local finding IDs their existing lane namespace."""
     renamed = {finding["id"]: f"{lane}:{finding['id']}" for finding in manifest["findings"]}
@@ -35,7 +45,11 @@ def namespace_lane(
     for assessment in manifest["class_assessments"]:
         if assessment["finding_id"] is not None:
             assessment["finding_id"] = renamed[assessment["finding_id"]]
-    return LaneResult(lane, manifest, attempts, rejected_payloads, member_coverage)
+    author = (
+        AuthorHandle(lane, session_ref, engine_name)
+        if session_ref and engine_name else None
+    )
+    return LaneResult(lane, manifest, attempts, rejected_payloads, member_coverage, author)
 
 
 @dataclass(frozen=True)
@@ -44,6 +58,7 @@ class CensusResult:
     attempts: list[rc.Attempt]
     rejected_payloads: list[dict[str, Any]]
     member_coverage: dict[str, list[str]]
+    lane_results: tuple[LaneResult, ...] = ()
 
 
 def _raise_failures(
@@ -95,6 +110,7 @@ def collect(lanes: Sequence[str], run_lane: Callable[[str], LaneResult]) -> Cens
         [attempt for row in rows for attempt in row.attempts],
         [payload for row in rows for payload in row.rejected_payloads],
         next(row.member_coverage for row in rows if row.lane == "integrity"),
+        tuple(rows),
     )
 
 
