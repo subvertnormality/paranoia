@@ -52,7 +52,9 @@ edits remain supported. A clean caller checkout is required before dispatch, and
 caller ref plus application preimages are checked again before return.
 Both cleanliness checks compare the reviewed HEAD, index, untracked inventory,
 filesystem kinds/modes, and raw content identities without invoking repository
-clean/process filters. Proposed creates are checked as one prospective inventory:
+clean/process filters. Every tracked leaf is reached only through real checkout
+directories; a symlinked or non-directory ancestor refuses admission or makes
+the returned proposal stale. Proposed creates are checked as one prospective inventory:
 case-folded file/file, file/directory, and ancestor-component collisions reject
 through the existing validation retry.
 Existing tracked names remain in that collision inventory even when they are

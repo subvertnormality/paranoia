@@ -17,7 +17,8 @@ Reject a replacement group when its final bytes equal its pinned original, while
 valid adjacent edits and the existing single validation retry for both branch and plan.
 Branch proposal cleanliness must compare HEAD, index, untracked paths and raw checkout
 bytes without invoking repository-selected clean/process filters, both before dispatch
-and after response. Validate create paths as one prospective case-folded inventory,
+and after response. Require real-directory checkout ancestors for every tracked leaf,
+preserving sparse-checkout and submodule handling. Validate create paths as one prospective case-folded inventory,
 including new/new and existing ancestor file/directory collisions.
 Retain non-ASCII tracked names in that collision inventory while keeping proposed paths
 portable ASCII. Treat an empty real directory at a tracked uninitialized submodule as clean,

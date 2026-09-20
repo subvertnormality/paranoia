@@ -827,6 +827,17 @@ def _branch_proposal_raw_cleanliness_issue(
     for raw_path, (indexed_mode, oid) in sorted(indexed.items()):
         path_text = raw_path.decode("utf-8", errors="surrogateescape")
         path = repo.joinpath(*path_text.split("/"))
+        ancestor = repo
+        for component in path_text.split("/")[:-1]:
+            ancestor /= component
+            try:
+                ancestor_info = ancestor.lstat()
+            except FileNotFoundError:
+                if raw_path in skip_worktree:
+                    break
+                return f"tracked path {path_text!r} has an absent checkout ancestor"
+            if not stat.S_ISDIR(ancestor_info.st_mode):
+                return f"tracked path {path_text!r} has a non-directory checkout ancestor"
         try:
             info = path.lstat()
         except FileNotFoundError:

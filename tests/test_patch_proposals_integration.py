@@ -653,6 +653,68 @@ def test_ignored_create_obstruction_marks_public_proposal_stale(
     assert audit["application_suitability"] == "STALE"
 
 
+@pytest.mark.parametrize("timing", ["before-dispatch", "after-response"])
+def test_tracked_replacement_through_ignored_symlink_ancestor_never_reports_current(
+    tmp_path, monkeypatch, timing,
+):
+    repo = repository(tmp_path)
+    nested = repo / "pkg"
+    nested.mkdir()
+    (nested / "app.py").write_text("value = 1\n", encoding="utf-8")
+    git(repo, "add", "pkg/app.py")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "nested tracked file")
+    (repo / ".git" / "info" / "exclude").write_text("pkg\n", encoding="utf-8")
+    external = tmp_path / f"external-{timing}"
+
+    def replace_ancestor():
+        if not nested.is_symlink():
+            nested.rename(external)
+            nested.symlink_to(external, target_is_directory=True)
+
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    staged = handlers._staged_structural_review
+    if timing == "before-dispatch":
+        def mutate_after_review(*args, **kwargs):
+            result = staged(*args, **kwargs)
+            replace_ancestor()
+            return result
+        monkeypatch.setattr(handlers, "_staged_structural_review", mutate_after_review)
+
+    text = proposal_payload([{
+        "target": "repository", "operation": "replace", "path": "pkg/app.py",
+        "old_text": "value = 1\n", "new_text": "value = 2\n",
+    }])
+    calls = 0
+    def resume(self, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if timing == "after-response":
+            replace_ancestor()
+        return engines.Review(text, "proposal-session", text)
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+
+    logs = tmp_path / "logs"
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": f"tracked-symlink-{timing}", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=logs)
+    assert output.endswith(trailer)
+    if timing == "before-dispatch":
+        assert calls == 0
+        assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+        assert "caller checkout is not clean" in output
+    else:
+        assert calls == 1
+        assert "PATCH-PROPOSAL: PROPOSED" in output
+        assert "APPLICATION-SUITABILITY: STALE" in output
+        audit = json.loads(
+            next(logs.glob("*critique_branch_patch_proposal*.json")).read_text()
+        )
+        assert audit["application_suitability"] == "STALE"
+
+
 @pytest.mark.parametrize("kind", ["localized-omission", "localized-validation"])
 def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structurally_clear(
     tmp_path, monkeypatch, kind,
