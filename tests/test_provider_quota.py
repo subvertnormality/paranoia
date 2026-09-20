@@ -11,11 +11,23 @@ from paranoia_local.runner import RunResult
 # Exact provider diagnostic from issue 124's retained failed Claude attempts.
 MESSAGE = "You've reached your Fable limit. Switch to another model, or manage usage credits at claude.ai/settings/usage?from=cc_cli_limit_message, to continue."
 RAW = json.dumps({"type": "result", "is_error": True, "result": MESSAGE, "session_id": "quota-session"})
+SAFEGUARD_MESSAGE = "Opus 5's safeguards flagged this message [bio]"
+SAFEGUARD_RAW = json.dumps({
+    "type": "result", "is_error": True, "result": SAFEGUARD_MESSAGE,
+    "session_id": "safeguard-session",
+})
 
 
 def quota_review():
     return engines.ClaudeEngine()._finalize_review(
         engines.ClaudeEngine().parse_output(RAW), returncode=1,
+        stderr="", measured_duration_ms=1,
+    )
+
+
+def safeguard_review():
+    return engines.ClaudeEngine()._finalize_review(
+        engines.ClaudeEngine().parse_output(SAFEGUARD_RAW), returncode=1,
         stderr="", measured_duration_ms=1,
     )
 
@@ -54,6 +66,36 @@ def test_claude_quota_is_diagnostic_only_across_cli_routes(resume, channel):
 def test_quota_detection_does_not_relabel_other_results(engine, error, code, text):
     review = engines.Review(text=text, raw=text, session_ref=None, error=error, returncode=code)
     assert engines.claude_quota_guidance(review, engine) is None
+
+
+def test_claude_safeguard_is_diagnostic_only_and_names_supported_recovery():
+    review = safeguard_review()
+    before = replace(review)
+    hint = engines.claude_provider_guidance(review, "claude")
+    assert "provider safeguard declined" in hint
+    assert "do not treat it as convergence" in hint
+    assert "repeat the unchanged request" in hint
+    assert "faithful, neutral restatement" in hint
+    assert "provider support" in hint
+    assert "cleaner and attester are separate role selections" in hint
+    assert "cleaner_model to evade a safeguard is unsupported" in hint
+    assert review == before and review.returncode == 1 and review.error
+
+
+@pytest.mark.parametrize("engine,error,code,text", [
+    ("claude", False, 0, SAFEGUARD_MESSAGE),
+    ("codex", True, 1, SAFEGUARD_MESSAGE),
+    ("claude", True, 124, SAFEGUARD_MESSAGE),
+    ("claude", True, 1, "Documentation says: " + SAFEGUARD_MESSAGE),
+    ("claude", True, 1, "Request rejected by policy"),
+])
+def test_safeguard_detection_does_not_relabel_other_results(
+    engine, error, code, text,
+):
+    review = engines.Review(
+        text=text, raw=text, session_ref=None, error=error, returncode=code,
+    )
+    assert engines.claude_safeguard_guidance(review, engine) is None
 
 
 @pytest.mark.parametrize("retry", [False, True])
@@ -122,6 +164,36 @@ def test_arbitration_quota_names_override_without_rewriting_failure_audit(tmp_pa
     assert caught.value.record["raw"] == RAW
     assert len(calls) == 1
     assert "Claude model quota exhausted" in handlers._footer(quota_review(), engines.ClaudeEngine())
+
+
+def test_issue_120_arbitration_safeguard_failure_is_actionable_and_audited(
+    repo, tmp_path, monkeypatch,
+):
+    from tests.test_arbitrate_handler import FakeEngine, BASE
+
+    monkeypatch.setattr(ah, "_preflight", lambda _engines: None)
+    monkeypatch.setattr(engines, "require_evidence_profile", lambda _engine: "test")
+    monkeypatch.setattr(
+        engines.ClaudeEngine, "run", lambda *args, **kwargs: safeguard_review(),
+    )
+    result = ah.arbitrate(
+        {**BASE, "repo_path": str(repo)},
+        engines=[FakeEngine("codex"), FakeEngine("claude")],
+        log_dir=tmp_path / "logs",
+    )
+    assert "ARBITRATION: FAILED" in result
+    assert "SELECTED: none" in result
+    assert "ROUNDS: 0" in result
+    assert "CLEANING: cleaner-rejected" in result
+    assert "provider safeguard declined" in result
+    assert "do not treat it as convergence" in result
+    assert "decider-model override cannot recover" in result
+    audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
+    [attempt] = audit["phase_attempts"]
+    assert attempt["role"] == "cleaner"
+    assert attempt["status"] == "provider-failed"
+    assert attempt["engine_failure"]["failure_detail"] == SAFEGUARD_MESSAGE
+    assert attempt["engine_failure"]["raw"] == SAFEGUARD_RAW
 
 
 @pytest.mark.parametrize("phase", ["discovery", "discovery-validation-retry", "binding", "binding-validation-retry"])

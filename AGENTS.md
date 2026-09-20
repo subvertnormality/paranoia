@@ -576,6 +576,12 @@ of the resulting code and tests.
 - When discovery and its single correction both fail local claim-payload validation, preserve the
   ordered bounded validator reasons and exact initial/correction raw exchange; do not describe a
   successful provider process as a reviewer execution failure.
+- For issue #120, a recognized Claude safeguard refusal remains an execution failure with exact
+  retained provider channels and no decision authority. Add bounded operational guidance only:
+  after the bounded retry, stop replaying the unchanged request and use a faithful neutral new-run
+  restatement or provider support. Never bypass safeguards, change arbitration
+  cleaner/attester roles to evade them, grant convergence, or imply that a decider-model
+  override repairs a cleaning-phase refusal.
 - The reviewer remains read-only. The calling coding agent autonomously validates packets,
   edits the plan before round 2, increments the round, and reruns. No human is required for
   ordinary convergence, and unchanged-input reviewer churn is not correction.

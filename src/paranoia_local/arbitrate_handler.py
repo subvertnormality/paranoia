@@ -418,7 +418,7 @@ def _research_execution_failure(
     completed["prompt_sha256"] = pending["prompt_sha256"]
     completed["prompt_excerpt"] = pending["prompt_excerpt"]
     attempts[-1] = completed
-    quota = eng.claude_quota_guidance(review, engine.name)
+    quota = eng.claude_provider_guidance(review, engine.name)
     return _research_failure(
         engine=engine, model=model, phase=phase, kind="execution",
         message=(quota + " Provider diagnostic: " if quota else "") + detail,
@@ -2966,7 +2966,7 @@ def _run_agent(
     # deliberately preserves in-band error text (see tests/test_instrumentation.py),
     # so accepting non-empty output here would let a failed process cast a vote.
     if review.error:
-        quota = eng.claude_quota_guidance(review, engine_name)
+        quota = eng.claude_provider_guidance(review, engine_name)
         detail = _bounded_research_text(
             (quota + " Provider diagnostic: " if quota else "")
             + (review.failure_detail

@@ -123,6 +123,44 @@ def claude_quota_guidance(review: Review, engine_name: str) -> str | None:
     return None
 
 
+def claude_safeguard_guidance(review: Review, engine_name: str) -> str | None:
+    """Recognize a terminal Claude safeguard refusal and name safe recovery.
+
+    This is diagnostic-only.  It does not retry, rewrite the provider channels,
+    change the fixed arbitration cleaner/attester, or turn a failed call into a
+    completed review.
+    """
+    if engine_name != "claude" or not review.error or review.returncode not in {0, 1}:
+        return None
+    pattern = re.compile(
+        r"\s*(?:(?:claude|opus|sonnet|haiku|fable)(?:\s+\d+(?:\.\d+)?)?['’]s\s+)?"
+        r"safeguards?\s+flagged\s+this\s+message\b",
+        re.IGNORECASE,
+    )
+    if not any(pattern.match(value or "") for value in (
+        review.failure_detail, review.stderr, review.text,
+    )):
+        return None
+    return (
+        "Claude's provider safeguard declined this request. The failed result remains "
+        "non-authoritative: do not treat it as convergence, bypass the safeguard, or "
+        "repeat the unchanged request after the bounded retry. Preserve the audit, then "
+        "start a new run with a faithful, neutral restatement that removes accidental "
+        "trigger wording, or escalate the false positive to provider support. In "
+        "arbitration the cleaner and attester are separate role selections, so a "
+        "decider-model override cannot recover a cleaning-phase refusal. Changing "
+        "cleaner_model to evade a safeguard is unsupported."
+    )
+
+
+def claude_provider_guidance(review: Review, engine_name: str) -> str | None:
+    """Return actionable guidance for a recognized failed Claude provider call."""
+    return (
+        claude_quota_guidance(review, engine_name)
+        or claude_safeguard_guidance(review, engine_name)
+    )
+
+
 class Engine(ABC):
     name: str
     default_model: str
