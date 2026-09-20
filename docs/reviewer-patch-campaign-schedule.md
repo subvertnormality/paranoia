@@ -1,10 +1,12 @@
 # Frozen reviewer-patch qualification schedule
 
-Status: **AUTHORIZED — NOT LAUNCHED**. Revision 2 was frozen on 2026-09-20
+Status: **CANCELLED WITHOUT LAUNCH — OPT-IN DELIVERY SELECTED**. Revision 2 was frozen on 2026-09-20
 after the user explicitly approved the complete 16-pair external campaign,
 synthetic fixture/plan/finding/prompt egress to both configured providers,
 fresh Codex caller sessions, and the 708 reviewer/proposal/evidence plus 88
-caller-invocation hard ceilings. No campaign provider call has yet been made.
+caller-invocation hard ceilings. The user subsequently ruled out the expensive
+campaign and approved the narrower explicit opt-in merge. No campaign provider
+or caller call was made; this schedule remains as the unexecuted historical design.
 This schedule follows
 `docs/reviewer-patch-proposal-plan.md` sections 12 and 16. It authorizes no
 provider call beyond that explicit authorization. The converged implementation

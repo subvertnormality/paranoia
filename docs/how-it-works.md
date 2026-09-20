@@ -1,9 +1,9 @@
 # How Paranoia Local works
 
-> Reviewer-authored patch proposals are under qualification under
+> Reviewer-authored patch proposals are available as an explicit opt-in under
 > [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
-> while explicit true is reserved for the qualification harness.
+> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
+> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
 
 This guide explains the behavior behind the public tools. Start with the
 [README](../README.md) for installation or the [tool reference](tool-reference.md)
@@ -34,7 +34,7 @@ that default is deliberate.
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
 
-### Qualification-only patch supplement
+### Opt-in patch supplement
 
 With explicit propose_patch: true, a successful fresh census author may be
 resumed once to produce closed structured edits and once more only for local

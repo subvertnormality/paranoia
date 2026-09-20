@@ -1,9 +1,9 @@
 # Paranoia Local tool reference
 
-> Reviewer-authored patch proposals are under qualification under
+> Reviewer-authored patch proposals are available as an explicit opt-in under
 > [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
-> while explicit true is reserved for the qualification harness.
+> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
+> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
 
 This page documents the public MCP interface. The runtime schemas in
 [`src/paranoia_local/server.py`](../src/paranoia_local/server.py) are authoritative
@@ -60,7 +60,7 @@ default and returns cited findings plus a computed convergence trailer.
 | `lineage` | string | Derived | Explicit key; required for a detached head or raw commit |
 | `exempt` | object array | `[]` | Exempt exact `{class_id,path,line,line_text}` predicate matches |
 | `unexempt` | object array | `[]` | Revoke exact `{class_id,path,line}` exemptions |
-| `propose_patch` | boolean | `false` during qualification | Request a supplemental reviewer-authored, unapplied candidate patch after tracked settlement |
+| `propose_patch` | boolean | `false` | Request a supplemental reviewer-authored, unapplied candidate patch after tracked settlement |
 
 Rules:
 
@@ -79,6 +79,9 @@ Rules:
   checkout. It never changes the review verdict, durable state, or returned
   convergence trailer. The candidate is validated against pinned blobs but is
   not applied and no tests are run. Stale caller ref/preimages are reported.
+- Executing agents should opt in on the initial review when blocking debt is
+  concretely repairable. Keep it off for correction/final rounds, dirty or
+  one-shot reviews, architectural/authority gaps, or an already complete repair.
 
 Example:
 
@@ -110,7 +113,7 @@ runs before structural review by default.
 | `focus` | string | — | Optional review focus |
 | `stakes` | string | Modest internal-tool assumptions | Scope and consequence boundary |
 | `already_raised` | string array | `[]` | Accepted cited findings from earlier rounds |
-| `propose_patch` | boolean | `false` during qualification | Request a supplemental reviewer-authored, unapplied plan-text candidate after tracked settlement |
+| `propose_patch` | boolean | `false` | Request a supplemental reviewer-authored, unapplied plan-text candidate after tracked settlement |
 
 Rules:
 

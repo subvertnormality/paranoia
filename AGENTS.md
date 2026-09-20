@@ -1,9 +1,16 @@
 # Repository agent instructions
 
 Reviewer-authored patch proposals follow docs/reviewer-patch-proposal-plan.md and
-remain under qualification. `PROPOSE_PATCH_DEFAULT` is false; omission and explicit
-false are disabled, and explicit true is reserved for the qualification harness.
-Do not publish delivered/default-on wording before the plan's pre-flip gates pass.
+are delivered as an explicit opt-in. `PROPOSE_PATCH_DEFAULT` is false; omission and
+explicit false preserve ordinary review-only behavior, while explicit true requests
+the qualified supplemental path. The user declined the expensive paired campaign and
+approved this narrower opt-in merge; do not claim campaign-proven speed/cost benefit
+or publish default-on wording without a separate decision and default-on repair.
+Executing agents should set `propose_patch: true` on an initial clean, committed,
+tracked PLAN or CODE review when blocking debt appears concretely repairable in the
+reviewed artifact. Inspect the candidate rather than applying it blindly. Leave the
+flag false or omitted for correction/final rounds, dirty or one-shot reviews,
+architectural/authority gaps, or when a complete verified repair is already prepared.
 Proposal generation is supplemental after durable settlement: ordinary proposal-local
 preparation, provider, validation, logging and rendering failures must return the original
 review and exact trailer with an inert UNAVAILABLE diagnostic; retain every completed proposal

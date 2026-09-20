@@ -1,18 +1,20 @@
-# Reviewer-authored patch proposal qualification
+# Reviewer-authored patch proposal opt-in delivery
 
 This record follows `docs/reviewer-patch-proposal-plan.md`. The public default remains
-false. Explicit `propose_patch: true` is reserved for qualification until every pre-flip
-gate passes; no proposal is applied or tested by the production path.
+false and the user approved a narrower explicit opt-in merge after ruling out the
+expensive paired campaign. Explicit `propose_patch: true` requests the qualified
+supplement; no proposal is applied or tested by the production path. Default-on
+performance benefit is not claimed.
 
 | Gate | Branch evidence | Plan evidence | Status / disposition |
 | --- | --- | --- | --- |
 | G1 feasibility | Six frozen families across both providers; retained successes and decline; the repeated-occurrence trial remains historically failed with a documented false-rejecting harness diagnosis | Structural routes qualified for both providers; Claude verified route qualified; Codex verified harness failure retained | PASS for implementation feasibility only |
 | G2 local correctness | Pure protocol/rendering plus Git-backed directory, pre-read byte admission, retry cache, clean/stale caller, inert rendering, exception containment with retained attempt and rejected-payload evidence through retry preparation, requested/returned proposal-handle rebut exclusion and public-handler lifecycle coverage | Exact plan capture/newline/staleness, source-processing and localized-omission exclusion with UNAVAILABLE rendering, audit/trailer equality, custody, the same failure matrix through retry preparation, and a public verified-plan factual-repair lifecycle with real capture, binding and cold attestation | PASS pre-flip on the current branch |
 | G3 state independence | Paired isolated state roots drive the production census/materializer/class engine/persistence through nonempty debt/class, an actual committed wrong repair, correct repair and cold final; true and false successors/trailers match | Paired isolated state roots drive both structural-only and verified production plan lifecycles through nonempty debt/class/claim state, wrong and scope-weakening text, correct text and cold final; true and false review/class/claim successors and trailers match | PASS pre-flip |
-| G4 native correctness | Production-entry native campaign authorized but not run | Production-entry native campaign authorized but not run | PENDING campaign execution |
-| G5 usefulness | Paired E1-E9 experiment not run | L8/L9 paired experiment not run | PENDING; no benefit claim |
-| G6 human quality | No named independent human inspection yet | No named independent human inspection yet | PENDING; cannot be supplied by an LLM |
-| G7 delivery acceptance | Requires post-flip regression, primary E2E, docs/default agreement and CODE closure | Same, separately | BLOCKED until G1-G6 pass; no candidate flip |
+| G4 native correctness | Current-source public-handler Codex E2E produced a validated, CURRENT two-file proposal in one call | Earlier feasibility covers structural and verified plan paths | Campaign not run; sufficient only for explicit opt-in |
+| G5 usefulness | Paired E1-E9 experiment not run | L8/L9 paired experiment not run | WAIVED for opt-in by user; no speed/cost benefit claim |
+| G6 human quality | No campaign final-diff packet exists | No campaign final-diff packet exists | NOT APPLICABLE to cancelled campaign; user approved narrower opt-in |
+| G7 delivery acceptance | Default remains false; full regression, docs/default agreement, CODE closure and current native E2E complete | Default remains false; production lifecycle coverage retained | PASS for explicit opt-in only; default-on remains unqualified |
 
 ## Current evidence
 
@@ -22,7 +24,15 @@ gate passes; no proposal is applied or tested by the production path.
 - Frozen but unlaunched campaign schedule and spend boundary:
   `docs/reviewer-patch-campaign-schedule.md`.
 - Production path status: implemented under explicit true; omitted and false make zero
-  proposal calls. `PROPOSE_PATCH_DEFAULT` remains false.
+  proposal calls. `PROPOSE_PATCH_DEFAULT` remains false by explicit delivery decision.
+- Repository-only two-provider arbitration unanimously selected `merge-opt-in`.
+  Both deciders identified that flipping the constant alone would turn some valid
+  omitted-flag calls into eligibility errors; default-on needs separate tri-state
+  eligibility work. The arbitration used one round and no web research.
+- Current-source primary E2E: public `critique_branch` with explicit true produced
+  one validated two-file Codex proposal in 23,819 ms, exact snapshot/structural
+  bindings, `APPLICATION-SUITABILITY: CURRENT`, and an audit receipt. The reviewer
+  applied nothing and ran no tests.
 - Focused pre-flip matrix:
   `PYTHONPATH=src /home/andy/tools/paranoia-local/.venv/bin/pytest -q
   tests/test_patch_proposals.py tests/test_patch_proposals_integration.py
@@ -126,8 +136,8 @@ gate passes; no proposal is applied or tested by the production path.
 - Cost: qualifying proposal calls added 8.3-26.5 seconds in the small feasibility set.
   Human time, subscription price, and comparative experiment cost remain unknown.
 
-## Stop conditions currently active
+## Default-on stop conditions retained
 
-Do not flip `PROPOSE_PATCH_DEFAULT`, publish delivered/default-on wording, or claim repair
-speed/cost improvement until the frozen native paired campaign, separate branch/plan benefit
-thresholds, complete interval/call custody, and named human quality inspection all pass.
+Do not flip `PROPOSE_PATCH_DEFAULT`, publish default-on wording, or claim repair
+speed/cost improvement without a separate approved decision, corrected omitted-flag
+eligibility semantics, and proportionate new acceptance evidence.

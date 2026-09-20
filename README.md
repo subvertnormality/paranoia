@@ -1,9 +1,9 @@
 # Paranoia
 
-> Reviewer-authored patch proposals are under qualification under
+> Reviewer-authored patch proposals are available as an explicit opt-in under
 > [`docs/reviewer-patch-proposal-plan.md`](docs/reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
-> while explicit true is reserved for the qualification harness.
+> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
+> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
 
 Get a cold, adversarial review of your code, plans, and technical decisions from
 the other frontier coding agent.
@@ -145,7 +145,7 @@ You can bind an approved implementation plan to the branch review with
 contract for the lineage; later rounds verify the implementation against the same
 text. Changing the contract requires a new lineage.
 
-During the current qualification, explicit propose_patch: true can ask the
+Explicit `propose_patch: true` can ask the
 successful fresh census author for a supplemental candidate diff after the
 tracked review has settled. Omission and false remain disabled. The proposal is
 read-only, bound to the reviewed snapshot and complete target/class context,
@@ -153,6 +153,12 @@ locally validated against pinned source, separately audited, and never applied
 or tested by Paranoia. The original verdict, durable state, and convergence
 trailer remain authoritative. A dirty caller tree blocks branch proposal spend;
 later ref or preimage movement marks a returned candidate stale.
+
+For executing agents, opt in on the initial clean, committed, tracked review when
+blocking debt appears concretely repairable in the reviewed code or plan. Inspect
+and amend the candidate deliberately. Keep it off for correction/final rounds,
+dirty or one-shot reviews, architectural or missing-authority findings, and cases
+where the agent already has a complete verified repair.
 
 ### Review a plan
 

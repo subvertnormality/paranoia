@@ -1,13 +1,19 @@
 # Paranoia Local: LLM operating reference
 
-> Reviewer-authored patch proposals are under qualification under
+> Reviewer-authored patch proposals are available as an explicit opt-in under
 > [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` remains false: omission and explicit false are disabled,
-> while explicit true is reserved for the qualification harness.
+> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
+> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
 
 Purpose: provide enough precise context for an agent to install, select, and call
 Paranoia Local without inferring behavior from introductory prose. Runtime MCP
 schemas are authoritative.
+
+Patch-proposal selection rule: set `propose_patch: true` for an initial clean,
+committed, tracked PLAN or CODE review when blocking debt appears concretely
+repairable in the reviewed artifact. Inspect or amend the candidate; never apply
+it blindly. Omit or set false for correction/final rounds, dirty or one-shot
+reviews, architectural/authority gaps, or an already complete verified repair.
 
 ## Identity
 
