@@ -588,14 +588,18 @@ def test_git_backed_nonascii_inventory_blocks_ascii_create_collisions(tmp_path):
             pp.parse_and_render(context, proposal_payload([edit]), reader)
 
 
-def test_public_branch_accepts_empty_uninitialized_submodule_for_unrelated_proposal(
-    tmp_path, monkeypatch,
+@pytest.mark.parametrize("checkout_shape", ["empty-leaf", "absent-leaf", "absent-parent"])
+def test_public_branch_accepts_absent_or_empty_uninitialized_submodule_for_unrelated_proposal(
+    tmp_path, monkeypatch, checkout_shape,
 ):
     repo = repository(tmp_path)
     gitlink_oid = git(repo, "rev-parse", "HEAD")
     git(repo, "update-index", "--add", "--cacheinfo", "160000", gitlink_oid, "vendor/sub")
     git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "gitlink")
-    (repo / "vendor" / "sub").mkdir(parents=True)
+    if checkout_shape == "empty-leaf":
+        (repo / "vendor" / "sub").mkdir(parents=True)
+    elif checkout_shape == "absent-leaf":
+        (repo / "vendor").mkdir()
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
     trailer = install_settled_census(monkeypatch)
     text = proposal_reply("branch")
@@ -605,7 +609,8 @@ def test_public_branch_accepts_empty_uninitialized_submodule_for_unrelated_propo
     )
     output = handlers.critique_branch({
         "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
-        "round": 1, "lineage": "uninitialized-submodule", "stakes": "local",
+        "round": 1, "lineage": f"uninitialized-submodule-{checkout_shape}",
+        "stakes": "local",
         "web_search": False, "propose_patch": True,
     }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
     assert "PATCH-PROPOSAL: PROPOSED" in output
@@ -846,6 +851,88 @@ def test_public_handlers_contain_proposal_exceptions_and_preserve_settlement(
     assert "PATCH-PROPOSAL: UNAVAILABLE" in output
     assert "local proposal execution failed: RuntimeError: boom" in output
     assert output.endswith(trailer)
+
+
+@pytest.mark.parametrize("mode", ["branch", "plan"])
+@pytest.mark.parametrize("preparation_fault", ["prompt-check", "schema"])
+def test_public_handlers_retain_invalid_attempt_when_retry_preparation_raises(
+    tmp_path, monkeypatch, mode, preparation_fault,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    calls = 0
+
+    def resume(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return engines.Review("{}", "repair-session", "raw-invalid", duration_ms=29)
+
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+    if preparation_fault == "prompt-check":
+        original_prompt_issue = handlers._staged_prompt_issue
+        prompt_issue_calls = 0
+
+        def prompt_issue(*args, **kwargs):
+            nonlocal prompt_issue_calls
+            prompt_issue_calls += 1
+            if prompt_issue_calls == 2:
+                raise RuntimeError("prompt boom")
+            return original_prompt_issue(*args, **kwargs)
+
+        monkeypatch.setattr(
+            handlers, "_staged_prompt_issue", prompt_issue,
+        )
+        message = "local proposal retry preparation failed: RuntimeError: prompt boom"
+    else:
+        original_schema = pp.provider_schema
+        schema_calls = 0
+
+        def schema(context):
+            nonlocal schema_calls
+            schema_calls += 1
+            if schema_calls == 2:
+                raise RuntimeError("schema boom")
+            return original_schema(context)
+
+        monkeypatch.setattr(pp, "provider_schema", schema)
+        message = "local proposal retry preparation failed: RuntimeError: schema boom"
+    common = {
+        "repo_path": str(repo), "round": 1, "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }
+    if mode == "branch":
+        output = handlers.critique_branch({
+            **common, "base_ref": "main", "head_ref": "feature",
+            "lineage": f"retry-preparation-{preparation_fault}-branch",
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    else:
+        output = handlers.critique_plan({
+            **common, "plan_text": "The value is one.\n",
+            "lineage": f"retry-preparation-{preparation_fault}-plan",
+            "claim_verification": False,
+        }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert calls == 1
+    assert "settled body" in output
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in output
+    assert message in output
+    assert output.endswith(trailer)
+    audit = json.loads(next(
+        path for path in (tmp_path / "logs").glob("*patch_proposal*.json")
+    ).read_text())
+    assert audit["author_session_ref"] == "lane-session"
+    assert audit["proposal_session_ref"] == "repair-session"
+    assert audit["proposal_duration_ms"] >= 0
+    assert len(audit["proposal_attempt_ledger"]) == 1
+    attempt = audit["proposal_attempt_ledger"][0]
+    assert attempt["outcome"] == "validation-invalid"
+    assert attempt["session_ref"] == "repair-session"
+    assert attempt["duration_ms"] == 29
+    assert attempt["raw_excerpt"] == "raw-invalid"
+    assert attempt["raw_sha256"]
+    assert attempt["validation_issue"]
+    assert len(audit["rejected_payloads"]) == 1
+    assert audit["rejected_payloads"][0]["sequence"] == 1
 
 
 @pytest.mark.parametrize("mode", ["branch", "plan"])

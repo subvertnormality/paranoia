@@ -459,28 +459,40 @@ def _run_patch_proposal(
                 sp.MAX_ISSUE_CHARS,
             )
     if repairable and failure is not None and not review.error and review.session_ref:
-        retry_prompt = (
-            "Your complete patch-proposal object was rejected by local validation:\n"
-            + failure
-            + "\nReturn a complete replacement object. Discard the rejected object; do not "
-              "merge or omit edits. The full original binding and response contract follow.\n\n"
-            + prompt
-        )
-        retry_issue = _staged_prompt_issue(
-            retry_prompt, "patch proposal validation retry prompt",
-            maximum=MAX_PROPOSAL_PROMPT_CHARS,
-        )
-        if retry_issue is None and len(retry_prompt.encode("utf-8")) > MAX_PROPOSAL_PROMPT_CHARS:
-            retry_issue = (
-                "patch proposal validation retry prompt exceeds "
-                f"{MAX_PROPOSAL_PROMPT_CHARS} UTF-8 bytes"
+        retry_prompt: str | None = None
+        retry_schema: dict[str, Any] | None = None
+        try:
+            retry_prompt = (
+                "Your complete patch-proposal object was rejected by local validation:\n"
+                + failure
+                + "\nReturn a complete replacement object. Discard the rejected object; do not "
+                  "merge or omit edits. The full original binding and response contract follow.\n\n"
+                + prompt
+            )
+            retry_issue = _staged_prompt_issue(
+                retry_prompt, "patch proposal validation retry prompt",
+                maximum=MAX_PROPOSAL_PROMPT_CHARS,
+            )
+            if (retry_issue is None
+                    and len(retry_prompt.encode("utf-8")) > MAX_PROPOSAL_PROMPT_CHARS):
+                retry_issue = (
+                    "patch proposal validation retry prompt exceeds "
+                    f"{MAX_PROPOSAL_PROMPT_CHARS} UTF-8 bytes"
+                )
+            if retry_issue is None:
+                retry_schema = pp.provider_schema(context)
+        except Exception as exc:
+            retry_issue = rc.bounded_diagnostic(
+                f"local proposal retry preparation failed: {type(exc).__name__}: {exc}",
+                sp.MAX_ISSUE_CHARS,
             )
         if retry_issue is None:
+            assert retry_prompt is not None and retry_schema is not None
             try:
                 review = proposal_engine.resume_proposal(
                     review.session_ref, retry_prompt, cwd, model, effort,
                     timeout=PROPOSAL_RETRY_TIMEOUT_SEC, on_progress=on_progress,
-                    response_schema=pp.provider_schema(context),
+                    response_schema=retry_schema,
                 )
             except Exception as exc:
                 failure = rc.bounded_diagnostic(
@@ -828,16 +840,20 @@ def _branch_proposal_raw_cleanliness_issue(
         path_text = raw_path.decode("utf-8", errors="surrogateescape")
         path = repo.joinpath(*path_text.split("/"))
         ancestor = repo
+        ancestor_absent = False
         for component in path_text.split("/")[:-1]:
             ancestor /= component
             try:
                 ancestor_info = ancestor.lstat()
             except FileNotFoundError:
-                if raw_path in skip_worktree:
+                if raw_path in skip_worktree or indexed_mode == "160000":
+                    ancestor_absent = True
                     break
                 return f"tracked path {path_text!r} has an absent checkout ancestor"
             if not stat.S_ISDIR(ancestor_info.st_mode):
                 return f"tracked path {path_text!r} has a non-directory checkout ancestor"
+        if ancestor_absent:
+            continue
         try:
             info = path.lstat()
         except FileNotFoundError:

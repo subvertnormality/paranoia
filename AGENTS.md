@@ -7,7 +7,8 @@ Do not publish delivered/default-on wording before the plan's pre-flip gates pas
 Proposal generation is supplemental after durable settlement: ordinary proposal-local
 preparation, provider, validation, logging and rendering failures must return the original
 review and exact trailer with an inert UNAVAILABLE diagnostic; retain every completed proposal
-attempt and rejected reply in the bounded supplemental failure audit. Branch admission requires a
+attempt and rejected reply in the bounded supplemental failure audit, including when validation
+retry prompt or schema preparation fails before another dispatch. Branch admission requires a
 clean caller tree; pinned blob sizes and one shared retry-surviving source allowance gate reads,
 complete Git tree inventories retain directories, and returned suitability rechecks ref and
 preimages. Plan review keeps its historical universal-newline text/digest/snapshot semantics
@@ -21,7 +22,8 @@ and after response. Require real-directory checkout ancestors for every tracked 
 preserving sparse-checkout and submodule handling. Validate create paths as one prospective case-folded inventory,
 including new/new and existing ancestor file/directory collisions.
 Retain non-ASCII tracked names in that collision inventory while keeping proposed paths
-portable ASCII. Treat an empty real directory at a tracked uninitialized submodule as clean,
+portable ASCII. Treat an absent leaf, an absent ancestor, or an empty real directory at a tracked
+uninitialized submodule as clean,
 recursively validate initialized submodules, and mark create suitability stale for ignored
 destinations or non-directory checkout ancestors using lstat.
 If such debt is the only remaining claim blocker, report proposal UNAVAILABLE rather than

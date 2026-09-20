@@ -59,8 +59,9 @@ case-folded file/file, file/directory, and ancestor-component collisions reject
 through the existing validation retry.
 Existing tracked names remain in that collision inventory even when they are
 non-ASCII; proposed paths themselves retain the portable ASCII restriction.
-An empty uninitialized tracked submodule is clean, while initialized submodules
-are checked recursively. Ignored checkout entries do not dirty admission, but
+An absent or empty uninitialized tracked submodule is clean, including when its
+checkout parent is absent, while initialized submodules are checked recursively.
+Ignored checkout entries do not dirty admission, but
 an ignored destination or non-directory ancestor makes a returned create patch
 STALE.
 
@@ -75,7 +76,8 @@ Every provider-authored public field is emitted as an inert JSON value. A local
 proposal exception or missing supplemental audit yields PATCH-PROPOSAL:
 UNAVAILABLE while preserving the settled review and its exact existing
 trailer. Completed proposal attempts and rejected replies remain bounded in
-the supplemental failure audit. Known proposal-only author or continuation
+the supplemental failure audit even when retry prompt or schema preparation
+fails before another dispatch. Known proposal-only author or continuation
 handles cannot authorize rebut, even when the caller supplies an engine;
 runner fallback provenance covers both the requested author handle and any returned
 proposal handle. Only an independent completed critique or query can establish
