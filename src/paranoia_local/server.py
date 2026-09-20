@@ -173,10 +173,13 @@ TOOLS: list[Tool] = [
                 "propose_patch": {
                     "type": "boolean",
                     "description": (
-                        "Reviewer-authored unapplied patch proposal. Under qualification: "
-                        "omitted/false is disabled and explicit true is reserved for the "
-                        "qualification harness. Requires tracked committed convergence; it "
-                        "never applies changes or runs tests."
+                        "Explicit opt-in for a reviewer-authored unapplied patch proposal. "
+                        "Use true on an initial clean, committed, tracked review when blocking "
+                        "debt appears concretely repairable in the reviewed code; omitted/false "
+                        "keeps ordinary review-only behavior. Leave it off for correction/final, "
+                        "dirty or one-shot reviews, architectural or authority gaps, or when a "
+                        "complete verified repair already exists. It never applies changes or "
+                        "runs tests."
                     ),
                 },
                 "lineage": {
@@ -288,10 +291,13 @@ TOOLS: list[Tool] = [
                 "propose_patch": {
                     "type": "boolean",
                     "description": (
-                        "Reviewer-authored unapplied plan-text proposal. Under qualification: "
-                        "omitted/false is disabled and explicit true is reserved for the "
-                        "qualification harness. Requires tracked plan review; it never mutates "
-                        "the source plan or repository and never runs tests."
+                        "Explicit opt-in for a reviewer-authored unapplied plan-text proposal. "
+                        "Use true on an initial tracked review when blocking debt appears "
+                        "concretely repairable in the plan; omitted/false keeps ordinary "
+                        "review-only behavior. Leave it off for correction/final or one-shot "
+                        "reviews, architectural or authority gaps, or when a complete verified "
+                        "repair already exists. It never mutates the source plan or repository "
+                        "and never runs tests."
                     ),
                 },
                 "claim_verification": {

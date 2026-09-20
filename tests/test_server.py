@@ -82,6 +82,18 @@ class TestToolListing:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
         assert "repo_path" in tool.inputSchema["required"]
 
+    def test_review_schemas_explain_when_to_opt_in_to_patch_proposals(self) -> None:
+        for name in ("critique_branch", "critique_plan"):
+            tool = next(t for t in server.TOOLS if t.name == name)
+            description = tool.inputSchema["properties"]["propose_patch"]["description"]
+            assert "Explicit opt-in" in description
+            assert "initial" in description
+            assert "blocking debt appears concretely repairable" in description
+            assert "correction/final" in description
+            assert "architectural or authority gaps" in description
+            assert "omitted/false keeps ordinary review-only behavior" in description
+            assert "qualification harness" not in description
+
     def test_rebut_requires_session_and_rebuttal(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "rebut")
         req = tool.inputSchema["required"]
