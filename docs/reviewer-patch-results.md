@@ -108,6 +108,13 @@ gate passes; no proposal is applied or tested by the production path.
   session and timing without another dispatch, while preserving the settled
   review and trailer. Absent uninitialized gitlink leaves and ancestors are clean;
   existing symlink or non-directory ancestors remain rejected.
+- Full regression after the CODE round-11 repairs:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,471 passed in 268.51s at checkpoint `b67897b`. The proposal matrix passed
+  245 tests, all 19 historical allowance mutation guards passed, and
+  `git diff --check` passed before the clean checkpoint.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
