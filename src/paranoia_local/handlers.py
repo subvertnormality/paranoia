@@ -634,10 +634,7 @@ def _repository_proposal_sources(
         if not separator or len(fields) != 4:
             raise RuntimeError("malformed proposal Git tree entry")
         mode, kind, oid, raw_size = fields
-        try:
-            path = raw_path.decode("ascii", "strict")
-        except UnicodeDecodeError:
-            continue
+        path = raw_path.decode("utf-8", errors="surrogateescape")
         entry_kind = (
             "directory" if kind == "tree"
             else "gitlink" if kind == "commit" and mode == "160000"
@@ -838,8 +835,12 @@ def _branch_proposal_raw_cleanliness_issue(
             return f"tracked path {path_text!r} is absent from the caller checkout"
 
         if indexed_mode == "160000":
-            if not stat.S_ISDIR(info.st_mode) or not (path / ".git").exists():
-                return f"gitlink {path_text!r} is not an initialized or absent submodule"
+            if not stat.S_ISDIR(info.st_mode):
+                return f"gitlink {path_text!r} changed filesystem kind"
+            if not (path / ".git").exists():
+                if any(path.iterdir()):
+                    return f"uninitialized submodule {path_text!r} is not empty"
+                continue
             issue = _branch_proposal_raw_cleanliness_issue(path, oid, depth=depth + 1)
             if issue is not None:
                 return f"submodule {path_text!r} is not clean: {issue}"
@@ -888,8 +889,21 @@ def _branch_proposal_suitability(
         for item in result.files:
             path = repo.joinpath(*item.path.split("/"))
             if item.original is None:
-                if path.exists():
+                try:
+                    path.lstat()
+                except FileNotFoundError:
+                    pass
+                else:
                     return "STALE"
+                ancestor = repo
+                for component in item.path.split("/")[:-1]:
+                    ancestor /= component
+                    try:
+                        info = ancestor.lstat()
+                    except FileNotFoundError:
+                        continue
+                    if not stat.S_ISDIR(info.st_mode):
+                        return "STALE"
             elif path.read_bytes() != item.original:
                 return "STALE"
     except (OSError, RuntimeError, ValueError):
@@ -1025,13 +1039,13 @@ def _plan_patch_supplement(
                                  reason="tracked settlement was not confirmed", context=None)
     structural_targets = _proposal_structural_targets(closure)
     normalized_claims = pc.normalize_state(claim_state)
-    blocked_by_source_processing = any(
+    blocked_by_source_processing = claim_verification and any(
         pc.source_failure_only(row)
         for row in normalized_claims.get("claims", {}).values()
     )
     claim_targets = (
         _proposal_claim_targets(claim_state)
-        if claim_status.startswith(("parsed", "reused"))
+        if claim_verification and claim_status.startswith(("parsed", "reused"))
         else ()
     )
     targets = (*structural_targets, *claim_targets)
@@ -1045,7 +1059,7 @@ def _plan_patch_supplement(
                 ),
                 context=None,
             )
-        if pc.is_blocked(normalized_claims):
+        if claim_verification and pc.is_blocked(normalized_claims):
             return _proposal_section(
                 None, status="UNAVAILABLE",
                 reason=(

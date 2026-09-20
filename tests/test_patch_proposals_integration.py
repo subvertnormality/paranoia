@@ -561,6 +561,98 @@ def test_public_branch_cleanliness_never_executes_repository_filter(
     assert not sentinel.exists()
 
 
+def test_git_backed_nonascii_inventory_blocks_ascii_create_collisions(tmp_path):
+    repo = repository(tmp_path)
+    (repo / "K.py").write_text("kelvin\n", encoding="utf-8")
+    (repo / "ſrc").write_text("long s\n", encoding="utf-8")
+    git(repo, "add", "K.py", "ſrc")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "unicode inventory")
+    head = git(repo, "rev-parse", "HEAD")
+    entries, reader = handlers._repository_proposal_sources(repo, head, repo)
+    context = pp.ProposalContext(
+        "branch",
+        (pp.ProposalTarget(
+            "structural:D1", "repair", "MAJOR", ("repository/app.py:1",),
+        ),),
+        "stakes", head, "snapshot", None, None, entries,
+    )
+    for path, message in (
+        ("k.py", "case-collides with 'K.py'"),
+        ("src/new.py", "case-collides with existing path 'ſrc'"),
+    ):
+        edit = {
+            "target": "repository", "operation": "create", "path": path,
+            "old_text": None, "new_text": "created = True\n",
+        }
+        with pytest.raises(pp.ProposalError, match=message):
+            pp.parse_and_render(context, proposal_payload([edit]), reader)
+
+
+def test_public_branch_accepts_empty_uninitialized_submodule_for_unrelated_proposal(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    gitlink_oid = git(repo, "rev-parse", "HEAD")
+    git(repo, "update-index", "--add", "--cacheinfo", "160000", gitlink_oid, "vendor/sub")
+    git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "gitlink")
+    (repo / "vendor" / "sub").mkdir(parents=True)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_reply("branch")
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(text, "proposal-session", text),
+    )
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": "uninitialized-submodule", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs")
+    assert "PATCH-PROPOSAL: PROPOSED" in output
+    assert "APPLICATION-SUITABILITY: CURRENT" in output
+    assert output.endswith(trailer)
+
+
+@pytest.mark.parametrize("obstruction", ["file-ancestor", "symlink-ancestor", "dangling-target"])
+def test_ignored_create_obstruction_marks_public_proposal_stale(
+    tmp_path, monkeypatch, obstruction,
+):
+    repo = repository(tmp_path)
+    exclude = repo / ".git" / "info" / "exclude"
+    target = "ignored/new.py" if obstruction != "dangling-target" else "new.py"
+    exclude.write_text(("ignored\n" if target.startswith("ignored/") else "new.py\n"),
+                       encoding="utf-8")
+    if obstruction == "file-ancestor":
+        (repo / "ignored").write_text("not a directory\n", encoding="utf-8")
+    elif obstruction == "symlink-ancestor":
+        (repo / "real-directory").mkdir()
+        (repo / "ignored").symlink_to(repo / "real-directory", target_is_directory=True)
+    else:
+        (repo / "new.py").symlink_to(repo / "absent-target")
+
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    trailer = install_settled_census(monkeypatch)
+    text = proposal_payload([{
+        "target": "repository", "operation": "create", "path": target,
+        "old_text": None, "new_text": "created = True\n",
+    }])
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: engines.Review(text, "proposal-session", text),
+    )
+    logs = tmp_path / "logs"
+    output = handlers.critique_branch({
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "lineage": f"ignored-{obstruction}", "stakes": "local",
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=logs)
+    assert "PATCH-PROPOSAL: PROPOSED" in output
+    assert "APPLICATION-SUITABILITY: STALE" in output
+    assert output.endswith(trailer)
+    audit = json.loads(next(logs.glob("*critique_branch_patch_proposal*.json")).read_text())
+    assert audit["application_suitability"] == "STALE"
+
+
 @pytest.mark.parametrize("kind", ["localized-omission", "localized-validation"])
 def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structurally_clear(
     tmp_path, monkeypatch, kind,
@@ -608,6 +700,41 @@ def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structura
     ).read_text())
     assert trailer in review_audit["rendered_trailer"]
     assert output.endswith(review_audit["rendered_trailer"])
+
+
+def test_disabled_claim_verification_ignores_retained_claim_debt_for_supplement(
+    tmp_path, monkeypatch,
+):
+    repo = repository(tmp_path)
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state-root"))
+    trailer = install_settled_census(monkeypatch, blocking=False)
+    state = source_failure_claim_state()
+    calls = 0
+    def verify(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return state, "parsed retained failed claim"
+    monkeypatch.setattr(handlers, "_verify_plan_claims", verify)
+    common = {
+        "repo_path": str(repo), "plan_text": "The service always succeeds.\n",
+        "lineage": "disabled-retained-claims", "stakes": "local",
+        "propose_patch": False,
+    }
+    handlers.critique_plan({
+        **common, "round": 1, "claim_verification": True, "web_search": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs-first")
+    monkeypatch.setattr(
+        engines.CodexEngine, "resume_proposal",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("proposal called")),
+    )
+    output = handlers.critique_plan({
+        **common, "round": 2, "claim_verification": False,
+        "web_search": False, "propose_patch": True,
+    }, engine=engines.CodexEngine(), log_dir=tmp_path / "logs-second")
+    assert calls == 1
+    assert "PATCH-PROPOSAL: NOT-NEEDED" in output
+    assert "no blocking structural or semantic targets remain" in output
+    assert output.endswith(trailer)
 
 
 def test_caller_edit_during_continuation_marks_patch_stale(tmp_path, monkeypatch):

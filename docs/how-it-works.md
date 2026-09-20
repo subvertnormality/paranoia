@@ -55,6 +55,12 @@ filesystem kinds/modes, and raw content identities without invoking repository
 clean/process filters. Proposed creates are checked as one prospective inventory:
 case-folded file/file, file/directory, and ancestor-component collisions reject
 through the existing validation retry.
+Existing tracked names remain in that collision inventory even when they are
+non-ASCII; proposed paths themselves retain the portable ASCII restriction.
+An empty uninitialized tracked submodule is clean, while initialized submodules
+are checked recursively. Ignored checkout entries do not dirty admission, but
+an ignored destination or non-directory ancestor makes a returned create patch
+STALE.
 
 Plan review captures bytes once. Normal review, claim, digest, and structural
 identity continue to use the historical universal-newline text view; proposal
@@ -71,8 +77,11 @@ the supplemental failure audit. Known proposal-only author or continuation
 handles cannot authorize rebut, even when the caller supplies an engine;
 runner fallback provenance covers both the requested author handle and any returned
 proposal handle. Only an independent completed critique or query can establish
-that authority. Omission or localized-validation claim debt with no current
-semantic target reports proposal UNAVAILABLE, not a clean NOT-NEEDED result.
+that authority. When claim verification is active, omission or
+localized-validation claim debt with no current semantic target reports
+proposal UNAVAILABLE, not a clean NOT-NEEDED result. When verification is
+explicitly disabled, retained inactive claim history does not create proposal
+targets or change a structurally clean NOT-NEEDED result.
 
 1. **Census:** three independent cold lanes inspect the complete artifact. A
    separate call consolidates their validated findings into durable debt.

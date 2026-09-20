@@ -19,8 +19,14 @@ Branch proposal cleanliness must compare HEAD, index, untracked paths and raw ch
 bytes without invoking repository-selected clean/process filters, both before dispatch
 and after response. Validate create paths as one prospective case-folded inventory,
 including new/new and existing ancestor file/directory collisions.
+Retain non-ASCII tracked names in that collision inventory while keeping proposed paths
+portable ASCII. Treat an empty real directory at a tracked uninitialized submodule as clean,
+recursively validate initialized submodules, and mark create suitability stale for ignored
+destinations or non-directory checkout ancestors using lstat.
 If such debt is the only remaining claim blocker, report proposal UNAVAILABLE rather than
-NOT-NEEDED. Runner telemetry excludes both the requested author handle and returned proposal
+NOT-NEEDED only while claim verification is active; disabled verification leaves retained
+claim history inactive for supplemental status and targeting. Runner telemetry excludes both
+the requested author handle and returned proposal
 handle when a supplemental receipt is missing.
 Known proposal-only sessions are not rebut authority even with an explicit engine and cannot be
 promoted by a rebut continuation; an independent completed critique or query remains authoritative.
