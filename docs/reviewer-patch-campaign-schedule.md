@@ -1,9 +1,17 @@
 # Frozen reviewer-patch qualification schedule
 
-Status: **NOT LAUNCHED**. This schedule follows
+Status: **AUTHORIZED — NOT LAUNCHED**. Revision 2 was frozen on 2026-09-20
+after the user explicitly approved the complete 16-pair external campaign,
+synthetic fixture/plan/finding/prompt egress to both configured providers,
+fresh Codex caller sessions, and the 708 reviewer/proposal/evidence plus 88
+caller-invocation hard ceilings. No campaign provider call has yet been made.
+This schedule follows
 `docs/reviewer-patch-proposal-plan.md` sections 12 and 16. It authorizes no
-provider call by itself. The implementation under test is rooted at
-`8543823967a4a1e09eea2977d8fa42da5ed13910`; any production-code repair
+provider call beyond that explicit authorization. The converged implementation
+under test is rooted at
+`2b76c3fa44b14156df49eb38d60954b9b888bafe`; CODE rounds 12 and 13
+closed the round-11 debt and completed a cold final with zero open classes.
+Any production-code repair
 requires a new recorded schedule revision before launch.
 
 ## Fixed operating choices
