@@ -171,6 +171,7 @@ def test_issue_120_arbitration_safeguard_failure_is_actionable_and_audited(
     from tests.test_arbitrate_handler import FakeEngine, BASE
 
     monkeypatch.setattr(ah, "_preflight", lambda _engines: None)
+    monkeypatch.setattr(engines, "require_evidence_profile", lambda _engine: "test")
     monkeypatch.setattr(
         engines.ClaudeEngine, "run", lambda *args, **kwargs: safeguard_review(),
     )
