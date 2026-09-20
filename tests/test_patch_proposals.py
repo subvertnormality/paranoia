@@ -300,6 +300,18 @@ def test_create_parent_path_and_case_collisions_reject():
     with pytest.raises(pp.ProposalError, match="another edit path"):
         pp.parse_and_render(context, response(edits=creates), reader)
 
+    for paths in (
+        ("Pkg/a.py", "pkg/b.py"),
+        ("lib/Pkg/deep/a.py", "lib/pkg/deep/b.py"),
+    ):
+        creates = [
+            {"target": "repository", "operation": "create", "path": path,
+             "old_text": None, "new_text": "created = True\n"}
+            for path in paths
+        ]
+        with pytest.raises(pp.ProposalError, match="implied directory case-collides"):
+            pp.parse_and_render(context, response(edits=creates), reader)
+
     upper_file = entry("Src", data)
     context, reader = branch_context(data, entries=(upper_file,))
     with pytest.raises(pp.ProposalError, match="case-collides with existing path 'Src'"):
@@ -309,7 +321,7 @@ def test_create_parent_path_and_case_collisions_reject():
     distinct = [
         {"target": "repository", "operation": "create", "path": path,
          "old_text": None, "new_text": "created = True\n"}
-        for path in ("alpha.py", "beta.py")
+        for path in ("pkg/alpha.py", "pkg/beta.py")
     ]
     assert len(pp.parse_and_render(context, response(edits=distinct), reader).files) == 2
 

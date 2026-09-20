@@ -452,6 +452,24 @@ def _apply_edits(context: ProposalContext, edits: Sequence[dict[str, Any]],
                     f"another edit path {distinct!r}"
                 )
 
+    implied_directories: dict[str, dict[str, list[str]]] = {}
+    for path in grouped:
+        prefix = ""
+        for component in path.split("/")[:-1]:
+            prefix = f"{prefix}/{component}".lstrip("/")
+            implied_directories.setdefault(prefix.casefold(), {}).setdefault(
+                prefix, [],
+            ).append(path)
+    for spellings in implied_directories.values():
+        if len(spellings) > 1:
+            distinct = sorted(spellings)
+            affected = sorted({path for paths in spellings.values() for path in paths})
+            for path in affected:
+                issues.append(
+                    f"/edits/{grouped[path][0][0]}/path: implied directory "
+                    f"case-collides across edit paths {distinct!r}"
+                )
+
     total_source = 0
     result: list[ProposedFile] = []
     for path, rows in grouped.items():
