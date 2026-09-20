@@ -35,7 +35,7 @@ from . import logs, orientation, patch_proposals as pp, plan_claims as pc, promp
 from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions
 from .config import load_repo_config, resolve
-from .engines import Engine, Review, claude_quota_guidance
+from .engines import Engine, Review, claude_provider_guidance
 from .worktree import worktree_at
 
 
@@ -1202,7 +1202,7 @@ def _review_failure_projection(review: Review) -> dict[str, Any]:
 def _engine_failure_error(
     review: Review, *, role: str, engine_name: str = "",
 ) -> rc.CensusError:
-    quota = claude_quota_guidance(review, engine_name)
+    quota = claude_provider_guidance(review, engine_name)
     kind = (
         "timeout" if review.returncode == 124
         else "unavailable" if review.returncode == 127
@@ -2897,7 +2897,7 @@ def _footer(review: Review, engine: Engine) -> str:
             f"⚠️ REVIEW FAILED (engine={engine.name}, exit={review.returncode}) — treat the "
             f"output below as an error, not a completed review.\n\n"
         )
-    quota = claude_quota_guidance(review, engine.name)
+    quota = claude_provider_guidance(review, engine.name)
     return prefix + (quota + "\n\n" if quota else "") + (review.text or "[empty review]") + note
 
 
@@ -4259,7 +4259,7 @@ def _verify_plan_claims(
             if isinstance(review, _EvidencePhaseReview) and review.admission_reason else (
                 f"claim-{evidence_phase or 'audit'} reviewer failed "
                 f"(exit {review.returncode})"
-                + ("; " + quota if (quota := claude_quota_guidance(review, engine.name)) else "")
+                + ("; " + quota if (quota := claude_provider_guidance(review, engine.name)) else "")
             ),
             review.raw,
             failure_detail=review.failure_detail or "", stderr=review.stderr or "",
@@ -4314,7 +4314,7 @@ def _verify_plan_claims(
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
                 f"(exit {retry.returncode})"
-                + ("; " + quota if (quota := claude_quota_guidance(retry, engine.name)) else ""),
+                + ("; " + quota if (quota := claude_provider_guidance(retry, engine.name)) else ""),
                 retry.raw,
                 failure_detail=retry.failure_detail or "", stderr=retry.stderr or "",
                 returncode=retry.returncode,
@@ -5031,7 +5031,7 @@ class _CapturedClaimEngine:
             if review.error or not review.session_ref:
                 if expanded:
                     source_local_failure(
-                        claude_quota_guidance(review, self.binding_engine.name) or review.failure_detail or review.stderr or
+                        claude_provider_guidance(review, self.binding_engine.name) or review.failure_detail or review.stderr or
                         "dedicated expanded binding call failed"
                     )
                     continue
@@ -5059,7 +5059,7 @@ class _CapturedClaimEngine:
                 if correction.error or not correction.session_ref:
                     if expanded:
                         source_local_failure(
-                            claude_quota_guidance(correction, self.binding_engine.name) or correction.failure_detail or correction.stderr or
+                            claude_provider_guidance(correction, self.binding_engine.name) or correction.failure_detail or correction.stderr or
                             "dedicated expanded binding correction failed"
                         )
                         continue
@@ -5423,7 +5423,7 @@ class _CapturedClaimEngine:
                         attestation_batch[0]["evidence_index"],
                     )
                     local_failures[key] = pc.bounded_diagnostic(
-                        claude_quota_guidance(review, attester.name) or review.failure_detail or review.stderr or review.text
+                        claude_provider_guidance(review, attester.name) or review.failure_detail or review.stderr or review.text
                         or "dedicated expanded attestation call failed"
                     )
                     continue
@@ -5480,7 +5480,7 @@ class _CapturedClaimEngine:
                             attestation_batch[0]["evidence_index"],
                         )
                         local_failures[key] = pc.bounded_diagnostic(
-                            claude_quota_guidance(correction, attester.name) or correction.failure_detail or correction.stderr
+                            claude_provider_guidance(correction, attester.name) or correction.failure_detail or correction.stderr
                             or correction.text
                             or "dedicated expanded attestation correction failed"
                         )

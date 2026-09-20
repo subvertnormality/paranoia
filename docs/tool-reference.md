@@ -21,6 +21,16 @@ For Fable exhaustion, claude-opus-5 is a possible alternative, not a promise of
 availability. Model choice remains explicit and audited; no review is cleared by
 quota failure or by changing the model.
 
+A recognized Claude safeguard refusal is also a failed provider attempt, never
+a finding, decision, or convergence result. Paranoia retains the original
+provider channels and names the recovery path without weakening the safeguard:
+after the bounded retry, stop replaying the unchanged request; preserve the
+audit; then either start a new run with a faithful, neutral restatement that
+removes accidental trigger wording or escalate the false positive to provider
+support. In `arbitrate`, a `models.claude` override affects Claude research and
+decider calls only. The cleaner and attester remain fixed, so an override cannot
+recover a cleaning-phase refusal.
+
 `critique_branch`, `critique_plan`, `query`, and `rebut` accept these overrides:
 
 | Argument | Values | Default |
