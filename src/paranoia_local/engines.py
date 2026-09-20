@@ -147,8 +147,9 @@ def claude_safeguard_guidance(review: Review, engine_name: str) -> str | None:
         "repeat the unchanged request after the bounded retry. Preserve the audit, then "
         "start a new run with a faithful, neutral restatement that removes accidental "
         "trigger wording, or escalate the false positive to provider support. In "
-        "arbitration the cleaner and attester models are fixed, so a decider-model "
-        "override cannot recover a cleaning-phase refusal."
+        "arbitration the cleaner and attester are separate role selections, so a "
+        "decider-model override cannot recover a cleaning-phase refusal. Changing "
+        "cleaner_model to evade a safeguard is unsupported."
     )
 
 

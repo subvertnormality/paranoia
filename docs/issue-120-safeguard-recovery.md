@@ -21,7 +21,9 @@ Recovery remains fail-closed:
 3. Start a new arbitration with a faithful, neutral restatement that removes
    accidental trigger wording, or report the false positive to provider support.
 4. Do not use `models.claude` as a cleaner workaround. That mapping affects
-   Claude research and voting; the cleaner and attester models stay fixed.
+   Claude research and voting, not the separate cleaner or attester role.
+   `cleaner_model` is an explicit API override, but changing it to evade a
+   safeguard is unsupported.
 
 `tests/test_provider_quota.py` covers exact recognition, negative controls,
 unchanged provider-channel retention, and the public pre-vote arbitration

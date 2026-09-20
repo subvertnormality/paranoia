@@ -28,8 +28,8 @@ after the bounded retry, stop replaying the unchanged request; preserve the
 audit; then either start a new run with a faithful, neutral restatement that
 removes accidental trigger wording or escalate the false positive to provider
 support. In `arbitrate`, a `models.claude` override affects Claude research and
-decider calls only. The cleaner and attester remain fixed, so an override cannot
-recover a cleaning-phase refusal.
+decider calls only; it does not select the separate cleaner or attester role.
+Changing `cleaner_model` to evade a safeguard is unsupported.
 
 `critique_branch`, `critique_plan`, `query`, and `rebut` accept these overrides:
 

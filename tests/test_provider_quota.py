@@ -77,7 +77,8 @@ def test_claude_safeguard_is_diagnostic_only_and_names_supported_recovery():
     assert "repeat the unchanged request" in hint
     assert "faithful, neutral restatement" in hint
     assert "provider support" in hint
-    assert "cleaner and attester models are fixed" in hint
+    assert "cleaner and attester are separate role selections" in hint
+    assert "cleaner_model to evade a safeguard is unsupported" in hint
     assert review == before and review.returncode == 1 and review.error
 
 
