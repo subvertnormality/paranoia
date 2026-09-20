@@ -78,6 +78,19 @@ gate passes; no proposal is applied or tested by the production path.
   /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
   2,457 passed in 264.93s at checkpoint `f463159`. The proposal matrix passed
   231 tests and the clean committed issue-115/117/126 guard set passed 68 tests.
+- CODE round 9 was structurally clear and identified four minor custody/status
+  edges. The branch inventory now retains non-ASCII tracked names for portable
+  path collision checks; empty uninitialized submodules remain clean while
+  initialized ones are checked recursively; ignored create obstructions make
+  application suitability STALE; and disabled claim verification leaves
+  retained claim history inactive for supplemental status and targeting.
+- Full regression after those CODE round-9 repairs:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,463 passed in 252.25s at checkpoint `8dc41cb`. The expanded proposal
+  matrix passed 237 tests and the clean committed issue-115/117/126 guard set
+  passed 68 tests.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
