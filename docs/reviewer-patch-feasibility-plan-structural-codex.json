@@ -1,0 +1,399 @@
+{
+  "claim_attempts": [],
+  "claim_state": null,
+  "claim_status": null,
+  "effort": "medium",
+  "elapsed_ms": 83248,
+  "engine": "codex",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "domain",
+  "lane_attempts": [
+    {
+      "duration_ms": 64080,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0ba96-64a0-77c2-9636-b69c7f2b1b25\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I’ll read the repository and check the rollout and acceptance contract against its parser behavior.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files --hidden repository'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'rg --files --hidden repository'\",\"aggregated_output\":\"repository/README.md\\nrepository/validator.py\\nrepository/.git/logs/refs/heads/master\\nrepository/.git/logs/HEAD\\nrepository/.git/hooks/pre-rebase.sample\\nrepository/.git/hooks/post-update.sample\\nrepository/.git/hooks/commit-msg.sample\\nrepository/.git/hooks/prepare-commit-msg.sample\\nrepository/.git/hooks/pre-commit.sample\\nrepository/.git/hooks/applypatch-msg.sample\\nrepository/.git/hooks/pre-merge-commit.sample\\nrepository/.git/hooks/sendemail-validate.sample\\nrepository/.git/hooks/pre-receive.sample\\nrepository/.git/hooks/pre-push.sample\\nrepository/.git/hooks/pre-applypatch.sample\\nrepository/.git/hooks/update.sample\\nrepository/.git/hooks/push-to-checkout.sample\\nrepository/.git/hooks/fsmonitor-watchman.sample\\nrepository/.git/description\\nrepository/.git/config\\nrepository/.git/HEAD\\nrepository/.git/index\\nrepository/.git/COMMIT_EDITMSG\\nrepository/.git/refs/heads/master\\nrepository/.git/objects/43/efd2d6913bd85d5659c773b6b0a3a14089ca36\\nrepository/.git/info/exclude\\nrepository/.git/objects/f9/3275b21f1589a215319bf9def706fc84c7cf48\\nrepository/.git/objects/0f/0b2712e7ae5acc99aa54e29e71623be9d469b6\\nrepository/.git/objects/f7/642bbebe2cb838de94d73614b9e83bd6c41e76\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'nl -ba repository/README.md\\nnl -ba repository/validator.py'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'nl -ba repository/README.md\\nnl -ba repository/validator.py'\",\"aggregated_output\":\"     1\\t# Patch proposal feasibility fixture\\n     2\\t\\n     3\\tIdentifiers are integers, but Boolean values must be rejected.\\n     1\\tdef accepts_identifier(value):\\n     2\\t    # bool is an int subclass, but identifiers must reject booleans.\\n     3\\t    return isinstance(value, int)\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"class_assessments\\\": [],\\n  \\\"coverage\\\": [\\n    {\\n      \\\"evidence\\\": [\\n        {\\\"anchor\\\": \\\"plan:1-7\\\", \\\"rationale\\\": \\\"The entire plan specifies only immediate parser rollout and generic test execution; it does not define the repository change.\\\"}\\n      ],\\n      \\\"finding_ids\\\": [\\\"D1\\\"],\\n      \\\"id\\\": \\\"artifact-complete\\\",\\n      \\\"status\\\": \\\"finding\\\",\\n      \\\"summary\\\": \\\"The implementation contract is missing.\\\"\\n    },\\n    {\\n      \\\"evidence\\\": [\\n        {\\\"anchor\\\": \\\"repository/README.md:3\\\", \\\"rationale\\\": \\\"The repository requires integer identifiers with Boolean values rejected.\\\"},\\n        {\\\"anchor\\\": \\\"repository/validator.py:1-3\\\", \\\"rationale\\\": \\\"The supplied implementation is an identifier predicate, not a request parser.\\\"}\\n      ],\\n      \\\"finding_ids\\\": [\\\"D1\\\"],\\n      \\\"id\\\": \\\"repository-premises\\\",\\n      \\\"status\\\": \\\"finding\\\",\\n      \\\"summary\\\": \\\"The parser rollout premise does not match the supplied repository.\\\"\\n    },\\n    {\\n      \\\"evidence\\\": [\\n        {\\\"anchor\\\": \\\"repository/validator.py:1-3\\\", \\\"rationale\\\": \\\"The integer check currently admits Boolean values because bool subclasses int.\\\"},\\n        {\\\"anchor\\\": \\\"plan:3\\\", \\\"rationale\\\": \\\"Enabling an unspecified parser does not bind a correction to this predicate.\\\"}\\n      ],\\n     ",
+      "raw_sha256": "d908712979b188b89968c5d7435c50c7932ed8765a9457ad2ae1d9b675733dcf",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\n  \"class_assessments\": [],\n  \"coverage\": [\n    {\n      \"evidence\": [\n        {\"anchor\": \"plan:1-7\", \"rationale\": \"The entire plan specifies only immediate parser rollout and generic test execution; it does not define the repository change.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"artifact-complete\",\n      \"status\": \"finding\",\n      \"summary\": \"The implementation contract is missing.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"The repository requires integer identifiers with Boolean values rejected.\"},\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"The supplied implementation is an identifier predicate, not a request parser.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"repository-premises\",\n      \"status\": \"finding\",\n      \"summary\": \"The parser rollout premise does not match the supplied repository.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"The integer check currently admits Boolean values because bool subclasses int.\"},\n        {\"anchor\": \"plan:3\", \"rationale\": \"Enabling an unspecified parser does not bind a correction to this predicate.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"transformations\",\n      \"status\": \"finding\",\n      \"summary\": \"The plan does not specify the required identifier-validation correction.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"plan:3\", \"rationale\": \"The instruction refers to every request without identifying a request path or integration point.\"},\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"The supplied callable is the concrete consumer-facing boundary available for this change.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"consumers\",\n      \"status\": \"finding\",\n      \"summary\": \"The rollout targets an undefined consumer surface.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"Rejecting Boolean identifiers is the explicit failure behavior required by the repository.\"},\n        {\"anchor\": \"plan:1-7\", \"rationale\": \"The plan does not bind this rejection behavior.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"failure-recovery\",\n      \"status\": \"finding\",\n      \"summary\": \"Required rejection behavior is absent from the implementation contract.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"plan:5-7\", \"rationale\": \"Acceptance names neither executable checks nor expected outcomes.\"}\n      ],\n      \"finding_ids\": [\"D2\"],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"finding\",\n      \"summary\": \"The generic test gate cannot establish the required behavior.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"The documented behavior provides an authoritative contract that the implementation plan must follow.\"},\n        {\"anchor\": \"plan:3\", \"rationale\": \"The rollout instruction is disconnected from that documented contract.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"docs-operations\",\n      \"status\": \"finding\",\n      \"summary\": \"Operational instructions do not implement the documented identifier rule.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"plan:1-7\", \"rationale\": \"The complete plan contains no independently repeated normative definitions requiring consolidation.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"consistency\",\n      \"status\": \"covered\",\n      \"summary\": \"No duplicate-authority defect was found.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"plan:3\", \"rationale\": \"A universal request-parser rollout has no established relationship to the supplied predicate correction.\"},\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"The available implementation surface is a single validation function.\"}\n      ],\n      \"finding_ids\": [\"D1\"],\n      \"id\": \"proportionality\",\n      \"status\": \"finding\",\n      \"summary\": \"The proposed rollout scope is unsupported by the repository.\"\n ",
+      "response_sha256": "0a3e87786b641dfd8703051b8f5c9f940b1f630ff2d2a3e1e802355a8d207f7b",
+      "returncode": 0,
+      "role": "census-domain",
+      "sequence": null,
+      "session_ref": "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 23552,
+        "input_tokens": 36340,
+        "output_tokens": 1664,
+        "reasoning_output_tokens": 186
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "plan:1-7"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "artifact-complete",
+        "status": "finding",
+        "summary": "The implementation contract is missing."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "repository-premises",
+        "status": "finding",
+        "summary": "The parser rollout premise does not match the supplied repository."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3",
+          "plan:3"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "The plan does not specify the required identifier-validation correction."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "consumers",
+        "status": "finding",
+        "summary": "The rollout targets an undefined consumer surface."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "plan:1-7"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "failure-recovery",
+        "status": "finding",
+        "summary": "Required rejection behavior is absent from the implementation contract."
+      },
+      {
+        "evidence": [
+          "plan:5-7"
+        ],
+        "finding_ids": [
+          "D2"
+        ],
+        "id": "tests-acceptance",
+        "status": "finding",
+        "summary": "The generic test gate cannot establish the required behavior."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "plan:3"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "docs-operations",
+        "status": "finding",
+        "summary": "Operational instructions do not implement the documented identifier rule."
+      },
+      {
+        "evidence": [
+          "plan:1-7"
+        ],
+        "finding_ids": [],
+        "id": "consistency",
+        "status": "covered",
+        "summary": "No duplicate-authority defect was found."
+      },
+      {
+        "evidence": [
+          "plan:3",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [
+          "D1"
+        ],
+        "id": "proportionality",
+        "status": "finding",
+        "summary": "The proposed rollout scope is unsupported by the repository."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "plan:1-7",
+          "repository/README.md:3",
+          "repository/validator.py:1-3"
+        ],
+        "id": "D1",
+        "remedy": "Replace the parser-rollout instruction with an exact implementation obligation for accepts_identifier: enforce the README contract by rejecting Boolean values while preserving acceptance of other integers and rejection of non-integers. Identify this callable as the change boundary and tie delivery to the concrete acceptance gate.",
+        "severity": "BLOCKER",
+        "summary": "The plan targets an unsupported parser rollout and leaves the repository's actual validation defect unaddressed."
+      },
+      {
+        "evidence": [
+          "plan:5-7",
+          "repository/README.md:3",
+          "repository/validator.py:1-3"
+        ],
+        "id": "D2",
+        "remedy": "Specify a test artifact and executable command, with expected outcomes for True and False, representative integers including zero and negative values, and representative non-integers. Require successful execution with tests actually collected; block delivery on missing, skipped required, or failing checks.",
+        "severity": "MAJOR",
+        "summary": "Acceptance is not executable or specific enough to detect the existing domain violation."
+      }
+    ],
+    "lane": "domain"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+  "mode": "plan",
+  "model": "gpt-6-astra",
+  "patch_applied": false,
+  "plan_digest": "61398e61e6938d47b287b46b7b8594e79792c3ae7d23473691b468bd814650fc",
+  "plan_text": "# Rollout\n\nEnable the new parser for every request immediately.\n\n# Acceptance\n\nRun the tests and deliver when they pass.\n",
+  "proposal": {
+    "addressed_finding_ids": [
+      "structural:probe-D1"
+    ],
+    "edits": [
+      {
+        "new_text": "# Implementation\n\nUpdate `validator.py::accepts_identifier` to enforce the identifier contract in `README.md`: accept integers, excluding Boolean values, and reject all non-integers. Preserve the callable's signature and Boolean return type. Explicitly exclude `bool` before accepting instances of `int`. This function is the implementation scope; no request-parser rollout is required.\n\n# Acceptance\n\nAdd `test_validator.py` using `unittest`, importing `accepts_identifier` from `validator`. Assert that `True` and `False` return `False`; that `0`, `1`, and `-1` return `True`; and that `None`, `1.0`, `\"1\"`, and `[]` return `False`.\n\nRun `python -m unittest discover -s . -p test_validator.py` from the repository root. Deliver only when all required cases execute and pass. Missing tests, skipped required cases, collection or import errors, and failing assertions block delivery. Record the command and result as acceptance evidence.",
+        "old_text": "# Rollout\n\nEnable the new parser for every request immediately.\n\n# Acceptance\n\nRun the tests and deliver when they pass.",
+        "operation": "replace",
+        "path": null,
+        "target": "plan"
+      }
+    ],
+    "limitations": [
+      "This candidate is unapplied and unverified; no files were modified and no code or tests were executed."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "During implementation, execute the replacement plan's unittest acceptance command and require every specified case to pass."
+    ],
+    "summary": "Replace the unsupported parser rollout with a scoped identifier-validation correction and an executable, fail-closed acceptance gate.",
+    "unaddressed": []
+  },
+  "proposal_attempts": [
+    {
+      "argv": [
+        "codex",
+        "exec",
+        "resume",
+        "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+        "--json",
+        "--ignore-user-config",
+        "--skip-git-repo-check",
+        "-m",
+        "gpt-6-astra",
+        "-c",
+        "model_reasoning_effort=\"medium\"",
+        "-c",
+        "approval_policy=\"never\"",
+        "-c",
+        "web_search=\"disabled\"",
+        "-c",
+        "sandbox_workspace_write.network_access=false",
+        "-c",
+        "sandbox_workspace_write.exclude_slash_tmp=true",
+        "-c",
+        "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+        "-c",
+        "sandbox_workspace_write.writable_roots=[]",
+        "--disable",
+        "apps",
+        "--disable",
+        "browser_use",
+        "--disable",
+        "browser_use_external",
+        "--disable",
+        "browser_use_full_cdp_access",
+        "--disable",
+        "computer_use",
+        "--disable",
+        "in_app_browser",
+        "--disable",
+        "plugins",
+        "--disable",
+        "remote_plugin",
+        "--disable",
+        "plugin_sharing",
+        "--disable",
+        "enable_mcp_apps",
+        "--disable",
+        "image_generation",
+        "--disable",
+        "multi_agent",
+        "--disable",
+        "workspace_dependencies",
+        "--disable",
+        "auth_elicitation",
+        "--disable",
+        "tool_call_mcp_elicitation",
+        "--disable",
+        "skill_mcp_dependency_install",
+        "--disable",
+        "hooks",
+        "--disable",
+        "tool_suggest",
+        "-c",
+        "sandbox_mode=\"read-only\"",
+        "-"
+      ],
+      "duration_ms": 19122,
+      "error": false,
+      "failure_detail": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "raw": {
+        "bytes": 2208,
+        "excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0ba96-64a0-77c2-9636-b69c7f2b1b25\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"addressed_finding_ids\\\": [\\\"structural:probe-D1\\\"],\\n  \\\"edits\\\": [\\n    {\\n      \\\"new_text\\\": \\\"# Implementation\\\\n\\\\nUpdate `validator.py::accepts_identifier` to enforce the identifier contract in `README.md`: accept integers, excluding Boolean values, and reject all non-integers. Preserve the callable's signature and Boolean return type. Explicitly exclude `bool` before accepting instances of `int`. This function is the implementation scope; no request-parser rollout is required.\\\\n\\\\n# Acceptance\\\\n\\\\nAdd `test_validator.py` using `unittest`, importing `accepts_identifier` from `validator`. Assert that `True` and `False` return `False`; that `0`, `1`, and `-1` return `True`; and that `None`, `1.0`, `\\\\\\\"1\\\\\\\"`, and `[]` return `False`.\\\\n\\\\nRun `python -m unittest discover -s . -p test_validator.py` from the repository root. Deliver only when all required cases execute and pass. Missing tests, skipped required cases, collection or import errors, and failing assertions block delivery. Record the command and result as acceptance evidence.\\\",\\n      \\\"old_text\\\": \\\"# Rollout\\\\n\\\\nEnable the new parser for every request immediately.\\\\n\\\\n# Acceptance\\\\n\\\\nRun the tests and deliver when they pass.\\\",\\n      \\\"operation\\\": \\\"replace\\\",\\n      \\\"path\\\": null,\\n      \\\"target\\\": \\\"plan\\\"\\n    }\\n  ],\\n  \\\"limitations\\\": [\\n    \\\"This candidate is unapplied and unverified; no files were modified and no code or tests were executed.\\\"\\n  ],\\n  \\\"schema_version\\\": 1,\\n  \\\"status\\\": \\\"proposed\\\",\\n  \\\"suggested_tests\\\": [\\n    \\\"During implementation, execute the replacement plan's unittest acceptance command and require every specified case to pass.\\\"\\n  ],\\n  \\\"summary\\\": \\\"Replace the unsupported parser rollout with a scoped identifier-validation correction and an executable, fail-closed acceptance gate.\\\",\\n  \\\"unaddressed\\\": []\\n}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13910,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":496,\"reasoning_output_tokens\":71}}\n",
+        "sha256": "c8b4e7fb40819b10135ed8438793e812dd686392902effb5d013ef93c69d924a"
+      },
+      "response": {
+        "bytes": 1783,
+        "excerpt": "{\n  \"addressed_finding_ids\": [\"structural:probe-D1\"],\n  \"edits\": [\n    {\n      \"new_text\": \"# Implementation\\n\\nUpdate `validator.py::accepts_identifier` to enforce the identifier contract in `README.md`: accept integers, excluding Boolean values, and reject all non-integers. Preserve the callable's signature and Boolean return type. Explicitly exclude `bool` before accepting instances of `int`. This function is the implementation scope; no request-parser rollout is required.\\n\\n# Acceptance\\n\\nAdd `test_validator.py` using `unittest`, importing `accepts_identifier` from `validator`. Assert that `True` and `False` return `False`; that `0`, `1`, and `-1` return `True`; and that `None`, `1.0`, `\\\"1\\\"`, and `[]` return `False`.\\n\\nRun `python -m unittest discover -s . -p test_validator.py` from the repository root. Deliver only when all required cases execute and pass. Missing tests, skipped required cases, collection or import errors, and failing assertions block delivery. Record the command and result as acceptance evidence.\",\n      \"old_text\": \"# Rollout\\n\\nEnable the new parser for every request immediately.\\n\\n# Acceptance\\n\\nRun the tests and deliver when they pass.\",\n      \"operation\": \"replace\",\n      \"path\": null,\n      \"target\": \"plan\"\n    }\n  ],\n  \"limitations\": [\n    \"This candidate is unapplied and unverified; no files were modified and no code or tests were executed.\"\n  ],\n  \"schema_version\": 1,\n  \"status\": \"proposed\",\n  \"suggested_tests\": [\n    \"During implementation, execute the replacement plan's unittest acceptance command and require every specified case to pass.\"\n  ],\n  \"summary\": \"Replace the unsupported parser rollout with a scoped identifier-validation correction and an executable, fail-closed acceptance gate.\",\n  \"unaddressed\": []\n}",
+        "sha256": "df6de34209a6fa1c1f95ade305357e19eb453f9d7a1d764aab67441ef785a5ab"
+      },
+      "returncode": 0,
+      "role": "proposal",
+      "session_ref": "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+      "stderr": {
+        "bytes": 0,
+        "excerpt": "",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 0,
+        "input_tokens": 13910,
+        "output_tokens": 496,
+        "reasoning_output_tokens": 71
+      },
+      "validation_issue": null
+    }
+  ],
+  "proposal_duration_ms": 19122,
+  "proposal_raw": {
+    "bytes": 2208,
+    "excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0ba96-64a0-77c2-9636-b69c7f2b1b25\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"addressed_finding_ids\\\": [\\\"structural:probe-D1\\\"],\\n  \\\"edits\\\": [\\n    {\\n      \\\"new_text\\\": \\\"# Implementation\\\\n\\\\nUpdate `validator.py::accepts_identifier` to enforce the identifier contract in `README.md`: accept integers, excluding Boolean values, and reject all non-integers. Preserve the callable's signature and Boolean return type. Explicitly exclude `bool` before accepting instances of `int`. This function is the implementation scope; no request-parser rollout is required.\\\\n\\\\n# Acceptance\\\\n\\\\nAdd `test_validator.py` using `unittest`, importing `accepts_identifier` from `validator`. Assert that `True` and `False` return `False`; that `0`, `1`, and `-1` return `True`; and that `None`, `1.0`, `\\\\\\\"1\\\\\\\"`, and `[]` return `False`.\\\\n\\\\nRun `python -m unittest discover -s . -p test_validator.py` from the repository root. Deliver only when all required cases execute and pass. Missing tests, skipped required cases, collection or import errors, and failing assertions block delivery. Record the command and result as acceptance evidence.\\\",\\n      \\\"old_text\\\": \\\"# Rollout\\\\n\\\\nEnable the new parser for every request immediately.\\\\n\\\\n# Acceptance\\\\n\\\\nRun the tests and deliver when they pass.\\\",\\n      \\\"operation\\\": \\\"replace\\\",\\n      \\\"path\\\": null,\\n      \\\"target\\\": \\\"plan\\\"\\n    }\\n  ],\\n  \\\"limitations\\\": [\\n    \\\"This candidate is unapplied and unverified; no files were modified and no code or tests were executed.\\\"\\n  ],\\n  \\\"schema_version\\\": 1,\\n  \\\"status\\\": \\\"proposed\\\",\\n  \\\"suggested_tests\\\": [\\n    \\\"During implementation, execute the replacement plan's unittest acceptance command and require every specified case to pass.\\\"\\n  ],\\n  \\\"summary\\\": \\\"Replace the unsupported parser rollout with a scoped identifier-validation correction and an executable, fail-closed acceptance gate.\\\",\\n  \\\"unaddressed\\\": []\\n}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13910,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":496,\"reasoning_output_tokens\":71}}\n",
+    "sha256": "c8b4e7fb40819b10135ed8438793e812dd686392902effb5d013ef93c69d924a"
+  },
+  "proposal_resume_argv": [
+    "codex",
+    "exec",
+    "resume",
+    "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+    "--json",
+    "--ignore-user-config",
+    "--skip-git-repo-check",
+    "-m",
+    "gpt-6-astra",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "approval_policy=\"never\"",
+    "-c",
+    "web_search=\"disabled\"",
+    "-c",
+    "sandbox_workspace_write.network_access=false",
+    "-c",
+    "sandbox_workspace_write.exclude_slash_tmp=true",
+    "-c",
+    "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+    "-c",
+    "sandbox_workspace_write.writable_roots=[]",
+    "--disable",
+    "apps",
+    "--disable",
+    "browser_use",
+    "--disable",
+    "browser_use_external",
+    "--disable",
+    "browser_use_full_cdp_access",
+    "--disable",
+    "computer_use",
+    "--disable",
+    "in_app_browser",
+    "--disable",
+    "plugins",
+    "--disable",
+    "remote_plugin",
+    "--disable",
+    "plugin_sharing",
+    "--disable",
+    "enable_mcp_apps",
+    "--disable",
+    "image_generation",
+    "--disable",
+    "multi_agent",
+    "--disable",
+    "workspace_dependencies",
+    "--disable",
+    "auth_elicitation",
+    "--disable",
+    "tool_call_mcp_elicitation",
+    "--disable",
+    "skill_mcp_dependency_install",
+    "--disable",
+    "hooks",
+    "--disable",
+    "tool_suggest",
+    "-c",
+    "sandbox_mode=\"read-only\"",
+    "-"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "a8c8e1c336d55d11adc1f42881e45433d0e5daa8532759ccbcb4117c87ca7d36",
+  "proposal_session_ref": "01a0ba96-64a0-77c2-9636-b69c7f2b1b25",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 13910,
+    "output_tokens": 496,
+    "reasoning_output_tokens": 71
+  },
+  "qualification_failure": null,
+  "qualified": true,
+  "scenario": "plan-structural",
+  "schema_version": 1,
+  "source_commit": "0f0b2712e7ae5acc99aa54e29e71623be9d469b6",
+  "target_id": "structural:probe-D1",
+  "tests_executed_by_proposal": false
+}

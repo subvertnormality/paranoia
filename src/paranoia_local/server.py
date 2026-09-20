@@ -170,6 +170,18 @@ TOOLS: list[Tool] = [
                         "for the legacy one-shot review."
                     ),
                 },
+                "propose_patch": {
+                    "type": "boolean",
+                    "description": (
+                        "Explicit opt-in for a reviewer-authored unapplied patch proposal. "
+                        "Use true on an initial clean, committed, tracked review when blocking "
+                        "debt appears concretely repairable in the reviewed code; omitted/false "
+                        "keeps ordinary review-only behavior. Leave it off for correction/final, "
+                        "dirty or one-shot reviews, architectural or authority gaps, or when a "
+                        "complete verified repair already exists. It never applies changes or "
+                        "runs tests."
+                    ),
+                },
                 "lineage": {
                     "type": "string",
                     "description": (
@@ -274,6 +286,18 @@ TOOLS: list[Tool] = [
                         "call argument only; .paranoia.toml is not consulted for it, in "
                         "either direction, so a project's branch-review setting can neither "
                         "enable nor disable the plan gate."
+                    ),
+                },
+                "propose_patch": {
+                    "type": "boolean",
+                    "description": (
+                        "Explicit opt-in for a reviewer-authored unapplied plan-text proposal. "
+                        "Use true on an initial tracked review when blocking debt appears "
+                        "concretely repairable in the plan; omitted/false keeps ordinary "
+                        "review-only behavior. Leave it off for correction/final or one-shot "
+                        "reviews, architectural or authority gaps, or when a complete verified "
+                        "repair already exists. It never mutates the source plan or repository "
+                        "and never runs tests."
                     ),
                 },
                 "claim_verification": {

@@ -14,8 +14,10 @@ from . import telemetry
 
 import hashlib
 import json
+import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -28,8 +30,8 @@ from threading import Lock
 from typing import Any, Callable, Mapping, Sequence
 
 from . import arbitration, class_closure as cc
-from . import engines as eng, external_sources, inert_git, inert_tree
-from . import logs, orientation, plan_claims as pc, prompts, review_census as rc
+from . import engines as eng, external_sources, git_objects, inert_git, inert_tree
+from . import logs, orientation, patch_proposals as pp, plan_claims as pc, prompts, review_census as rc
 from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions
 from .config import load_repo_config, resolve
@@ -58,6 +60,13 @@ STAGED_CENSUS_LANE_TIMEOUT_SEC = 1800
 STAGED_CONSOLIDATION_TIMEOUT_SEC = 1200
 STAGED_FOLLOWUP_TIMEOUT_SEC = 2400
 STAGED_FORMAT_RETRY_TIMEOUT_SEC = 600
+PROPOSAL_INITIAL_TIMEOUT_SEC = 900
+PROPOSAL_RETRY_TIMEOUT_SEC = 300
+PROPOSAL_LOCAL_RESERVE_SEC = 30
+PROPOSAL_TOTAL_RESERVE_SEC = 1230
+PROPOSAL_WHOLE_CALL_SECONDS = 8400
+MAX_PROPOSAL_PROMPT_CHARS = 1_000_000
+PROPOSE_PATCH_DEFAULT = False
 
 PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS = """This plan correction is a closure candidate. After
 checking every supplied debt repair, scan the complete artifact against every supplied checklist
@@ -355,6 +364,818 @@ def _attempt(
         response[:4000] if response else None, sequence,
         **projection, requested_timeout_sec=requested_timeout_sec,
         provider_duration_ms=review.provider_duration_ms,
+    )
+
+
+@dataclass(frozen=True)
+class _ProposalExecution:
+    result: pp.ProposalResult | None
+    attempts: tuple[dict[str, Any], ...]
+    rejected_payloads: tuple[dict[str, Any], ...]
+    reason: str | None
+    author_session_ref: str | None
+    proposal_session_ref: str | None
+    duration_ms: int
+
+
+def _run_patch_proposal(
+    *, context: pp.ProposalContext, source_reader: pp.SourceReader | None,
+    author: census.AuthorHandle, engine: Engine, cwd: Path, model: str, effort: str,
+    deadline: float | None, on_progress: Callable[[str], None] | None,
+) -> _ProposalExecution:
+    """Resume one successful lane, with one validation retry and no execution retry."""
+    started = time.monotonic()
+    if deadline is None:
+        return _ProposalExecution(None, (), (), "authoritative deadline unavailable",
+                                  author.session_ref, None, 0)
+    if time.monotonic() + PROPOSAL_TOTAL_RESERVE_SEC > deadline:
+        return _ProposalExecution(
+            None, (), (), "insufficient deadline headroom for bounded proposal and retry",
+            author.session_ref, None, 0,
+        )
+    prompt = pp.render_prompt(context)
+    issue = _staged_prompt_issue(
+        prompt, "patch proposal prompt", maximum=MAX_PROPOSAL_PROMPT_CHARS,
+    )
+    if issue is not None:
+        return _ProposalExecution(None, (), (), issue, author.session_ref, None,
+                                  int((time.monotonic() - started) * 1000))
+    if len(prompt.encode("utf-8")) > MAX_PROPOSAL_PROMPT_CHARS:
+        return _ProposalExecution(
+            None, (), (),
+            f"patch proposal prompt exceeds {MAX_PROPOSAL_PROMPT_CHARS} UTF-8 bytes",
+            author.session_ref, None, int((time.monotonic() - started) * 1000),
+        )
+    if author.engine_name != engine.name:
+        return _ProposalExecution(
+            None, (), (), "proposal author engine does not match current reviewer",
+            author.session_ref, None, int((time.monotonic() - started) * 1000),
+        )
+    proposal_engine = engine.for_role(eng.ROLE_REPOSITORY)
+    attempts: list[rc.Attempt] = []
+    rejected: list[dict[str, Any]] = []
+    result: pp.ProposalResult | None = None
+    failure: str | None = None
+    try:
+        review = proposal_engine.resume_proposal(
+            author.session_ref, prompt, cwd, model, effort,
+            timeout=PROPOSAL_INITIAL_TIMEOUT_SEC, on_progress=on_progress,
+            response_schema=pp.provider_schema(context),
+        )
+    except Exception as exc:
+        failure = rc.bounded_diagnostic(
+            f"local proposal execution failed: {type(exc).__name__}: {exc}",
+            sp.MAX_ISSUE_CHARS,
+        )
+        return _ProposalExecution(
+            None, (), (), failure, author.session_ref, None,
+            int((time.monotonic() - started) * 1000),
+        )
+    attempts.append(_attempt(
+        "patch-proposal", proposal_engine, review,
+        sequence=1, requested_timeout_sec=PROPOSAL_INITIAL_TIMEOUT_SEC,
+    ))
+    repairable = False
+    if review.error:
+        failure = rc.bounded_diagnostic(
+            review.failure_detail or review.text or "proposal provider failure",
+            sp.MAX_ISSUE_CHARS,
+        )
+    else:
+        try:
+            result = pp.parse_and_render(context, review.text, source_reader)
+        except pp.ProposalError as exc:
+            failure = str(exc)
+            repairable = True
+            attempts[-1] = replace(
+                attempts[-1], outcome="validation-invalid", validation_issue=failure,
+            )
+            rejected.append(rc.rejected_payload(
+                "patch-proposal", review.text, sequence=1, validation_issue=failure,
+            ))
+        except Exception as exc:
+            failure = rc.bounded_diagnostic(
+                f"local proposal processing failed: {type(exc).__name__}: {exc}",
+                sp.MAX_ISSUE_CHARS,
+            )
+    if repairable and failure is not None and not review.error and review.session_ref:
+        retry_prompt: str | None = None
+        retry_schema: dict[str, Any] | None = None
+        try:
+            retry_prompt = (
+                "Your complete patch-proposal object was rejected by local validation:\n"
+                + failure
+                + "\nReturn a complete replacement object. Discard the rejected object; do not "
+                  "merge or omit edits. The full original binding and response contract follow.\n\n"
+                + prompt
+            )
+            retry_issue = _staged_prompt_issue(
+                retry_prompt, "patch proposal validation retry prompt",
+                maximum=MAX_PROPOSAL_PROMPT_CHARS,
+            )
+            if (retry_issue is None
+                    and len(retry_prompt.encode("utf-8")) > MAX_PROPOSAL_PROMPT_CHARS):
+                retry_issue = (
+                    "patch proposal validation retry prompt exceeds "
+                    f"{MAX_PROPOSAL_PROMPT_CHARS} UTF-8 bytes"
+                )
+            if retry_issue is None:
+                retry_schema = pp.provider_schema(context)
+        except Exception as exc:
+            retry_issue = rc.bounded_diagnostic(
+                f"local proposal retry preparation failed: {type(exc).__name__}: {exc}",
+                sp.MAX_ISSUE_CHARS,
+            )
+        if retry_issue is None:
+            assert retry_prompt is not None and retry_schema is not None
+            try:
+                review = proposal_engine.resume_proposal(
+                    review.session_ref, retry_prompt, cwd, model, effort,
+                    timeout=PROPOSAL_RETRY_TIMEOUT_SEC, on_progress=on_progress,
+                    response_schema=retry_schema,
+                )
+            except Exception as exc:
+                failure = rc.bounded_diagnostic(
+                    f"local proposal retry failed: {type(exc).__name__}: {exc}",
+                    sp.MAX_ISSUE_CHARS,
+                )
+                return _ProposalExecution(
+                    None, tuple(attempt.json() for attempt in attempts),
+                    tuple(rejected), failure, author.session_ref,
+                    attempts[-1].session_ref,
+                    int((time.monotonic() - started) * 1000),
+                )
+            attempts.append(_attempt(
+                "patch-proposal-validation-retry", proposal_engine, review,
+                sequence=2, requested_timeout_sec=PROPOSAL_RETRY_TIMEOUT_SEC,
+            ))
+            if review.error:
+                failure = rc.bounded_diagnostic(
+                    review.failure_detail or review.text or "proposal retry failure",
+                    sp.MAX_ISSUE_CHARS,
+                )
+            else:
+                try:
+                    result = pp.parse_and_render(context, review.text, source_reader)
+                    failure = None
+                except pp.ProposalError as exc:
+                    failure = str(exc)
+                    attempts[-1] = replace(
+                        attempts[-1], outcome="validation-invalid",
+                        validation_issue=failure,
+                    )
+                    rejected.append(rc.rejected_payload(
+                        "patch-proposal-validation-retry", review.text,
+                        sequence=2, validation_issue=failure,
+                    ))
+                except Exception as exc:
+                    failure = rc.bounded_diagnostic(
+                        f"local proposal retry processing failed: "
+                        f"{type(exc).__name__}: {exc}",
+                        sp.MAX_ISSUE_CHARS,
+                    )
+        else:
+            failure = retry_issue
+    return _ProposalExecution(
+        result, tuple(attempt.json() for attempt in attempts), tuple(rejected), failure,
+        author.session_ref, review.session_ref,
+        int((time.monotonic() - started) * 1000),
+    )
+
+
+def _proposal_structural_targets(closure: "_ClosureRound") -> tuple[pp.ProposalTarget, ...]:
+    if closure.lineage is None:
+        return ()
+    targets = []
+    for debt in closure.lineage.review_state.get("debt", []):
+        if debt.get("status") != "open" or debt.get("severity") not in cc.BLOCKING_SEVERITIES:
+            continue
+        class_context = tuple(
+            json.dumps({
+                "class_id": tracked.class_id,
+                "invariant": tracked.invariant,
+                "severity": tracked.severity,
+                "first_round": tracked.first_round,
+                "status": tracked.status,
+                "pattern": tracked.pattern,
+                "pathspec": tracked.pathspec,
+                "procedure": tracked.procedure,
+                "members": list(tracked.members),
+                "superseded_by": tracked.superseded_by,
+                "detail": tracked.detail,
+            }, ensure_ascii=False, sort_keys=True)
+            for class_id in debt.get("class_ids", [])
+            if (tracked := closure.lineage.classes.get(class_id)) is not None
+        )
+        targets.append(pp.ProposalTarget(
+            f"structural:{debt['id']}", str(debt.get("summary", "")),
+            str(debt.get("severity", "MAJOR")), tuple(debt.get("evidence", [])),
+            str(debt.get("remedy", "")), class_context,
+        ))
+    return tuple(targets)
+
+
+def _proposal_claim_targets(claim_state: dict[str, Any]) -> tuple[pp.ProposalTarget, ...]:
+    state = pc.normalize_state(claim_state)
+    if isinstance(state.get("debt"), dict) and state["debt"].get("audit_failed") is True:
+        return ()
+    targets = []
+    for claim_id, row in state.get("claims", {}).items():
+        verdict = row.get("verdict")
+        if verdict not in {"refuted", "unverified"}:
+            continue
+        if not pc.has_current_semantic_adjudication(row):
+            continue
+        if pc.source_failure_only(row):
+            continue
+        context = json.dumps({
+            key: row.get(key) for key in (
+                "anchor", "proposition", "verdict", "replacement", "rationale",
+                "evidence", "capture_provenance",
+            )
+        }, ensure_ascii=False, sort_keys=True, default=str)
+        claim_evidence = tuple(filter(None, (
+            str(row.get("anchor")) if row.get("anchor") else None,
+            *(
+                str(item.get("url") or item.get("location") or "")
+                for item in row.get("evidence", []) if isinstance(item, dict)
+            ),
+        )))
+        targets.append(pp.ProposalTarget(
+            f"claim:{claim_id}", str(row.get("proposition", claim_id)), "MAJOR",
+            claim_evidence,
+            "Correct or explicitly qualify the exact unsupported or contradicted proposition.",
+            (), context,
+        ))
+    return tuple(targets)
+
+
+def _select_proposal_author(
+    closure: "_ClosureRound", targets: Sequence[pp.ProposalTarget], *, claim_only: bool = False,
+) -> census.AuthorHandle | None:
+    completed = closure.proposal_census
+    if completed is None:
+        return None
+    authors = {
+        row.lane: row.author for row in completed.lane_results if row.author is not None
+    }
+    if claim_only:
+        return authors.get("integrity")
+    counts = {lane: 0 for lane in sp.LANES[closure.mode]}
+    for target in targets:
+        debt_id = target.key.removeprefix("structural:")
+        for lane in closure.proposal_debt_lanes.get(debt_id, ()):
+            counts[lane] += 1
+    eligible = [lane for lane in sp.LANES[closure.mode] if counts[lane] > 0 and lane in authors]
+    if not eligible:
+        return None
+    eligible.sort(key=lambda lane: (-counts[lane], sp.LANES[closure.mode].index(lane)))
+    return authors[eligible[0]]
+
+
+def _repository_proposal_sources(
+    repo: Path, snapshot: str, checkout: Path,
+) -> tuple[tuple[pp.ProposalEntry, ...], pp.SourceReader]:
+    raw = inert_git.run(repo, ["ls-tree", "-rtlz", "--full-tree", snapshot])
+    entries: list[pp.ProposalEntry] = []
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.decode("ascii").split()
+        if not separator or len(fields) != 4:
+            raise RuntimeError("malformed proposal Git tree entry")
+        mode, kind, oid, raw_size = fields
+        path = raw_path.decode("utf-8", errors="surrogateescape")
+        entry_kind = (
+            "directory" if kind == "tree"
+            else "gitlink" if kind == "commit" and mode == "160000"
+            else "symlink" if mode == "120000"
+            else "executable" if mode == "100755"
+            else "file" if kind == "blob" and mode == "100644"
+            else "gitlink"
+        )
+        size = int(raw_size) if raw_size.isdigit() else None
+        entries.append(pp.ProposalEntry(path, entry_kind, mode, oid, size))
+    cache: dict[str, pp.SourceContent] = {}
+    admitted_bytes = 0
+
+    def read(entry: pp.ProposalEntry) -> pp.SourceContent:
+        nonlocal admitted_bytes
+        if entry.path not in cache:
+            if entry.oid is None:
+                raise pp.SourceReadError(f"proposal entry {entry.path!r} has no blob identity")
+            if entry.size is None:
+                raise pp.SourceReadError(f"proposal entry {entry.path!r} has no trusted blob size")
+            if entry.size > pp.MAX_SOURCE_BYTES - admitted_bytes:
+                raise pp.SourceReadError(
+                    f"admitting {entry.path!r} would exceed the shared "
+                    f"{pp.MAX_SOURCE_BYTES}-byte invocation source limit"
+                )
+            admitted_bytes += entry.size
+            request = git_objects.BlobRequest(entry.oid, entry.size)
+            pinned = next(git_objects.read_blobs(repo, [request]))
+            checkout_path = checkout.joinpath(*entry.path.split("/"))
+            checkout_data = None
+            try:
+                checkout_size = checkout_path.stat().st_size
+                if checkout_size <= pp.MAX_SOURCE_BYTES - admitted_bytes:
+                    with checkout_path.open("rb") as stream:
+                        candidate = stream.read(checkout_size + 1)
+                    if len(candidate) == checkout_size:
+                        admitted_bytes += checkout_size
+                        checkout_data = candidate
+            except (OSError, ValueError):
+                pass
+            cache[entry.path] = pp.SourceContent(pinned, checkout_data)
+        return cache[entry.path]
+
+    return tuple(entries), read
+
+
+def _proposal_section(
+    execution: _ProposalExecution | None, *, status: str, reason: str | None,
+    context: pp.ProposalContext | None, audit_path: Path | None = None,
+    application_suitability: str = "CURRENT-PREIMAGE-REQUIRED",
+) -> str:
+    lines = ["=== PATCH PROPOSAL (SUPPLEMENTAL; REVIEW VERDICT UNCHANGED) ===",
+             f"PATCH-PROPOSAL: {status}"]
+    if context is not None:
+        lines.extend([
+            "BOUND-REVIEWED-SNAPSHOT-JSON: " + json.dumps(context.reviewed_snapshot),
+            "BOUND-STRUCTURAL-SNAPSHOT-JSON: " + json.dumps(context.structural_snapshot),
+            "BOUND-CONTRACT-DIGEST-JSON: " + json.dumps(context.contract_digest),
+            "TARGET-IDS: " + json.dumps([target.key for target in context.targets]),
+        ])
+        if context.mode == "plan":
+            lines.extend([
+                "PLAN-SOURCE-KIND-JSON: " + json.dumps(context.plan_source_kind),
+                "PLAN-SOURCE-PATH-JSON: " + json.dumps(context.plan_source_path),
+                "PLAN-DIGEST-JSON: " + json.dumps(context.plan_digest),
+                "PLAN-VIRTUAL-LABEL-JSON: " + json.dumps(pp.PLAN_LABEL),
+            ])
+    if execution is not None:
+        lines.extend([
+            f"PROPOSAL-CALLS: {len(execution.attempts)}",
+            f"PROPOSAL-DURATION-MS: {execution.duration_ms}",
+            "PROPOSAL-AUTHOR-SESSION-JSON: "
+            + json.dumps(execution.author_session_ref),
+            "PROPOSAL-SESSION-JSON: " + json.dumps(execution.proposal_session_ref),
+        ])
+    if (
+        execution is not None and execution.result is not None
+        and status in {"PROPOSED", "PARTIAL", "DECLINED"}
+    ):
+        result = execution.result
+        lines.extend([
+            "AUTHOR-SUMMARY-JSON: " + json.dumps(result.summary, ensure_ascii=True),
+            "AUTHOR-COVERED: " + json.dumps(list(result.addressed_ids)),
+            "AUTHOR-UNADDRESSED: " + json.dumps([
+                {"finding_id": key, "reason": value} for key, value in result.unaddressed
+            ], ensure_ascii=True),
+            "SUGGESTED-TESTS-JSON: " + json.dumps(
+                list(result.suggested_tests), ensure_ascii=True,
+            ),
+            "LIMITATIONS-JSON: " + json.dumps(
+                list(result.limitations), ensure_ascii=True,
+            ),
+            f"PATCH-SHA256: {result.patch_sha256}",
+            "VALIDATION: original source spans matched; patch not applied; tests not executed",
+            "PROPOSAL-AUDIT-JSON: "
+            + json.dumps(audit_path.name if audit_path else None),
+            f"APPLICATION-SUITABILITY: {application_suitability}",
+        ])
+        if status in {"PROPOSED", "PARTIAL"}:
+            patch_text = result.patch.decode("utf-8")
+            fence = "`" * max(
+                3, max((len(run) for run in re.findall(r"`+", patch_text)), default=0) + 1,
+            )
+            lines.extend([fence + "diff", patch_text.rstrip("\n"), fence])
+    else:
+        lines.append(
+            "REASON-JSON: "
+            + json.dumps(reason or "no candidate patch was produced", ensure_ascii=True)
+        )
+    if context is not None and context.mode == "plan":
+        lines.append(
+            "CALLER: plan-artifact.md is a virtual diff label, not a repository path. "
+            "Inspect the candidate, apply it deliberately to the original plan buffer or "
+            "PLAN-SOURCE-PATH-JSON when non-null, then submit the changed plan in the same "
+            "lineage with the next lawful round label. A stale proposal requires a new review."
+        )
+    else:
+        lines.append(
+            "CALLER: inspect the candidate, confirm the bound preimage is current, apply "
+            "deliberately, run appropriate tests, and submit the changed artifact in the same "
+            "lineage with the next lawful round label. A stale proposal requires a new review."
+        )
+    return "\n".join(lines)
+
+
+def _branch_proposal_raw_cleanliness_issue(
+    repo: Path, expected_head: str, *, depth: int = 0,
+) -> str | None:
+    """Compare HEAD, index and raw checkout bytes without invoking Git filters."""
+    if depth > 8:
+        return "nested submodule depth exceeds the filter-free cleanliness limit"
+    if not orientation.has_head(repo) or orientation.resolve_head(repo) != expected_head:
+        return "caller checkout HEAD moved after review"
+
+    expected: dict[bytes, tuple[str, str]] = {}
+    for record in inert_git.run(
+        repo, ["ls-tree", "-rz", "--full-tree", expected_head],
+    ).split(b"\0"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3:
+            raise RuntimeError("malformed filter-free HEAD inventory")
+        mode, unused_kind, oid = fields
+        expected[raw_path] = (mode.decode("ascii"), oid.decode("ascii"))
+
+    indexed: dict[bytes, tuple[str, str]] = {}
+    for record in inert_git.run(
+        repo, ["ls-files", "-s", "-z", "--cached"],
+    ).split(b"\0"):
+        if not record:
+            continue
+        metadata, separator, raw_path = record.partition(b"\t")
+        fields = metadata.split()
+        if not separator or len(fields) != 3 or fields[2] != b"0":
+            return "caller index contains an unmerged or malformed entry"
+        indexed[raw_path] = (fields[0].decode("ascii"), fields[1].decode("ascii"))
+    if indexed != expected:
+        return "caller index differs from the reviewed HEAD"
+
+    untracked = [
+        row for row in inert_git.run(
+            repo, ["ls-files", "-z", "--others", "--exclude-standard"],
+        ).split(b"\0") if row
+    ]
+    if untracked:
+        return "caller checkout contains non-ignored untracked paths"
+
+    skip_worktree: set[bytes] = set()
+    for record in inert_git.run(
+        repo, ["ls-files", "-t", "-z", "--cached"],
+    ).split(b"\0"):
+        if not record:
+            continue
+        tag, separator, raw_path = record.partition(b" ")
+        if not separator or len(tag) != 1:
+            raise RuntimeError("malformed filter-free index tag inventory")
+        if tag == b"S":
+            skip_worktree.add(raw_path)
+
+    file_mode = inert_git.invoke(repo, ["config", "--bool", "core.fileMode"])
+    if file_mode.returncode not in (0, 1):
+        raise RuntimeError("could not read core.fileMode for filter-free cleanliness")
+    file_mode_reliable = (
+        file_mode.returncode != 0
+        or file_mode.stdout.decode("ascii", errors="strict").strip().lower() != "false"
+    )
+
+    for raw_path, (indexed_mode, oid) in sorted(indexed.items()):
+        path_text = raw_path.decode("utf-8", errors="surrogateescape")
+        path = repo.joinpath(*path_text.split("/"))
+        ancestor = repo
+        ancestor_absent = False
+        for component in path_text.split("/")[:-1]:
+            ancestor /= component
+            try:
+                ancestor_info = ancestor.lstat()
+            except FileNotFoundError:
+                if raw_path in skip_worktree or indexed_mode == "160000":
+                    ancestor_absent = True
+                    break
+                return f"tracked path {path_text!r} has an absent checkout ancestor"
+            if not stat.S_ISDIR(ancestor_info.st_mode):
+                return f"tracked path {path_text!r} has a non-directory checkout ancestor"
+        if ancestor_absent:
+            continue
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            if raw_path in skip_worktree or indexed_mode == "160000":
+                continue
+            return f"tracked path {path_text!r} is absent from the caller checkout"
+
+        if indexed_mode == "160000":
+            if not stat.S_ISDIR(info.st_mode):
+                return f"gitlink {path_text!r} changed filesystem kind"
+            if not (path / ".git").exists():
+                if any(path.iterdir()):
+                    return f"uninitialized submodule {path_text!r} is not empty"
+                continue
+            issue = _branch_proposal_raw_cleanliness_issue(path, oid, depth=depth + 1)
+            if issue is not None:
+                return f"submodule {path_text!r} is not clean: {issue}"
+            continue
+        if indexed_mode == "120000":
+            if not stat.S_ISLNK(info.st_mode):
+                return f"tracked symlink {path_text!r} changed filesystem kind"
+            data = os.fsencode(os.readlink(path))
+            actual_mode = "120000"
+        else:
+            if not stat.S_ISREG(info.st_mode):
+                return f"tracked file {path_text!r} changed filesystem kind"
+            data = path.read_bytes()
+            actual_mode = (
+                indexed_mode if not file_mode_reliable
+                else "100755" if info.st_mode & stat.S_IXUSR else "100644"
+            )
+        if actual_mode != indexed_mode or git_objects.blob_oid(data, len(oid)) != oid:
+            return f"tracked path {path_text!r} differs from the reviewed HEAD"
+    return None
+
+
+def _branch_proposal_admission_issue(repo: Path, head_id: str) -> str | None:
+    try:
+        dirty = _branch_proposal_raw_cleanliness_issue(repo, head_id)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        return "caller checkout cleanliness could not be established: " + rc.bounded_diagnostic(
+            str(exc), sp.MAX_ISSUE_CHARS,
+        )
+    if dirty is not None:
+        return (
+            "caller checkout is not clean; preserve the edits and rerun after committing "
+            "or otherwise selecting a clean application tree (" + dirty + ")"
+        )
+    return None
+
+
+def _branch_proposal_suitability(
+    repo: Path, head_id: str, result: pp.ProposalResult,
+) -> str:
+    try:
+        if _branch_proposal_admission_issue(repo, head_id) is not None:
+            return "STALE"
+        if not orientation.has_head(repo) or orientation.resolve_head(repo) != head_id:
+            return "STALE"
+        for item in result.files:
+            path = repo.joinpath(*item.path.split("/"))
+            if item.original is None:
+                try:
+                    path.lstat()
+                except FileNotFoundError:
+                    pass
+                else:
+                    return "STALE"
+                ancestor = repo
+                for component in item.path.split("/")[:-1]:
+                    ancestor /= component
+                    try:
+                        info = ancestor.lstat()
+                    except FileNotFoundError:
+                        continue
+                    if not stat.S_ISDIR(info.st_mode):
+                        return "STALE"
+            elif path.read_bytes() != item.original:
+                return "STALE"
+    except (OSError, RuntimeError, ValueError):
+        return "STALE"
+    return "CURRENT"
+
+
+def _branch_patch_supplement(
+    *, repo: Path, checkout: Path, head_id: str, structural_snapshot: str | None,
+    closure: "_ClosureRound" | None, branch_contract: _BranchContract | None,
+    stakes: str, engine: Engine, model: str, effort: str, deadline: float | None,
+    on_progress: Callable[[str], None] | None, log_dir: Path, now: Clock,
+    review_log_path: Path | None,
+) -> str:
+    if review_log_path is None:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="settled review audit receipt unavailable", context=None)
+    if closure is None or structural_snapshot is None or not closure._settled:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="tracked settlement was not confirmed", context=None)
+    targets = _proposal_structural_targets(closure)
+    if not targets:
+        return _proposal_section(None, status="NOT-NEEDED",
+                                 reason="no blocking structural targets remain", context=None)
+    if len(targets) > pp.MAX_TARGETS:
+        return _proposal_section(
+            None, status="UNAVAILABLE",
+            reason=f"{len(targets)} blocking targets exceed limit {pp.MAX_TARGETS}",
+            context=None,
+        )
+    author = _select_proposal_author(closure, targets)
+    if author is None:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="no successful fresh-census author session", context=None)
+    admission_issue = _branch_proposal_admission_issue(repo, head_id)
+    if admission_issue is not None:
+        return _proposal_section(
+            None, status="UNAVAILABLE", reason=admission_issue, context=None,
+        )
+    entries, reader = _repository_proposal_sources(repo, head_id, repo)
+    context = pp.ProposalContext(
+        "branch", targets, stakes, head_id, structural_snapshot,
+        branch_contract.digest if branch_contract else None,
+        branch_contract.original if branch_contract else None,
+        entries,
+    )
+    execution = _run_patch_proposal(
+        context=context, source_reader=reader, author=author, engine=engine,
+        cwd=checkout, model=model, effort=effort, deadline=deadline,
+        on_progress=on_progress,
+    )
+    status = "UNAVAILABLE"
+    reason = execution.reason
+    proposal_audit: Path | None = None
+    application_suitability = "CURRENT-PREIMAGE-REQUIRED"
+    if execution.result is not None:
+        status = execution.result.status.upper()
+        application_suitability = _branch_proposal_suitability(
+            repo, head_id, execution.result,
+        )
+        proposal_review = Review(
+            text=execution.result.summary,
+            session_ref=execution.proposal_session_ref,
+            raw=json.dumps(execution.result.raw_value, ensure_ascii=False),
+        )
+        proposal_audit = _log(log_dir, "critique_branch_patch_proposal", engine,
+                              proposal_review, now, {
+            "review_audit": str(review_log_path),
+            "reviewed_snapshot": head_id,
+            "structural_snapshot": structural_snapshot,
+            "contract_digest": context.contract_digest,
+            "target_ids": [target.key for target in targets],
+            "author_session_ref": execution.author_session_ref,
+            "proposal_session_ref": execution.proposal_session_ref,
+            "proposal_attempt_ledger": list(execution.attempts),
+            "rejected_payloads": list(execution.rejected_payloads),
+            "proposal_duration_ms": execution.duration_ms,
+            "patch": execution.result.patch.decode("utf-8"),
+            "patch_sha256": execution.result.patch_sha256,
+            "patch_bytes": len(execution.result.patch),
+            "application_suitability": application_suitability,
+            "patch_applied": False, "tests_executed": False,
+        })
+        if proposal_audit is None:
+            status = "UNAVAILABLE"
+            reason = "supplemental proposal audit receipt unavailable"
+    else:
+        _log(log_dir, "critique_branch_patch_proposal", engine,
+             Review(text=reason or "proposal unavailable",
+                    session_ref=execution.proposal_session_ref, raw="", error=True), now, {
+            "review_audit": str(review_log_path),
+            "reviewed_snapshot": head_id,
+            "structural_snapshot": structural_snapshot,
+            "target_ids": [target.key for target in targets],
+            "author_session_ref": execution.author_session_ref,
+            "proposal_session_ref": execution.proposal_session_ref,
+            "proposal_attempt_ledger": list(execution.attempts),
+            "rejected_payloads": list(execution.rejected_payloads),
+            "proposal_duration_ms": execution.duration_ms,
+            "failure": reason,
+        })
+    return _proposal_section(
+        execution, status=status, reason=reason, context=context,
+        audit_path=proposal_audit,
+        application_suitability=application_suitability,
+    )
+
+
+def _plan_patch_supplement(
+    *, plan_bytes: bytes, plan_path: str | None, plan_input_issue: str | None,
+    structural_snapshot: str | None, closure: "_ClosureRound" | None,
+    claim_state: dict[str, Any], claim_status: str, claim_verification: bool,
+    stakes: str, engine: Engine,
+    cwd: Path, model: str, effort: str, deadline: float | None,
+    on_progress: Callable[[str], None] | None, log_dir: Path, now: Clock,
+    review_log_path: Path | None,
+) -> str:
+    if review_log_path is None:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="settled review audit receipt unavailable", context=None)
+    if plan_input_issue is not None:
+        return _proposal_section(None, status="UNAVAILABLE", reason=plan_input_issue, context=None)
+    if claim_verification and not (
+        claim_status.startswith("parsed") or claim_status.startswith("reused")
+    ):
+        return _proposal_section(
+            None, status="UNAVAILABLE",
+            reason=f"current claim audit did not complete successfully: {claim_status}",
+            context=None,
+        )
+    if closure is None or structural_snapshot is None or not closure._settled:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="tracked settlement was not confirmed", context=None)
+    structural_targets = _proposal_structural_targets(closure)
+    normalized_claims = pc.normalize_state(claim_state)
+    blocked_by_source_processing = claim_verification and any(
+        pc.source_failure_only(row)
+        for row in normalized_claims.get("claims", {}).values()
+    )
+    claim_targets = (
+        _proposal_claim_targets(claim_state)
+        if claim_verification and claim_status.startswith(("parsed", "reused"))
+        else ()
+    )
+    targets = (*structural_targets, *claim_targets)
+    if not targets:
+        if blocked_by_source_processing:
+            return _proposal_section(
+                None, status="UNAVAILABLE",
+                reason=(
+                    "claim evidence is blocked by capture, binding, or attestation "
+                    "processing; retry evidence work rather than rewriting the proposition"
+                ),
+                context=None,
+            )
+        if claim_verification and pc.is_blocked(normalized_claims):
+            return _proposal_section(
+                None, status="UNAVAILABLE",
+                reason=(
+                    "current claim debt has no independently actionable semantic target; "
+                    "retry or repair claim adjudication rather than rewriting the proposition"
+                ),
+                context=None,
+            )
+        return _proposal_section(None, status="NOT-NEEDED",
+                                 reason="no blocking structural or semantic targets remain",
+                                 context=None)
+    if len(targets) > pp.MAX_TARGETS:
+        return _proposal_section(
+            None, status="UNAVAILABLE",
+            reason=f"{len(targets)} blocking targets exceed limit {pp.MAX_TARGETS}",
+            context=None,
+        )
+    author = _select_proposal_author(
+        closure, structural_targets or targets, claim_only=not structural_targets,
+    )
+    if author is None:
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason="no successful fresh-census author session", context=None)
+    digest = hashlib.sha256(plan_bytes).hexdigest()
+    context = pp.ProposalContext(
+        "plan", tuple(targets), stakes, digest, structural_snapshot, None, None,
+        (), plan_bytes, digest, "plan_path" if plan_path else "plan_text", plan_path,
+    )
+    execution = _run_patch_proposal(
+        context=context, source_reader=None, author=author, engine=engine,
+        cwd=cwd, model=model, effort=effort, deadline=deadline,
+        on_progress=on_progress,
+    )
+    status = "UNAVAILABLE"
+    reason = execution.reason
+    proposal_audit: Path | None = None
+    application_suitability = "CURRENT-PREIMAGE-REQUIRED"
+    if plan_path:
+        try:
+            if Path(plan_path).read_bytes() != plan_bytes:
+                application_suitability = "STALE"
+        except OSError:
+            application_suitability = "STALE"
+    if execution.result is not None:
+        status = execution.result.status.upper()
+        proposal_review = Review(
+            text=execution.result.summary,
+            session_ref=execution.proposal_session_ref,
+            raw=json.dumps(execution.result.raw_value, ensure_ascii=False),
+        )
+        proposal_audit = _log(log_dir, "critique_plan_patch_proposal", engine,
+                              proposal_review, now, {
+            "review_audit": str(review_log_path),
+            "source_kind": context.plan_source_kind,
+            "source_path": plan_path,
+            "plan_digest": digest,
+            "structural_snapshot": structural_snapshot,
+            "target_ids": [target.key for target in targets],
+            "author_session_ref": execution.author_session_ref,
+            "proposal_session_ref": execution.proposal_session_ref,
+            "proposal_attempt_ledger": list(execution.attempts),
+            "rejected_payloads": list(execution.rejected_payloads),
+            "proposal_duration_ms": execution.duration_ms,
+            "patch": execution.result.patch.decode("utf-8"),
+            "patch_sha256": execution.result.patch_sha256,
+            "patch_bytes": len(execution.result.patch),
+            "application_suitability": application_suitability,
+            "patch_applied": False, "tests_executed": False,
+        })
+        if proposal_audit is None:
+            status = "UNAVAILABLE"
+            reason = "supplemental proposal audit receipt unavailable"
+    else:
+        _log(log_dir, "critique_plan_patch_proposal", engine,
+             Review(text=reason or "proposal unavailable",
+                    session_ref=execution.proposal_session_ref, raw="", error=True), now, {
+            "review_audit": str(review_log_path), "source_kind": context.plan_source_kind,
+            "source_path": plan_path, "plan_digest": digest,
+            "structural_snapshot": structural_snapshot,
+            "target_ids": [target.key for target in targets],
+            "author_session_ref": execution.author_session_ref,
+            "proposal_session_ref": execution.proposal_session_ref,
+            "proposal_attempt_ledger": list(execution.attempts),
+            "rejected_payloads": list(execution.rejected_payloads),
+            "proposal_duration_ms": execution.duration_ms, "failure": reason,
+        })
+    return _proposal_section(
+        execution, status=status, reason=reason, context=context,
+        audit_path=proposal_audit, application_suitability=application_suitability,
     )
 
 
@@ -1668,6 +2489,7 @@ def _staged_structural_review(
             return census.namespace_lane(
                 lane, parsed, lane_attempts, lane_rejected,
                 sp.received_lane_member_ids(result.text, mode=mode, lane=lane),
+                session_ref=result.session_ref, engine_name=engine.name,
             )
 
         manifests = _cached_census_manifests(
@@ -1681,11 +2503,13 @@ def _staged_structural_review(
         received_member_coverage: dict[str, list[str]] = {}
         if manifests is None:
             completed = census.collect(lanes, run_lane)
+            closure.proposal_census = completed
             attempts.extend(completed.attempts)
             rejected_payloads.extend(completed.rejected_payloads)
             manifests = completed.manifests
             received_member_coverage = completed.member_coverage
         else:
+            closure.proposal_census = None
             received_member_coverage = deepcopy(
                 state["census_cache"]["member_coverage"]
             )
@@ -1853,6 +2677,21 @@ def _staged_structural_review(
         state, settlement, phase=phase, snapshot=snapshot, round_no=round_no,
         engine_name=engine.name,
     )
+    if phase == "census" and closure.proposal_census is not None:
+        governing_lanes: dict[str, list[str]] = {}
+        for disposition in settlement.get("source_dispositions", []):
+            source_id = disposition.get("source_id")
+            governing_id = disposition.get("governing_id")
+            if not isinstance(source_id, str) or not isinstance(governing_id, str):
+                continue
+            lane = source_id.partition(":")[0]
+            if lane in sp.LANES[mode]:
+                governing_lanes.setdefault(governing_id, []).append(lane)
+        closure.proposal_debt_lanes = {
+            debt["id"]: tuple(dict.fromkeys(governing_lanes.get(debt["finding_id"], ())))
+            for debt in state.get("debt", [])
+            if debt.get("status") == "open"
+        }
     replacements = {
         cid: cls.superseded_by for cid, cls in lineage.classes.items()
         if cls.status == cc.SUPERSEDED and cls.superseded_by
@@ -2167,8 +3006,8 @@ def _log(
     review: Review,
     now: Clock,
     extra: dict[str, Any],
-) -> None:
-    logs.write_log(
+) -> Path | None:
+    return logs.write_log(
         log_dir,
         tool=tool,
         record={
@@ -2193,6 +3032,12 @@ def critique_branch(
     on_progress: Callable[[str], None] | None = None,
     _after_contract_load: Callable[[_BranchContract | None], None] | None = None,
 ) -> str:
+    proposal_requested = bool(arguments.get("propose_patch", PROPOSE_PATCH_DEFAULT))
+    proposal_deadline = (
+        time.monotonic() + PROPOSAL_WHOLE_CALL_SECONDS if proposal_requested else None
+    )
+    if proposal_requested and type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
+        raise ValueError("propose_patch=true requires a supported native Codex or Claude engine")
     repo = _require_repo(arguments)
     cfg = load_repo_config(repo)
 
@@ -2222,6 +3067,11 @@ def critique_branch(
     # scope; ROUND (per-call, raised each convergence round) sets the severity floor.
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
     _require_converge(converge, closure_on)
+    if proposal_requested and (not converge or not closure_on or include_unc):
+        raise ValueError(
+            "propose_patch=true requires converge:true, class_closure:true, and "
+            "include_uncommitted:false"
+        )
     if supplied_contract is not None and (not converge or not closure_on):
         raise ValueError(
             "critique_branch plan contracts require converge:true and class_closure:true"
@@ -2330,6 +3180,7 @@ def critique_branch(
             review_round=arguments.get("round"), include_unc=include_unc,
             branch_contract=contract, contract_latch_owned=contract_latch_owned,
             stakes_notice=_stakes_notice(no_stakes),
+            propose_patch=proposal_requested, proposal_deadline=proposal_deadline,
         )
 
     packet = orientation.build_orientation(
@@ -2380,6 +3231,8 @@ def _converge_branch_review(
     branch_contract: _BranchContract | None = None,
     contract_latch_owned: bool = False,
     stakes_notice: str = "",
+    propose_patch: bool = False,
+    proposal_deadline: float | None = None,
 ) -> str:
     """Opt-in convergence path: pre-gather a deterministic packet so the reviewer skips
     the re-read/re-grep turns, and review it against an IMMUTABLE materialized worktree
@@ -2426,6 +3279,8 @@ def _converge_branch_review(
     # failed *write* is the one case that deliberately keeps the latch (see `release`).
     attempt_ledger: list[dict[str, Any]] = []
     structural_snapshot: str | None = None
+    review_logged = False
+    proposal_text: str | None = None
     try:
         packet = orientation.build_packet(
             repo, base_id, head_id,
@@ -2482,6 +3337,65 @@ def _converge_branch_review(
                 # must see the same materialized snapshot the review did.
                 trailer = closure.settle(review, engine, wt, model, effort, web_search,
                                          on_progress) if closure else None
+            if propose_patch:
+                review_log_path = _log(log_dir, "critique_branch", engine, review, now,
+                     {"target": target.description, "model": model, "mode": "converge-packet",
+                      "round": review_round, "already_raised": already,
+                      "usage": review.usage, "duration_ms": review.duration_ms,
+                      "base_id": base_id, "head_id": head_id,
+                      "structural_snapshot": structural_snapshot,
+                      "plan_digest": branch_contract.digest if branch_contract else None,
+                      "plan_digest_assertion": branch_contract.assertion if branch_contract else None,
+                      "plan_path": branch_contract.supplied_path if branch_contract else None,
+                      "plan_text": branch_contract.original if branch_contract else None,
+                      "plan_contract_reused": branch_contract.reused if branch_contract else False,
+                      "lineage": closure.lineage_id if closure else None,
+                      "retry_register": closure.retry_register if closure else None,
+                      "attempt_ledger": attempt_ledger,
+                      "rendered_trailer": trailer,
+                      "correction_gates": deepcopy(closure.correction_gates) if closure else [],
+                      "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
+                      "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
+                      "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
+                review_logged = True
+                if review.error:
+                    proposal_text = _proposal_section(
+                        None, status="UNAVAILABLE",
+                        reason="settled review failed; no proposal authority", context=None,
+                    )
+                else:
+                    try:
+                        proposal_text = _branch_patch_supplement(
+                            repo=repo, checkout=wt, head_id=head_id,
+                            structural_snapshot=structural_snapshot, closure=closure,
+                            branch_contract=branch_contract, stakes=stakes, engine=engine,
+                            model=model, effort=effort, deadline=proposal_deadline,
+                            on_progress=on_progress, log_dir=log_dir, now=now,
+                            review_log_path=review_log_path,
+                        )
+                    except Exception as exc:
+                        diagnostic = rc.bounded_diagnostic(
+                            f"{type(exc).__name__}: {exc}", sp.MAX_ISSUE_CHARS,
+                        )
+                        _log(
+                            log_dir, "critique_branch_patch_proposal", engine,
+                            Review(
+                                text=diagnostic, session_ref=None, raw="", error=True,
+                                failure_detail=diagnostic,
+                            ),
+                            now, {
+                                "review_audit": str(review_log_path),
+                                "reviewed_snapshot": head_id,
+                                "structural_snapshot": structural_snapshot,
+                                "failure_kind": "local-proposal-exception",
+                                "failure": diagnostic,
+                            },
+                        )
+                        proposal_text = _proposal_section(
+                            None, status="UNAVAILABLE",
+                            reason="local proposal processing failed: " + diagnostic,
+                            context=None,
+                        )
     except BaseException:
         if closure:
             closure.abandon()
@@ -2490,7 +3404,8 @@ def _converge_branch_review(
         if closure:
             closure.release()
 
-    _log(log_dir, "critique_branch", engine, review, now,
+    if not review_logged:
+        _log(log_dir, "critique_branch", engine, review, now,
          {"target": target.description, "model": model, "mode": "converge-packet",
           # Which suppression list and which round produced this prompt: without them an
           # incident cannot be replayed even with the snapshot ids below.
@@ -2523,6 +3438,8 @@ def _converge_branch_review(
         # supplied would otherwise be invisible in everything they can see.
         body += ("\n\n---\n_The register below was supplied on retry and is what this "
                  f"round applied:_\n\n{closure.retry_register.strip()}")
+    if proposal_text:
+        body += "\n\n" + proposal_text
     return f"{body}\n\n{trailer}" if trailer else body
 
 
@@ -2617,17 +3534,50 @@ def critique_plan(
     now: Clock = _default_clock,
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
+    proposal_requested = bool(arguments.get("propose_patch", PROPOSE_PATCH_DEFAULT))
+    if proposal_requested and type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
+        raise ValueError("propose_patch=true requires a supported native Codex or Claude engine")
+    # Proposal-mode incompatibilities are deterministic caller errors.  Reject them
+    # before repository/provider capability admission so an unsupported request cannot
+    # spend a CLI probe or evidence call.
+    closure_on = bool(arguments.get("class_closure", True))
+    if proposal_requested and not closure_on:
+        raise ValueError("propose_patch=true requires class_closure:true for plan review")
     plan_text = arguments.get("plan_text")
     plan_path = arguments.get("plan_path")
+    plan_source_bytes: bytes | None = None
+    plan_patch_input_issue: str | None = None
     if plan_text and plan_path:
         raise ValueError("critique_plan takes plan_text OR plan_path, not both")
     if not plan_text and not plan_path:
         raise ValueError("critique_plan requires plan_text or plan_path")
     if plan_path:
         try:
-            plan_text = Path(plan_path).read_text(encoding="utf-8", errors="replace")
+            plan_source_bytes = Path(plan_path).read_bytes()
+            # Preserve the historical text-mode universal-newline view used by review,
+            # claims, and structural identity while retaining the exact captured bytes
+            # for proposal validation and the proposal-only raw digest.
+            plan_text = (
+                plan_source_bytes.decode("utf-8", errors="replace")
+                .replace("\r\n", "\n")
+                .replace("\r", "\n")
+            )
         except (FileNotFoundError, IsADirectoryError, PermissionError, OSError) as exc:
             raise ValueError(f"cannot read plan_path: {exc}") from exc
+        try:
+            strict_plan = plan_source_bytes.decode("utf-8", errors="strict")
+            if "\r" in strict_plan or "\x00" in strict_plan:
+                plan_patch_input_issue = "plan patch requires strict UTF-8 LF-only text"
+        except UnicodeDecodeError:
+            plan_patch_input_issue = "plan patch requires strict UTF-8 LF-only text"
+    else:
+        try:
+            plan_source_bytes = plan_text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            plan_patch_input_issue = "plan patch requires strict UTF-8 LF-only text"
+            plan_source_bytes = plan_text.encode("utf-8", errors="surrogatepass")
+        if "\r" in plan_text or "\x00" in plan_text:
+            plan_patch_input_issue = "plan patch requires strict UTF-8 LF-only text"
     plan_view = sp.ArtifactView.from_text(plan_text)
     if plan_view.line_count < 1:
         raise ValueError("critique_plan requires a plan containing at least one line")
@@ -2676,7 +3626,6 @@ def critique_plan(
     # Call argument ONLY — `.paranoia.toml` is deliberately not consulted. A per-project
     # setting could never suffice anyway, since the lineage is inherently per-seam, and
     # sharing the branch key would give one name two meanings across two tools.
-    closure_on = bool(arguments.get("class_closure", True))
     lineage_id = arguments.get("lineage")
     if closure_on and not lineage_id:
         raise ValueError(
@@ -2740,7 +3689,10 @@ def critique_plan(
         claim_verification and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
     )
     plan_deadline = (
-        time.monotonic() + PLAN_REVIEW_TOTAL_TIMEOUT_SEC if verified_profile else None
+        time.monotonic() + PLAN_REVIEW_TOTAL_TIMEOUT_SEC
+        if verified_profile else
+        time.monotonic() + PROPOSAL_WHOLE_CALL_SECONDS
+        if proposal_requested else None
     )
     claim_status = "disabled"
     claim_duration_ms: int | None = None
@@ -2751,6 +3703,7 @@ def critique_plan(
     staged_preflight_failed = False
     preflight_review: Review | None = None
     preflight_trailer: str | None = None
+    proposal_trailer_finalized = False
     if closure:
         # A structural preflight can settle before claim verification starts. Attach
         # the retained claim state first so that failure still renders the combined
@@ -2902,6 +3855,8 @@ def critique_plan(
         closure.claim_state = claim_state
 
     trailer: str | None = preflight_trailer
+    review_logged = False
+    proposal_text: str | None = None
     try:
         body = _plan_body(plan_view, context, focus, already, repo_grounded=bool(repo),
                           class_blocks=blocks)
@@ -3012,6 +3967,105 @@ def critique_plan(
                     )
                 if closure:
                     closure.deadline = plan_deadline
+                if proposal_requested:
+                    normalized_for_log = pc.normalize_state(claim_state)
+                    claim_failed_for_log = bool(
+                        claim_verification
+                        and isinstance(normalized_for_log.get("debt"), dict)
+                        and normalized_for_log["debt"].get("audit_failed") is True
+                    )
+                    claim_rows_last_for_log = bool(
+                        claim_failed_for_log
+                        and normalized_for_log["debt"].get("claim_rows") == "last-accepted"
+                    )
+                    claim_counts_for_log = {
+                        verdict: sum(
+                            1 for claim in normalized_for_log["claims"].values()
+                            if claim.get("verdict") == verdict
+                        ) for verdict in sorted(pc.VERDICTS)
+                    } if claim_verification else None
+                    if trailer and claim_verification:
+                        trailer += "\n" + rc.attempt_trailer(attempt_ledger).replace(
+                            "STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1,
+                        )
+                        proposal_trailer_finalized = True
+                    review_log_path = _log(log_dir, "critique_plan", engine, review, now, {
+                        "grounded": bool(repo), "model": model,
+                        "round": arguments.get("round"), "already_raised": already,
+                        "plan_digest": hashlib.sha256(
+                            plan_text.encode("utf-8", "surrogateescape")
+                        ).hexdigest()[:16],
+                        "plan_path": plan_path, "class_closure": closure_on,
+                        "lineage": lineage_id if closure else None,
+                        "register_status": closure.register_status if closure else None,
+                        "claim_verification": claim_verification,
+                        "claim_status": claim_status, "claim_duration_ms": claim_duration_ms,
+                        "claim_model_calls": sum(
+                            1 for item in attempt_ledger
+                            if str(item.get("role", "")).startswith("claim-")
+                        ),
+                        "claim_audit_failed": claim_failed_for_log if claim_verification else None,
+                        "claim_counts": (
+                            None if claim_failed_for_log else claim_counts_for_log
+                        ),
+                        "claim_last_accepted_counts": (
+                            claim_counts_for_log if claim_rows_last_for_log else None
+                        ),
+                        "claim_nonadjudicated_count": (
+                            len(normalized_for_log["claims"])
+                            if claim_failed_for_log and not claim_rows_last_for_log
+                            and normalized_for_log["claims"] else None
+                        ),
+                        "retry_register": closure.retry_register if closure else None,
+                        "attempt_ledger": attempt_ledger, "rendered_trailer": trailer,
+                        "correction_gates": deepcopy(closure.correction_gates) if closure else [],
+                        "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
+                        "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
+                        "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
+                    })
+                    review_logged = True
+                    if review.error:
+                        proposal_text = _proposal_section(
+                            None, status="UNAVAILABLE",
+                            reason="settled review failed; no proposal authority", context=None,
+                        )
+                    else:
+                        assert plan_source_bytes is not None
+                        try:
+                            proposal_text = _plan_patch_supplement(
+                                plan_bytes=plan_source_bytes, plan_path=plan_path,
+                                plan_input_issue=plan_patch_input_issue,
+                                structural_snapshot=structural_snapshot, closure=closure,
+                                claim_state=claim_state, claim_status=claim_status,
+                                claim_verification=claim_verification,
+                                stakes=stakes or "", engine=reviewer, cwd=review_cwd,
+                                model=model, effort=effort, deadline=plan_deadline,
+                                on_progress=on_progress, log_dir=log_dir, now=now,
+                                review_log_path=review_log_path,
+                            )
+                        except Exception as exc:
+                            diagnostic = rc.bounded_diagnostic(
+                                f"{type(exc).__name__}: {exc}", sp.MAX_ISSUE_CHARS,
+                            )
+                            _log(
+                                log_dir, "critique_plan_patch_proposal", engine,
+                                Review(
+                                    text=diagnostic, session_ref=None, raw="", error=True,
+                                    failure_detail=diagnostic,
+                                ),
+                                now, {
+                                    "review_audit": str(review_log_path),
+                                    "plan_path": plan_path,
+                                    "structural_snapshot": structural_snapshot,
+                                    "failure_kind": "local-proposal-exception",
+                                    "failure": diagnostic,
+                                },
+                            )
+                            proposal_text = _proposal_section(
+                                None, status="UNAVAILABLE",
+                                reason="local proposal processing failed: " + diagnostic,
+                                context=None,
+                            )
                 if closure and not staged_profile:
                     trailer = closure.settle(
                         review, reviewer, review_cwd, model, effort, False, on_progress,
@@ -3045,11 +4099,12 @@ def critique_plan(
         claim_audit_failed
         and normalized_claim_log_state["debt"].get("claim_rows") == "last-accepted"
     )
-    if trailer and claim_verification:
+    if trailer and claim_verification and not proposal_trailer_finalized:
         trailer += "\n" + rc.attempt_trailer(attempt_ledger).replace(
             "STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1,
         )
-    _log(log_dir, "critique_plan", engine, review, now, {
+    if not review_logged:
+        _log(log_dir, "critique_plan", engine, review, now, {
         "grounded": bool(repo), "model": model,
         # None of this was recorded before, so a plan seam was not reconstructible at
         # all — neither what was suppressed nor which plan was reviewed.
@@ -3092,6 +4147,8 @@ def critique_plan(
     if closure and closure.retry_register:
         body_text += ("\n\n---\n_The register below was supplied on retry and is what this "
                       f"round applied:_\n\n{closure.retry_register.strip()}")
+    if proposal_text:
+        body_text += "\n\n" + proposal_text
     if trailer:
         return f"{body_text}\n\n{trailer}"
     if claim_verification:
@@ -4965,6 +6022,8 @@ class _ClosureRound:
         self.prepared_lineage: cc.Lineage | None = None
         self.preflight_validation_error: rc.CensusError | None = None
         self.correction_gates: list[dict[str, Any]] = []
+        self.proposal_census: census.CensusResult | None = None
+        self.proposal_debt_lanes: dict[str, tuple[str, ...]] = {}
         self._latched = latch_owned
         self._settled = False
 

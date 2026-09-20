@@ -159,12 +159,15 @@ def test_claim_discovery_timeout_public_acceptance_record() -> None:
     assert invocation["source_revision_before"] == artifact["source"]["revision"]
     assert invocation["source_revision_after"] == artifact["source"]["revision"]
     assert invocation["source_status_before"] == invocation["source_status_after"] == ""
-    assert Path(invocation["effective_executable"]).resolve() == Path(
-        invocation["executable"]
-    ).resolve()
-    assert Path(invocation["effective_resume_executable"]).resolve() == Path(
-        invocation["executable"]
-    ).resolve()
+    requested_executable = Path(invocation["executable"])
+    expected_effective_executable = (
+        requested_executable.parent.parent / "@openai/codex/bin/codex.js"
+    )
+    assert Path(invocation["effective_executable"]) == expected_effective_executable
+    assert (
+        Path(invocation["effective_resume_executable"])
+        == expected_effective_executable
+    )
     assert Path(invocation["effective_state_root"]).resolve() == Path(
         invocation["lineage_path"]
     ).parents[1].resolve()

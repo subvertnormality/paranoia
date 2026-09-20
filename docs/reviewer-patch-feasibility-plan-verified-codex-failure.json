@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "reviewer-patch-native-feasibility-harness-failure",
+  "engine": "codex",
+  "scenario": "plan-verified",
+  "qualified": false,
+  "stage": "post-claim-audit-pre-lane",
+  "provider_proposal_admitted": false,
+  "patch_applied": false,
+  "tests_executed_by_proposal": false,
+  "observed_claim_status": "parsed 2 new + 0 targeted retained + 0 frozen",
+  "observed_blocking_claim_ids": [
+    "C-42eb74462c",
+    "C-98196b3ca8"
+  ],
+  "failure": "The assessment harness incorrectly required exactly one completed semantic claim blocker; the production claim audit correctly returned two.",
+  "retention_failure": "The harness raised before serializing its in-memory claim attempt ledger, so exact call usage and durations are unavailable and are not reconstructed.",
+  "replacement_policy": "This frozen failed case is retained and was not rerun. The harness was generalized to exact-partition every nonempty blocker set before the subsequently scheduled Claude verified-plan case."
+}

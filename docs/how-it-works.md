@@ -1,5 +1,10 @@
 # How Paranoia Local works
 
+> Reviewer-authored patch proposals are available as an explicit opt-in under
+> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
+> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
+> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
+
 This guide explains the behavior behind the public tools. Start with the
 [README](../README.md) for installation or the [tool reference](tool-reference.md)
 for exact inputs.
@@ -28,6 +33,59 @@ that default is deliberate.
 ## The tracked lifecycle
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
+
+### Opt-in patch supplement
+
+With explicit propose_patch: true, a successful fresh census author may be
+resumed once to produce closed structured edits and once more only for local
+validation repair. This happens after the normal review is durably settled. The
+proposal route is read-only and web-disabled; Paranoia never applies the patch,
+runs repository code, or runs tests.
+
+Branch validation retains the complete Git tree (including directories),
+reserves trusted blob sizes before any source read, and shares one 2 MiB source
+allowance and cache across the initial reply and retry. Creation cannot replace
+an existing directory. Exact preimages must occur once, counting overlapping
+occurrences. Individually valid replacement groups that cancel back to the
+original bytes are rejected through the same validation retry; valid adjacent
+edits remain supported. A clean caller checkout is required before dispatch, and the
+caller ref plus application preimages are checked again before return.
+Both cleanliness checks compare the reviewed HEAD, index, untracked inventory,
+filesystem kinds/modes, and raw content identities without invoking repository
+clean/process filters. Every tracked leaf is reached only through real checkout
+directories; a symlinked or non-directory ancestor refuses admission or makes
+the returned proposal stale. Proposed creates are checked as one prospective inventory:
+case-folded file/file, file/directory, and ancestor-component collisions reject
+through the existing validation retry.
+Existing tracked names remain in that collision inventory even when they are
+non-ASCII; proposed paths themselves retain the portable ASCII restriction.
+An absent or empty uninitialized tracked submodule is clean, including when its
+checkout parent is absent, while initialized submodules are checked recursively.
+Ignored checkout entries do not dirty admission, but
+an ignored destination or non-directory ancestor makes a returned create patch
+STALE.
+
+Plan review captures bytes once. Normal review, claim, digest, and structural
+identity continue to use the historical universal-newline text view; proposal
+eligibility and patch validation use the exact captured bytes and require
+strict UTF-8 LF-only text. plan-artifact.md is a virtual display label.
+Source capture, binding, or attestation failures are retried as evidence work,
+not offered as factual rewrite targets.
+
+Every provider-authored public field is emitted as an inert JSON value. A local
+proposal exception or missing supplemental audit yields PATCH-PROPOSAL:
+UNAVAILABLE while preserving the settled review and its exact existing
+trailer. Completed proposal attempts and rejected replies remain bounded in
+the supplemental failure audit even when retry prompt or schema preparation
+fails before another dispatch. Known proposal-only author or continuation
+handles cannot authorize rebut, even when the caller supplies an engine;
+runner fallback provenance covers both the requested author handle and any returned
+proposal handle. Only an independent completed critique or query can establish
+that authority. When claim verification is active, omission or
+localized-validation claim debt with no current semantic target reports
+proposal UNAVAILABLE, not a clean NOT-NEEDED result. When verification is
+explicitly disabled, retained inactive claim history does not create proposal
+targets or change a structurally clean NOT-NEEDED result.
 
 1. **Census:** three independent cold lanes inspect the complete artifact. A
    separate call consolidates their validated findings into durable debt.

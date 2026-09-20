@@ -1,0 +1,261 @@
+{
+  "effort": "medium",
+  "elapsed_ms": 59527,
+  "engine": "codex",
+  "kind": "reviewer-patch-native-feasibility",
+  "lane": "behaviour",
+  "lane_attempts": [
+    {
+      "duration_ms": 48400,
+      "engine": "codex",
+      "failure_detail_excerpt": "",
+      "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "outcome": "completed",
+      "provider_duration_ms": null,
+      "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0ba83-c057-7431-8bf8-b4d1d0758b58\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I’ll inspect the committed fixture, its validation contract, and the relevant history without changing files or running tests.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g 'README.md'; git status --short; git log -5 --oneline; git ls-files\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g 'README.md'; git status --short; git log -5 --oneline; git ls-files\\\"\",\"aggregated_output\":\"/tmp/paranoia-patch-probe-pp7mz7aw\\nREADME.md\\n2bc54ed Add feasibility fixture\\nREADME.md\\nvalidator.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; cat -n validator.py; git log --follow -p -- validator.py; rg -n 'validate|identifier|bool|int' .; rg --files --hidden -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!.git'\\\"' /tmp 2>/dev/null\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; cat -n validator.py; git log --follow -p -- validator.py; rg -n 'validate|identifier|bool|int' .; rg --files --hidden -g 'AGENTS.md' -g 'CLAUDE.md' -g '\\\"'!.git'\\\"' /tmp 2>/dev/null\\\"\",\"aggregated_output\":\"/tmp/paranoia-106-restatement.sWy26v/repo/CLAUDE.md\\n/tmp/paranoia-106-restatement.sWy26v/repo/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-9a51bans/repository/CLAUDE.md\\n/tmp/paranoia-predecessor-preflight-9a51bans/repository/AGENTS.md\\n/tmp/paranoia-recurring-source-2026-09-07/CLAUDE.md\\n/tmp/paranoia-recurring-source-2026-09-07/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-kblvz33u/repository/CLAUDE.md\\n/tmp/paranoia-predecessor-preflight-kblvz33u/repository/AGENTS.md\\n/tmp/issue91-full-final-committed/test_plan_review_reliability_r0/validation-replay/CLAUDE.md\\n/tmp/issue91-full-final-committed/test_plan_review_reliability_r0/validation-replay/AGENTS.md\\n/tmp/paranoia-106-restatement.eOgA1q/repo/CLAUDE.md\\n/tmp/paranoia-106-restatement.eOgA1q/repo/AGENTS.md\\n/tmp/paranoia-106-full.J0pGjj/repo/CLAUDE.md\\n/tmp/paranoia-106-full.J0pGjj/repo/AGENTS.md\\n/tmp/paranoia-local-claim-binding/CLAUDE.md\\n/tmp/paranoia-local-claim-binding/AGENTS.md\\n/tmp/paranoia-local-issue-59/CLAUDE.md\\n/tmp/paranoia-local-issue-59/AGENTS.md\\n/tmp/rd-ui-candidate/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-8iwwdg39/repository/CLAUDE.md\\n/tmp/paranoia-predecessor-preflight-8iwwdg39/repository/AGENTS.md\\n/tmp/paranoia-local-schema-fix/CLAUDE.md\\n/tmp/paranoia-local-schema-fix/AGENTS.md\\n/tmp/mosaic-rd-snapshot-5df157c-clean2/AGENTS.md\\n/tmp/issue91-full-empty-plan/test_plan_review_reliability_r0/validation-replay/CLAUDE.md\\n/tmp/issue91-full-empty-plan/test_plan_review_reliability_r0/validation-replay/AGENTS.md\\n/tmp/issue91-full-empty-plan/test_plan_review_reliability_a0/paranoia-predecessor-preflight-z4q3c86y/repository/CLAUDE.md\\n/tmp/issue91-full-empty-plan/test_plan_review_reliability_a0/paranoia-predecessor-preflight-z4q3c86y/repository/AGENTS.md\\n/tmp/paranoia-local-issue-91/CLAUDE.md\\n/tmp/paranoia-local-issue-91/AGENTS.md\\n/tmp/rd-ui-candidate-v5/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-8o3wie07/repository/CLAUDE.md\\n/tmp/paranoia-predecessor-preflight-8o3wie07/repository/AGENTS.md\\n/tmp/paranoia-census-baseline/CLAUDE.md\\n/tmp/paranoia-census-baseline/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-lneqagfp/repository/CLAUDE.md\\n/tmp/paranoia-predecessor-preflight-lneqagfp/repository/AGENTS.md\\n/tmp/paranoia-predecessor-preflight-wc0ww2nf/repository/CLAUDE.m",
+      "raw_sha256": "3535273ca6893f7c0f0c780ff43b4a2a799db714f491398322cae87859a7f995",
+      "rejected_reply_excerpt": null,
+      "rejected_reply_sha256": null,
+      "requested_timeout_sec": 900,
+      "response_excerpt": "{\n  \"class_assessments\": [],\n  \"coverage\": [\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:1-3\", \"rationale\": \"Read the complete documented contract.\"},\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"Read the complete implementation and its initial commit history.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"artifact-complete\",\n      \"status\": \"covered\",\n      \"summary\": \"Reviewed both committed files in full.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"Explicitly requires rejection of Boolean identifiers.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"repository-premises\",\n      \"status\": \"covered\",\n      \"summary\": \"The stated requirement matches the repository contract.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:2-3\", \"rationale\": \"The integer subclass check also accepts both Boolean values.\"}\n      ],\n      \"finding_ids\": [\"B1\"],\n      \"id\": \"transformations\",\n      \"status\": \"finding\",\n      \"summary\": \"Validation incorrectly maps Boolean inputs to acceptance.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"This function is the entire implementation; repository search found no callers.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"consumers\",\n      \"status\": \"covered\",\n      \"summary\": \"No additional consumers or production counterparts exist in the fixture.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"The predicate has no state, persistence, or recovery lifecycle.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"failure-recovery\",\n      \"status\": \"not_applicable\",\n      \"summary\": \"No recovery behavior is involved.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"Provides the acceptance criterion; no test files are present.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"covered\",\n      \"summary\": \"Assessed acceptance by inspection. No tests or repository scripts were executed.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"The documented behavior is explicit and requires no operational configuration.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"docs-operations\",\n      \"status\": \"covered\",\n      \"summary\": \"Documentation clearly states the intended behavior.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"Requires Boolean rejection.\"},\n        {\"anchor\": \"repository/validator.py:2-3\", \"rationale\": \"The comment repeats the requirement, but the return expression violates it.\"}\n      ],\n      \"finding_ids\": [\"B1\"],\n      \"id\": \"consistency\",\n      \"status\": \"finding\",\n      \"summary\": \"Implementation contradicts both assertions of the contract.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"A simple predicate is proportionate; only its Boolean handling needs correction.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"proportionality\",\n      \"status\": \"covered\",\n      \"summary\": \"The finding concerns ordinary inputs within the stated stakes; no additional hardening is needed.\"\n    }\n  ],\n  \"findings\": [\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/validator.py:1-3\", \"rationale\": \"Because bool subclasses int, accepts_identifier(True) and accepts_identifier(False) both return True, despite the comment requiring rejection.\"},\n        {\"anchor\": \"repository/README.md:3\", \"rationale\": \"Boolean rejection is an explicit repository requirement.\"}\n      ],\n      \"id\": \"B1\",\n      \"remedy\": \"Return isinstance(value, int) and not isinstance(value, bool). Preserve the README and comment contract, and add regression coverage rejecting True and False while accepting ordinary integers and rejecting non-integers.\",\n      \"severity\": \"BLOCKER\",\n      \"summary\": \"The identifier",
+      "response_sha256": "8b607f888d89a19c892b76e585931113e05467ab284dfe12f3661895d81a122b",
+      "returncode": 0,
+      "role": "census-behaviour",
+      "sequence": null,
+      "session_ref": "01a0ba83-c057-7431-8bf8-b4d1d0758b58",
+      "stderr_excerpt": "",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 25216,
+        "input_tokens": 46844,
+        "output_tokens": 1183,
+        "reasoning_output_tokens": 10
+      },
+      "validation_issue": null,
+      "validation_pointer": null
+    }
+  ],
+  "lane_manifest": {
+    "class_assessments": [],
+    "coverage": [
+      {
+        "evidence": [
+          "repository/README.md:1-3",
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "artifact-complete",
+        "status": "covered",
+        "summary": "Reviewed both committed files in full."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "finding_ids": [],
+        "id": "repository-premises",
+        "status": "covered",
+        "summary": "The stated requirement matches the repository contract."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:2-3"
+        ],
+        "finding_ids": [
+          "B1"
+        ],
+        "id": "transformations",
+        "status": "finding",
+        "summary": "Validation incorrectly maps Boolean inputs to acceptance."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "consumers",
+        "status": "covered",
+        "summary": "No additional consumers or production counterparts exist in the fixture."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "failure-recovery",
+        "status": "not_applicable",
+        "summary": "No recovery behavior is involved."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "finding_ids": [],
+        "id": "tests-acceptance",
+        "status": "covered",
+        "summary": "Assessed acceptance by inspection. No tests or repository scripts were executed."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3"
+        ],
+        "finding_ids": [],
+        "id": "docs-operations",
+        "status": "covered",
+        "summary": "Documentation clearly states the intended behavior."
+      },
+      {
+        "evidence": [
+          "repository/README.md:3",
+          "repository/validator.py:2-3"
+        ],
+        "finding_ids": [
+          "B1"
+        ],
+        "id": "consistency",
+        "status": "finding",
+        "summary": "Implementation contradicts both assertions of the contract."
+      },
+      {
+        "evidence": [
+          "repository/validator.py:1-3"
+        ],
+        "finding_ids": [],
+        "id": "proportionality",
+        "status": "covered",
+        "summary": "The finding concerns ordinary inputs within the stated stakes; no additional hardening is needed."
+      }
+    ],
+    "findings": [
+      {
+        "evidence": [
+          "repository/validator.py:1-3",
+          "repository/README.md:3"
+        ],
+        "id": "B1",
+        "remedy": "Return isinstance(value, int) and not isinstance(value, bool). Preserve the README and comment contract, and add regression coverage rejecting True and False while accepting ordinary integers and rejecting non-integers.",
+        "severity": "BLOCKER",
+        "summary": "The identifier validator accepts both Boolean values, violating its explicit contract."
+      }
+    ],
+    "lane": "behaviour"
+  },
+  "lane_rejected_payloads": [],
+  "lane_session_ref": "01a0ba83-c057-7431-8bf8-b4d1d0758b58",
+  "model": "gpt-6-astra",
+  "patch_applied": false,
+  "proposal": {
+    "addressed_finding_ids": [
+      "structural:probe-D1"
+    ],
+    "edits": [
+      {
+        "new_text": "    return isinstance(value, int) and not isinstance(value, bool)\n",
+        "old_text": "    return isinstance(value, int)\n",
+        "operation": "replace",
+        "path": "validator.py",
+        "target": "repository"
+      }
+    ],
+    "limitations": [
+      "Candidate patch only; not applied or tested."
+    ],
+    "schema_version": 1,
+    "status": "proposed",
+    "suggested_tests": [
+      "Check that True and False are rejected, ordinary integers are accepted, and non-integers are rejected."
+    ],
+    "summary": "Reject Boolean identifiers while preserving acceptance of other integers.",
+    "unaddressed": []
+  },
+  "proposal_duration_ms": 11092,
+  "proposal_raw": {
+    "bytes": 1089,
+    "excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0ba83-c057-7431-8bf8-b4d1d0758b58\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"addressed_finding_ids\\\": [\\\"structural:probe-D1\\\"],\\n  \\\"edits\\\": [\\n    {\\n      \\\"new_text\\\": \\\"    return isinstance(value, int) and not isinstance(value, bool)\\\\n\\\",\\n      \\\"old_text\\\": \\\"    return isinstance(value, int)\\\\n\\\",\\n      \\\"operation\\\": \\\"replace\\\",\\n      \\\"path\\\": \\\"validator.py\\\",\\n      \\\"target\\\": \\\"repository\\\"\\n    }\\n  ],\\n  \\\"limitations\\\": [\\\"Candidate patch only; not applied or tested.\\\"],\\n  \\\"schema_version\\\": 1,\\n  \\\"status\\\": \\\"proposed\\\",\\n  \\\"suggested_tests\\\": [\\n    \\\"Check that True and False are rejected, ordinary integers are accepted, and non-integers are rejected.\\\"\\n  ],\\n  \\\"summary\\\": \\\"Reject Boolean identifiers while preserving acceptance of other integers.\\\",\\n  \\\"unaddressed\\\": []\\n}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":22150,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":184,\"reasoning_output_tokens\":0}}\n",
+    "sha256": "3db65f9a3027d9feb51316faf032d66d010d7fd99024de890be1ed374e7336b8"
+  },
+  "proposal_resume_argv": [
+    "codex",
+    "exec",
+    "resume",
+    "01a0ba83-c057-7431-8bf8-b4d1d0758b58",
+    "--json",
+    "--ignore-user-config",
+    "--skip-git-repo-check",
+    "-m",
+    "gpt-6-astra",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "approval_policy=\"never\"",
+    "-c",
+    "web_search=\"disabled\"",
+    "-c",
+    "sandbox_workspace_write.network_access=false",
+    "-c",
+    "sandbox_workspace_write.exclude_slash_tmp=true",
+    "-c",
+    "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+    "-c",
+    "sandbox_workspace_write.writable_roots=[]",
+    "--disable",
+    "apps",
+    "--disable",
+    "browser_use",
+    "--disable",
+    "browser_use_external",
+    "--disable",
+    "browser_use_full_cdp_access",
+    "--disable",
+    "computer_use",
+    "--disable",
+    "in_app_browser",
+    "--disable",
+    "plugins",
+    "--disable",
+    "remote_plugin",
+    "--disable",
+    "plugin_sharing",
+    "--disable",
+    "enable_mcp_apps",
+    "--disable",
+    "image_generation",
+    "--disable",
+    "multi_agent",
+    "--disable",
+    "workspace_dependencies",
+    "--disable",
+    "auth_elicitation",
+    "--disable",
+    "tool_call_mcp_elicitation",
+    "--disable",
+    "skill_mcp_dependency_install",
+    "--disable",
+    "hooks",
+    "--disable",
+    "tool_suggest",
+    "-c",
+    "sandbox_mode=\"read-only\"",
+    "-"
+  ],
+  "proposal_returncode": 0,
+  "proposal_schema_sha256": "a91be219ea82651d5e831bd071c0a5e2603acc75afb91ede48e08d4f73d26476",
+  "proposal_session_ref": "01a0ba83-c057-7431-8bf8-b4d1d0758b58",
+  "proposal_stderr": {
+    "bytes": 0,
+    "excerpt": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "proposal_usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 22150,
+    "output_tokens": 184,
+    "reasoning_output_tokens": 0
+  },
+  "qualified": true,
+  "schema_version": 1,
+  "source_commit": "2bc54ed9aa2cc2c73db8bc804593ac6be6b781be",
+  "tests_executed_by_proposal": false
+}

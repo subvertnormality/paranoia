@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,10 @@ class SpyEngine:
     def run(self, prompt, cwd, model, effort, web_search, runner=None, timeout=None):
         return Review(text=f"REVIEW via {self.name}", session_ref="s1", raw="")
 
-    def resume(self, session_ref, prompt, cwd, model, effort, web_search, runner=None, timeout=None):
+    def resume(
+        self, session_ref, prompt, cwd, model, effort, web_search,
+        runner=None, timeout=None, **kwargs,
+    ):
         return Review(text="REBUT via " + self.name, session_ref=session_ref, raw="")
 
 
@@ -78,6 +82,18 @@ class TestToolListing:
         tool = next(t for t in server.TOOLS if t.name == "critique_branch")
         assert "repo_path" in tool.inputSchema["required"]
 
+    def test_review_schemas_explain_when_to_opt_in_to_patch_proposals(self) -> None:
+        for name in ("critique_branch", "critique_plan"):
+            tool = next(t for t in server.TOOLS if t.name == name)
+            description = tool.inputSchema["properties"]["propose_patch"]["description"]
+            assert "Explicit opt-in" in description
+            assert "initial" in description
+            assert "blocking debt appears concretely repairable" in description
+            assert "correction/final" in description
+            assert "architectural or authority gaps" in description
+            assert "omitted/false keeps ordinary review-only behavior" in description
+            assert "qualification harness" not in description
+
     def test_rebut_requires_session_and_rebuttal(self) -> None:
         tool = next(t for t in server.TOOLS if t.name == "rebut")
         req = tool.inputSchema["required"]
@@ -127,6 +143,86 @@ class TestDispatch:
             "query", {}, default_engine_name="codex", log_dir=tmp_path, now=lambda: "t",
         )
         assert "[paranoia-local error]" in out
+
+    def test_rebut_dispatch_excludes_reused_proposal_author_until_independent_review(
+        self, repo: Path, tmp_path: Path, spy_get_engine,
+    ) -> None:
+        author = "proposal-author"
+        (tmp_path / "proposal.json").write_text(json.dumps({
+            "tool": "critique_branch_patch_proposal",
+            "author_session_ref": author, "proposal_session_ref": author,
+            "proposal_attempt_ledger": [{
+                "role": "patch-proposal", "returncode": 0,
+                "session_ref": author,
+            }],
+        }))
+        (tmp_path / "census.json").write_text(json.dumps({
+            "tool": "critique_branch", "engine": "codex",
+            "error": False, "returncode": 0,
+            "session_ref": "review-session",
+            "attempt_ledger": [{
+                "role": "behaviour", "outcome": "completed", "returncode": 0,
+                "session_ref": author, "engine": "codex",
+            }],
+        }))
+        arguments = {
+            "repo_path": str(repo), "session_ref": author,
+            "rebuttal": "The finding is incorrect.",
+        }
+        refused = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t",
+        )
+        assert "proposal-only" in refused
+        assert spy_get_engine == []
+
+        explicitly_refused = server.dispatch(
+            "rebut", {**arguments, "engine": "codex"},
+            default_engine_name="claude", log_dir=tmp_path, now=lambda: "t-explicit",
+        )
+        assert "proposal-only" in explicitly_refused
+        assert spy_get_engine == []
+
+        (tmp_path / "stale-rebut.json").write_text(json.dumps({
+            "tool": "rebut", "engine": "codex", "error": False,
+            "returncode": 0, "session_ref": author,
+        }))
+        still_refused = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t-promoted",
+        )
+        assert "proposal-only" in still_refused
+        assert spy_get_engine == []
+
+        # A runner trace is the durable fallback when the supplemental receipt
+        # could not be written or the provider returned a different/no handle.
+        (tmp_path / "proposal.json").unlink()
+        (tmp_path / "proposal-run.json").write_text(json.dumps({
+            "tool": "run", "attempts": [{
+                "role": "patch-proposal", "provider_outcome": "completed",
+                "returncode": 0, "requested_session": author,
+                "session_ref": "different-proposal-session", "engine": "codex",
+            }],
+        }))
+        for explicit in (None, "codex"):
+            fallback_refused = server.dispatch(
+                "rebut", {**arguments, "engine": explicit} if explicit else arguments,
+                default_engine_name="claude", log_dir=tmp_path,
+                now=lambda: "t-run-fallback",
+            )
+            assert "proposal-only" in fallback_refused
+        assert spy_get_engine == []
+
+        (tmp_path / "independent.json").write_text(json.dumps({
+            "tool": "query", "engine": "codex", "error": False,
+            "returncode": 0, "session_ref": author,
+        }))
+        accepted = server.dispatch(
+            "rebut", arguments, default_engine_name="claude",
+            log_dir=tmp_path, now=lambda: "t2",
+        )
+        assert "REBUT via codex" in accepted
+        assert spy_get_engine == ["codex"]
 
     def test_bad_engine_name_returns_error_text(self, repo: Path, tmp_path: Path, spy_get_engine) -> None:
         out = server.dispatch(

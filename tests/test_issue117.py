@@ -262,6 +262,9 @@ def check_historical_boundary(original, current, name):
         restore(original["reviewed_snapshot"]["allowed_later_handlers_diff"],
                 current["reviewed_snapshot"]["allowed_later_handlers_diff"],
                 ("sha256", "scope", "additions", "deletions"))
+        restore(original["reviewed_snapshot"]["allowed_later_plan_claims_diff"],
+                current["reviewed_snapshot"]["allowed_later_plan_claims_diff"],
+                ("sha256", "scope", "additions", "deletions"))
         old = "The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here."
         new = "This historical run used its recorded prompts. Issue 117 later changes cold-attestation authoring and exact prompt sizes, requiring separate current-source acceptance."
         assert old in original["scope"]
