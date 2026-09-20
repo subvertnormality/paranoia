@@ -67,6 +67,17 @@ gate passes; no proposal is applied or tested by the production path.
   2,457 passed in 288.21s at checkpoint `806266a`. The proposal matrix
   passed 231 tests and the clean committed issue-115/117/126 guard set passed
   68 tests.
+- CODE round 7 closed structural debt with no findings. Its round-8 cold final
+  was structurally clear but found one minor prospective-inventory edge case:
+  differently cased implied directory prefixes could escape collision
+  validation. The repair now rejects shallow and deep implied-directory aliases
+  while preserving consistently spelled shared directories.
+- Full regression after that cold-final repair:
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign
+  GIT_CONFIG_VALUE_0=false PYTHONPATH=src
+  /home/andy/tools/paranoia-local/.venv/bin/pytest -q --tb=short` —
+  2,457 passed in 264.93s at checkpoint `f463159`. The proposal matrix passed
+  231 tests and the clean committed issue-115/117/126 guard set passed 68 tests.
 - The deterministic E2 evidence validator rejects mismatched state/trailer/snapshot/session
   custody, missing audit or cleanup evidence, invalid call counts, overlapping or unowned
   intervals, and derives the frozen 7/8-second repair and 17/18-second end-to-end examples
