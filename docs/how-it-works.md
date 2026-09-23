@@ -1,9 +1,12 @@
 # How Paranoia Local works
 
-> Reviewer-authored patch proposals are available as an explicit opt-in under
-> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
-> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
+> **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
+> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> `claude-opus-5-5` (high effort), require an independent strongest-model cold final
+> before `NOT-BLOCKED` (including after a clean census), and request an unapplied
+> repair proposal after a blocked census or blocked cold final by default. Opt out with
+> `review_model_policy: "strongest"` and `propose_patch: false`. See
+> [`docs/beta-tiered-review-plan.md`](beta-tiered-review-plan.md).
 
 This guide explains the behavior behind the public tools. Start with the
 [README](../README.md) for installation or the [tool reference](tool-reference.md)
@@ -34,9 +37,37 @@ that default is deliberate.
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
 
-### Opt-in patch supplement
+### Beta phase routing and independent acceptance
 
-With explicit propose_patch: true, a successful fresh census author may be
+This beta (`tiered-review-beta-1`) selects the structural model from the durable phase
+chosen by `review_transitions.incoming` under the lineage latch, never from round labels
+or caller prose. With the default `tiered` policy, census lanes, consolidation and the
+cold final use the engine's strongest model at medium effort; correction uses
+`gpt-6-sol` / `claude-opus-5-5` at high effort. `strongest` keeps every structural phase
+on the strongest model. Effort resolves per model family: an `effort_by_model` entry,
+then the global `effort`, then the release family default. Validation retries keep their role's model, effort and session.
+Claim discovery, binding and attestation keep the call-level model, so routing a
+correction never weakens external claim adjudication.
+
+A clean census now advances to a cold final owned by its engine instead of clearing.
+A final that settles clear writes a closed `acceptance` record (release, engine, model,
+effort, policy, override flag, snapshot). `CONVERGENCE: NOT-BLOCKED` requires that
+record on the exact current snapshot; `clear` state without it (pre-beta lineages, the
+zero-call legacy claim-only migration) renders `FINAL-REGRESSION: required` and the next
+round runs one strongest cold final. A custom model/effort override may clear but is
+labelled `custom-override`; a later run without the override re-verifies with its own
+final. Leaving `clear` drops the record. The final receives `closed_class_history`
+(closed classes' invariants and closing debt) as context only; closed classes still owe
+their ordinary outcome, and a violation reopens through the existing evidenced path.
+
+### Patch supplement (default-on in this beta)
+
+Omitting propose_patch requests one supplemental candidate after a blocked census
+(resuming the successful census lane author) or a blocked cold final (resuming that
+final's own session, never an older census session), using the source review's model and
+effort. Correction rounds, cached-census reuse, dirty, one-shot and closure-disabled
+reviews render an inert UNAVAILABLE reason and make no call; false makes zero calls;
+explicit true keeps its preflight rejection of unsupported modes. The author is
 resumed once to produce closed structured edits and once more only for local
 validation repair. This happens after the normal review is durably settled. The
 proposal route is read-only and web-disabled; Paranoia never applies the patch,
@@ -103,8 +134,8 @@ correction/final cycles; it does not guarantee a fixed round count and cannot
 clear the lineage. The independent cold final remains mandatory. Branch
 correction is unchanged and remains targeted.
 
-A clear census can converge immediately. Otherwise, increase `round` after each
-successfully settled edit. Failed or rejected rounds may reuse their label.
+A clear census proceeds to its cold final. Increase `round` after each successfully
+settled edit that repairs debt. After a clean census or clean correction (`FINAL-REGRESSION: required`), increment `round` and review the unchanged snapshot to run the cold final; edit only to repair debt. Failed or rejected rounds may reuse their label.
 Repeated or backward labels after settlement block without provider spend.
 
 ## Findings, classes, and closure

@@ -102,6 +102,10 @@ def collect_slot(directory, spec):
         checks = read(directory / "checks.json") if (directory / "checks.json").exists() else []
         for path in sorted((directory / "logs").glob("*.json")):
             audit = read(path)
+            if str(audit.get("tool", "")).endswith("_patch_proposal"):
+                # Beta default-on proposals write a separate supplemental audit; it is
+                # never a primary review output. Historical runs contain none.
+                continue
             (traces if audit.get("tool") == "run" else audits).append(audit)
         outputs = [read(p) for p in sorted(directory.glob("output-*.json"))]
         for row in rows:

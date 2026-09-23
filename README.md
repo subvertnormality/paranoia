@@ -1,9 +1,12 @@
 # Paranoia
 
-> Reviewer-authored patch proposals are available as an explicit opt-in under
-> [`docs/reviewer-patch-proposal-plan.md`](docs/reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
-> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
+> **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
+> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> `claude-opus-5-5` (high effort), require an independent strongest-model cold final
+> before `NOT-BLOCKED` (including after a clean census), and request an unapplied
+> repair proposal after a blocked census or blocked cold final by default. Opt out with
+> `review_model_policy: "strongest"` and `propose_patch: false`. See
+> [`docs/beta-tiered-review-plan.md`](docs/beta-tiered-review-plan.md).
 
 Get a cold, adversarial review of your code, plans, and technical decisions from
 the other frontier coding agent.
@@ -145,20 +148,23 @@ You can bind an approved implementation plan to the branch review with
 contract for the lineage; later rounds verify the implementation against the same
 text. Changing the contract requires a new lineage.
 
-Explicit `propose_patch: true` can ask the
-successful fresh census author for a supplemental candidate diff after the
-tracked review has settled. Omission and false remain disabled. The proposal is
+In this beta, omitting `propose_patch` asks the source reviewer for a supplemental
+candidate diff after a blocked census (the successful census lane author) or a blocked
+cold final (that final's own session) has settled, using that review's model and effort.
+Clean results report `NOT-NEEDED`; correction rounds, dirty, one-shot and
+closure-disabled reviews report an inert `UNAVAILABLE` and make no proposal call.
+`false` makes zero proposal calls; explicit `true` still rejects unsupported modes. The
+proposal is
 read-only, bound to the reviewed snapshot and complete target/class context,
 locally validated against pinned source, separately audited, and never applied
 or tested by Paranoia. The original verdict, durable state, and convergence
 trailer remain authoritative. A dirty caller tree blocks branch proposal spend;
 later ref or preimage movement marks a returned candidate stale.
 
-For executing agents, opt in on the initial clean, committed, tracked review when
-blocking debt appears concretely repairable in the reviewed code or plan. Inspect
-and amend the candidate deliberately. Keep it off for correction/final rounds,
-dirty or one-shot reviews, architectural or missing-authority findings, and cases
-where the agent already has a complete verified repair.
+For executing agents: inspect and amend the candidate deliberately, run appropriate
+checks, and submit the changed artifact in the next round. A proposal is never proof of
+repair. Pass `propose_patch: false` for architectural or missing-authority findings or
+when you already have a complete verified repair.
 
 ### Review a plan
 
@@ -303,6 +309,27 @@ phases:
    model consolidation. See the [census execution architecture](docs/census-execution.md).
 2. **Correction:** later rounds target durable debt and the effects of your fixes.
 3. **Final:** after debt closes, one fresh whole-artifact regression is required.
+   In this beta a clean census also advances to a final rather than clearing directly.
+
+Beta model routing (`review_model_policy`, default `tiered`): census lanes, consolidation
+and the cold final use the engine's strongest model (`gpt-6-astra` / `claude-fable-5-1`,
+medium effort); targeted correction uses `gpt-6-sol` / `claude-opus-5-5` at high effort.
+`strongest` uses the strongest model for every structural phase. Tiered Codex routing
+needs a Codex CLI recent enough to be offered `gpt-6-sol` (0.156.1 verified; 0.153.3 on a
+ChatGPT account is refused with "model is not supported"), which fails visibly rather
+than substituting a model: update the CLI or pass `review_model_policy: "strongest"`. Set effort per model
+family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
+merged per family); a family entry beats the global `effort`, so
+`{"sol": "high", "opus": "high"}` keeps correction at high. The model is chosen from
+the authoritative durable phase, never from round labels. An explicit `model` (argument or
+`.paranoia.toml`) pins every structural phase as a custom override: it can
+clear, but its `BETA-ACCEPTANCE` is labelled `custom-override`, and a later run without the
+override needs its own strongest cold final. An effort setting counts as a custom
+override only when it changes the cold final's release effort. Claim verification, `query`, `rebut` and
+`arbitrate` keep the call-level model. `NOT-BLOCKED` requires a cold-final acceptance
+record bound to the exact current snapshot; older `clear` state is re-verified by one
+final. Each staged trailer begins with `REVIEW-ROUTING` naming the actual phase, model,
+effort, policy and its source.
 
 The engine that closes correction debt owns the resulting final-regression gate.
 A different engine may still report new debt, but its clean result cannot discharge
@@ -313,8 +340,8 @@ The retained 2026-08-23 persistent-correction acceptance predates final ownershi
 and is historical evidence only; it does not certify the current final-selection or
 clearance route. Current owner behavior is exercised through both public handlers.
 
-A clear census can finish immediately. Otherwise, increase `round` only after
-you have changed the reviewed artifact. Failed or rejected rounds can reuse the
+A clear census proceeds to its cold final on the same snapshot. Increase `round`
+after you change the reviewed artifact to repair debt. After a clean census or clean correction (`FINAL-REGRESSION: required`), increment `round` and review the unchanged snapshot to run the cold final; edit only to repair debt. Failed or rejected rounds can reuse the
 same label; a successfully settled round requires the next label to increase.
 
 Paranoia tracks both concrete findings and reusable defect classes. Blocking
@@ -440,8 +467,8 @@ isolate = true
 ```
 
 Supported keys are `base_ref`, `project_summary`, `stakes`, `isolate`,
-`converge`, `class_closure`, `max_packet_chars`, `model`, `effort`, and
-`web_search`.
+`converge`, `class_closure`, `max_packet_chars`, `model`, `effort`,
+`review_model_policy` (beta), `effort_by_model` (beta table), and `web_search`.
 
 For `critique_plan`, `lineage` and `class_closure` are call-only arguments and
 are never read from `.paranoia.toml`.

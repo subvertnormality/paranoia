@@ -3337,11 +3337,12 @@ def test_issue_126_snapshot_preparation_and_admission_diagnostics(
         cc.default_state_root(), lineage_id, stamp="T2", mode=cc.PLAN_MODE,
     )
     discovery = [timeout for role, timeout in calls if role == handlers.eng.ROLE_DISCOVERY]
-    assert lineage.review_state["phase"] == "clear"
+    # Beta: the clean census awaits its strongest-model cold final.
+    assert lineage.review_state["phase"] == "final"
     if setup_seconds <= 360.0:
         assert discovery == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC]
         assert lineage.claim_state["debt"] is None
-        assert "\nCONVERGENCE: NOT-BLOCKED" in result
+        assert "\nCONVERGENCE: BLOCKED — structural closure remains open." in result
     else:
         assert discovery == []
         assert lineage.claim_state["claims"] == prior_claims
@@ -3423,9 +3424,10 @@ def test_evidence_deadline_debt_is_persisted_before_structural_review(
     assert "CLAIM-REGISTER: AUDIT-FAILED" in result
     assert "CLAIM-CLOSURE: AUDIT-FAILED" in result
     assert "REVIEW-ATTEMPTS:" in result
-    assert lineage.review_state["phase"] == "clear"
-    assert "STRUCTURAL-PHASE: clear" in result
-    assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
+    # Beta: the clean census awaits its cold final; claim debt still governs first.
+    assert lineage.review_state["phase"] == "final"
+    assert "STRUCTURAL-PHASE: final" in result
+    assert "STRUCTURAL-CONVERGENCE: BLOCKED" in result
     assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
     assert "staged structural debt remains open" not in result
     audit = json.loads(next((tmp_path / "logs").glob("*.json")).read_text())
@@ -3496,7 +3498,10 @@ def test_same_snapshot_claim_only_correction_migrates_without_structural_call(
     assert migrated.claim_state["debt"]["reason"] == "claim discovery timed out"
     assert "STRUCTURAL STATE MIGRATED" in result
     assert "STRUCTURAL-PHASE: clear" in result
-    assert "STRUCTURAL-CONVERGENCE: NOT-BLOCKED" in result
+    # Beta: the zero-call migration grants no acceptance, so a cold final is still owed.
+    assert "FINAL-REGRESSION: required" in result
+    assert "STRUCTURAL-CONVERGENCE: BLOCKED" in result
+    assert "acceptance" not in migrated.review_state
     assert "CONVERGENCE: BLOCKED — external claim closure remains open." in result
     assert "STAGED-ATTEMPTS: total=0" in result
 
@@ -3771,7 +3776,10 @@ def test_issue_108_public_census_and_final_satisfy_a_migrated_legacy_member(
     assert calls and all(member in prompt for prompt in calls)
     assert durable.classes[class_id].members == (member,)
     assert durable.classes[class_id].status == cc.CLOSED
-    assert durable.review_state["phase"] == "clear"
+    # Beta: a clean census awaits its cold final; a clean final clears.
+    assert durable.review_state["phase"] == (
+        "final" if starting_phase == "census" else "clear"
+    )
     assert f"STRUCTURAL-PHASE: {durable.review_state['phase']}" in result
 
 
@@ -4961,7 +4969,8 @@ def test_issue_115_claude_public_adapter_retry_and_durable_retirement(repo, tmp_
     if repaired:
         assert not state["claims"] and not pc.is_blocked(state)
         assert attempts[1]["outcome"] == "completed"
-        assert "CONVERGENCE: NOT-BLOCKED" in result
+        # Beta: repaired claims leave only the clean census's pending cold final.
+        assert "CONVERGENCE: BLOCKED — structural closure remains open." in result
     else:
         assert state["claims"] == prior["claims"] and pc.is_blocked(state)
         assert attempts[1]["outcome"] == "validation-invalid"

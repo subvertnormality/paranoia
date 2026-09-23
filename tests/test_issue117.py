@@ -117,9 +117,13 @@ def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malfo
         "round": 1, "model": "opus", "effort": "high", "claim_verification": True,
         "web_search": True, "stakes": "Trusted local operator and OS; one external claim."},
         default_engine_name="claude", log_dir=tmp_path / "logs")
+    # Beta: a clean census awaits its cold final, so supported claims leave only the
+    # structural gate open while claim debt still governs the combined verdict first.
+    claims_clear = "CONVERGENCE: BLOCKED — structural closure remains open."
     if malformation == "valid-whitespace":
         assert len(calls) == 1 and not replies
-        assert "CONVERGENCE: NOT-BLOCKED" in result
+        assert claims_clear in result
+        assert "FINAL-REGRESSION: required" in result
         return
     assert len(calls) == 2 and not replies
     argv, correction = calls[1]
@@ -146,7 +150,8 @@ def test_public_claude_attestation_correction(repo, tmp_path, monkeypatch, malfo
         assert all(c["verdict"] != "supported" for c in state["claims"].values())
     verdicts = [line for line in result.splitlines() if line.startswith("CONVERGENCE:")]
     assert len(verdicts) == 1
-    assert verdicts[0].startswith("CONVERGENCE: NOT-BLOCKED") == (repair == "valid")
+    assert (verdicts[0] == claims_clear) == (repair == "valid")
+    assert "CONVERGENCE: NOT-BLOCKED" not in result
 
 
 @pytest.mark.parametrize("limit", [handlers.MAX_PLAN_BINDING_BATCH_CHARS, handlers.MAX_PLAN_EXPANDED_PROMPT_CHARS])
@@ -265,6 +270,14 @@ def check_historical_boundary(original, current, name):
         restore(original["reviewed_snapshot"]["allowed_later_plan_claims_diff"],
                 current["reviewed_snapshot"]["allowed_later_plan_claims_diff"],
                 ("sha256", "scope", "additions", "deletions"))
+        # Beta tiered review changes review_census.py: existing allowance metadata only.
+        census_permitted = tuple(
+            field for field in ("sha256", "scope", "additions", "deletions")
+            if field in original["reviewed_snapshot"]["allowed_later_review_census_diff"]
+        )
+        restore(original["reviewed_snapshot"]["allowed_later_review_census_diff"],
+                current["reviewed_snapshot"]["allowed_later_review_census_diff"],
+                census_permitted)
         old = "The exact allowed later handlers diff changes role-specific discovery timing and combined trailer composition but not the capture, binding, cold-attestation, prompt-size, or source-admission semantics proved here."
         new = "This historical run used its recorded prompts. Issue 117 later changes cold-attestation authoring and exact prompt sizes, requiring separate current-source acceptance."
         assert old in original["scope"]

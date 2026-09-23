@@ -74,5 +74,7 @@ def test_public_verified_plan_observes_batch_workspace_and_retains_earlier_call(
         assert calls == [engines.ROLE_DISCOVERY]
         assert len(trace["attempts"]) == 1
     else:
-        assert "CONVERGENCE: NOT-BLOCKED" in out
+        # Beta: supported claims leave only the clean census's pending cold final.
+        assert "CONVERGENCE: BLOCKED — structural closure remains open." in out
+        assert "FINAL-REGRESSION: required" in out
         assert workspaces and all(not p.exists() for p in workspaces)

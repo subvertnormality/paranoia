@@ -1,16 +1,27 @@
 # Repository agent instructions
 
-Reviewer-authored patch proposals follow docs/reviewer-patch-proposal-plan.md and
-are delivered as an explicit opt-in. `PROPOSE_PATCH_DEFAULT` is false; omission and
-explicit false preserve ordinary review-only behavior, while explicit true requests
-the qualified supplemental path. The user declined the expensive paired campaign and
-approved this narrower opt-in merge; do not claim campaign-proven speed/cost benefit
-or publish default-on wording without a separate decision and default-on repair.
-Executing agents should set `propose_patch: true` on an initial clean, committed,
-tracked PLAN or CODE review when blocking debt appears concretely repairable in the
-reviewed artifact. Inspect the candidate rather than applying it blindly. Leave the
-flag false or omitted for correction/final rounds, dirty or one-shot reviews,
-architectural/authority gaps, or when a complete verified repair is already prepared.
+On branch `codex/beta-tiered-review`, docs/beta-tiered-review-plan.md is the bounded
+contract for the user-approved (2026-09-23) default-on beta. It supersedes the opt-in
+proposal default below for this branch only; stable main keeps opt-in behavior until a
+separate promotion decision. Omitted `propose_patch` means automatic eligibility (never
+coerced to a boolean); false makes zero proposal calls; explicit true keeps its preflight
+rejection. Proposals run only after a blocked census or blocked cold final, resuming that
+source session with its actual model/effort. Structural roles route by durable phase
+(`review_model_policy`, default `tiered`: census/final strongest, correction Sol/Opus 5.5
+at high); effort resolves per model family (`effort_by_model`, then global `effort`,
+then release family default); claim roles, query, rebut and arbitrate are not routed. Every beta acceptance
+needs a strongest-model cold final bound by the durable `acceptance` record to the exact
+snapshot, including after a clean census; legacy or custom-override clear never
+qualifies. Historical acceptance records change only existing allowance hash/scope
+metadata for beta-changed files (plan §10.8); never add entries or alter provider evidence. Do not claim savings or unchanged quality; they remain hypotheses. Native
+qualification on both providers is a delivery gate that has not yet run.
+
+Historical opt-in contract: reviewer-authored patch proposals follow
+docs/reviewer-patch-proposal-plan.md and were delivered as an explicit opt-in on main.
+The user declined the expensive paired campaign and approved that narrower opt-in merge;
+do not claim campaign-proven speed/cost benefit. Inspect every candidate rather than
+applying it blindly, and pass false for architectural/authority gaps or when a complete
+verified repair is already prepared.
 Proposal generation is supplemental after durable settlement: ordinary proposal-local
 preparation, provider, validation, logging and rendering failures must return the original
 review and exact trailer with an inert UNAVAILABLE diagnostic; retain every completed proposal

@@ -33,7 +33,7 @@ from . import arbitration, class_closure as cc
 from . import engines as eng, external_sources, git_objects, inert_git, inert_tree
 from . import logs, orientation, patch_proposals as pp, plan_claims as pc, prompts, review_census as rc
 from . import staged_protocol as sp, census_execution as census
-from . import review_transitions as transitions
+from . import review_transitions as transitions, review_policy as rp
 from .config import load_repo_config, resolve
 from .engines import Engine, Review, claude_provider_guidance
 from .worktree import worktree_at
@@ -66,7 +66,9 @@ PROPOSAL_LOCAL_RESERVE_SEC = 30
 PROPOSAL_TOTAL_RESERVE_SEC = 1230
 PROPOSAL_WHOLE_CALL_SECONDS = 8400
 MAX_PROPOSAL_PROMPT_CHARS = 1_000_000
-PROPOSE_PATCH_DEFAULT = False
+# Beta (docs/beta-tiered-review-plan.md): omission selects automatic eligibility rather
+# than a boolean default; see review_policy.proposal_mode.
+PROPOSE_PATCH_DEFAULT = None
 
 PLAN_CLOSURE_CANDIDATE_INSTRUCTIONS = """This plan correction is a closure candidate. After
 checking every supplied debt repair, scan the complete artifact against every supplied checklist
@@ -352,6 +354,7 @@ def _staged_prompt_issue(
 def _attempt(
     role: str, engine: Engine, review: Review, *, sequence: int | None = None,
     requested_timeout_sec: int | None = None,
+    model: str | None = None, effort: str | None = None,
 ) -> rc.Attempt:
     response = review.text or ""
     projection = _review_failure_projection(review)
@@ -363,7 +366,7 @@ def _attempt(
         if response else None,
         response[:4000] if response else None, sequence,
         **projection, requested_timeout_sec=requested_timeout_sec,
-        provider_duration_ms=review.provider_duration_ms,
+        provider_duration_ms=review.provider_duration_ms, model=model, effort=effort,
     )
 
 
@@ -434,6 +437,7 @@ def _run_patch_proposal(
     attempts.append(_attempt(
         "patch-proposal", proposal_engine, review,
         sequence=1, requested_timeout_sec=PROPOSAL_INITIAL_TIMEOUT_SEC,
+        model=model, effort=effort,
     ))
     repairable = False
     if review.error:
@@ -508,6 +512,7 @@ def _run_patch_proposal(
             attempts.append(_attempt(
                 "patch-proposal-validation-retry", proposal_engine, review,
                 sequence=2, requested_timeout_sec=PROPOSAL_RETRY_TIMEOUT_SEC,
+                model=model, effort=effort,
             ))
             if review.error:
                 failure = rc.bounded_diagnostic(
@@ -610,9 +615,48 @@ def _proposal_claim_targets(claim_state: dict[str, Any]) -> tuple[pp.ProposalTar
     return tuple(targets)
 
 
+def _proposal_source_phase(closure: "_ClosureRound") -> str | None:
+    phase_model = getattr(closure, "phase_model", None)
+    return phase_model.phase if phase_model is not None else None
+
+
+def _missing_author_reason(closure: "_ClosureRound") -> str:
+    phase = _proposal_source_phase(closure)
+    if phase == "correction":
+        return (
+            "correction-phase review is proposal-ineligible; the next cold final may "
+            "propose after it settles"
+        )
+    if phase == "final":
+        return "the settled cold final left no resumable author session for its targets"
+    if phase == "census" and closure.proposal_census is None:
+        return (
+            "census lanes were reused from a validated cache; no fresh census author "
+            "session exists"
+        )
+    return "no successful fresh-census author session"
+
+
+def _proposal_source_model(
+    closure: "_ClosureRound" | None, model: str, effort: str,
+) -> tuple[str, str]:
+    """A proposal resumes its source review with that review's actual model/effort."""
+    phase_model = getattr(closure, "phase_model", None) if closure else None
+    if phase_model is None:
+        return model, effort
+    return phase_model.model, phase_model.effort
+
+
 def _select_proposal_author(
     closure: "_ClosureRound", targets: Sequence[pp.ProposalTarget], *, claim_only: bool = False,
 ) -> census.AuthorHandle | None:
+    phase = _proposal_source_phase(closure)
+    if phase == "correction":
+        return None
+    if phase == "final":
+        # Only this final's durably settled structural targets; never resume an older
+        # census session against a newer final snapshot.
+        return None if claim_only else getattr(closure, "proposal_final_author", None)
     completed = closure.proposal_census
     if completed is None:
         return None
@@ -951,6 +995,10 @@ def _branch_patch_supplement(
     if closure is None or structural_snapshot is None or not closure._settled:
         return _proposal_section(None, status="UNAVAILABLE",
                                  reason="tracked settlement was not confirmed", context=None)
+    if _proposal_source_phase(closure) == "correction":
+        # Plan §3: correction rounds are phase-ineligible even when their debt closed.
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason=_missing_author_reason(closure), context=None)
     targets = _proposal_structural_targets(closure)
     if not targets:
         return _proposal_section(None, status="NOT-NEEDED",
@@ -964,7 +1012,7 @@ def _branch_patch_supplement(
     author = _select_proposal_author(closure, targets)
     if author is None:
         return _proposal_section(None, status="UNAVAILABLE",
-                                 reason="no successful fresh-census author session", context=None)
+                                 reason=_missing_author_reason(closure), context=None)
     admission_issue = _branch_proposal_admission_issue(repo, head_id)
     if admission_issue is not None:
         return _proposal_section(
@@ -977,9 +1025,10 @@ def _branch_patch_supplement(
         branch_contract.original if branch_contract else None,
         entries,
     )
+    source_model, source_effort = _proposal_source_model(closure, model, effort)
     execution = _run_patch_proposal(
         context=context, source_reader=reader, author=author, engine=engine,
-        cwd=checkout, model=model, effort=effort, deadline=deadline,
+        cwd=checkout, model=source_model, effort=source_effort, deadline=deadline,
         on_progress=on_progress,
     )
     status = "UNAVAILABLE"
@@ -1064,6 +1113,10 @@ def _plan_patch_supplement(
     if closure is None or structural_snapshot is None or not closure._settled:
         return _proposal_section(None, status="UNAVAILABLE",
                                  reason="tracked settlement was not confirmed", context=None)
+    if _proposal_source_phase(closure) == "correction":
+        # Plan §3: correction rounds are phase-ineligible even when their debt closed.
+        return _proposal_section(None, status="UNAVAILABLE",
+                                 reason=_missing_author_reason(closure), context=None)
     structural_targets = _proposal_structural_targets(closure)
     normalized_claims = pc.normalize_state(claim_state)
     blocked_by_source_processing = claim_verification and any(
@@ -1109,15 +1162,16 @@ def _plan_patch_supplement(
     )
     if author is None:
         return _proposal_section(None, status="UNAVAILABLE",
-                                 reason="no successful fresh-census author session", context=None)
+                                 reason=_missing_author_reason(closure), context=None)
     digest = hashlib.sha256(plan_bytes).hexdigest()
     context = pp.ProposalContext(
         "plan", tuple(targets), stakes, digest, structural_snapshot, None, None,
         (), plan_bytes, digest, "plan_path" if plan_path else "plan_text", plan_path,
     )
+    source_model, source_effort = _proposal_source_model(closure, model, effort)
     execution = _run_patch_proposal(
         context=context, source_reader=None, author=author, engine=engine,
-        cwd=cwd, model=model, effort=effort, deadline=deadline,
+        cwd=cwd, model=source_model, effort=source_effort, deadline=deadline,
         on_progress=on_progress,
     )
     status = "UNAVAILABLE"
@@ -1245,6 +1299,7 @@ def _staged_call(
     )
     attempts = [_attempt(
         role, engine, review, sequence=sequence, requested_timeout_sec=timeout,
+        model=model, effort=effort,
     )]
     if review.error:
         error = _engine_failure_error(review, role=role, engine_name=engine.name)
@@ -1305,6 +1360,7 @@ def _staged_call(
         attempts.append(_attempt(
             f"{role}-validation-retry", engine, retry, sequence=retry_sequence,
             requested_timeout_sec=min(STAGED_FORMAT_RETRY_TIMEOUT_SEC, timeout),
+            model=model, effort=effort,
         ))
         if retry.error:
             error = _engine_failure_error(
@@ -1392,6 +1448,62 @@ def _staged_class_context(blocks: list[str]) -> str:
         raise _staged_error(
             str(exc), role="active-class-preflight", kind="validation",
         ) from exc
+
+
+MAX_CLOSED_CLASS_HISTORY_CHARS = rc.MAX_CLASS_CONTEXT_CHARS
+MAX_CLOSED_CLASS_HISTORY_DEBT = 5
+
+
+def _closed_class_history(
+    lineage: cc.Lineage, debt: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Historical closure context for the cold final; never an outcome key.
+
+    Closed classes stay in `active_classes` and still require a final outcome. This
+    only adds how each was discharged, so a false correction closure can be rechecked
+    against current bytes. Bounded: the newest closing debt per class, then whole
+    classes are omitted with an explicit count rather than truncating text.
+    """
+    rows: list[dict[str, Any]] = []
+    for tracked in lineage.active():
+        if tracked.status != cc.CLOSED:
+            continue
+        closing = sorted(
+            (
+                row for row in debt
+                if row.get("status") == "closed"
+                and tracked.class_id in row.get("class_ids", [])
+            ),
+            key=lambda row: row.get("last_round") or 0, reverse=True,
+        )[:MAX_CLOSED_CLASS_HISTORY_DEBT]
+        rows.append({
+            "class_id": tracked.class_id, "invariant": tracked.invariant,
+            "procedure": tracked.procedure, "pattern": tracked.pattern,
+            "members": list(tracked.members),
+            "closing_debt": [
+                {
+                    key: row.get(key) for key in (
+                        "id", "summary", "evidence", "remedy", "last_round",
+                    )
+                }
+                for row in closing
+            ],
+        })
+    kept: list[dict[str, Any]] = []
+    for row in rows:
+        candidate = [*kept, row]
+        if len(json.dumps(candidate, ensure_ascii=False)) > MAX_CLOSED_CLASS_HISTORY_CHARS:
+            break
+        kept = candidate
+    return {
+        "note": (
+            "Historical context only. Resolved labels and closing debt do not prove an "
+            "invariant: recheck each closed class against the current artifact and report "
+            "a violation through its required outcome in active_classes."
+        ),
+        "classes": kept,
+        "omitted_classes": len(rows) - len(kept),
+    }
 
 
 def _active_class_rows(lineage: cc.Lineage, mode: str) -> list[dict[str, Any]]:
@@ -1682,7 +1794,7 @@ def _census_cache_binding(
     *, mode: str, snapshot: str, stakes: str, body: str,
     active_classes: list[dict[str, Any]], existing_debt: list[dict[str, Any]],
     engine_name: str, model: str, effort: str, web_search: bool,
-    plan_lines: int | None, lane_prompts: dict[str, str],
+    plan_lines: int | None, lane_prompts: dict[str, str], policy: str | None = None,
 ) -> dict[str, Any]:
     canonical_classes = json.dumps(
         sorted(active_classes, key=lambda row: row["class_id"]),
@@ -1691,7 +1803,7 @@ def _census_cache_binding(
     complete_input = json.dumps({
         "mode":mode, "snapshot_digest":snapshot, "stakes":stakes, "body":body,
         "active_classes":active_classes, "existing_debt":existing_debt,
-        "engine":engine_name, "model":model, "effort":effort,
+        "engine":engine_name, "model":model, "effort":effort, "policy":policy,
         "web_search":web_search, "plan_lines":plan_lines,
         "lane_prompts":lane_prompts,
         "lane_schemas":{
@@ -2137,10 +2249,19 @@ def _staged_structural_review(
     on_progress: Callable[[str], None] | None, plan_lines: int | None = None,
     web_search: bool = False,
     branch_contract_section: str | None = None,
+    routing: rp.StructuralRouting | None = None,
 ) -> tuple[Review, str, list[dict[str, Any]]]:
-    """Run census/correction/final and atomically settle it into the open lineage."""
+    """Run census/correction/final and atomically settle it into the open lineage.
+
+    `model`/`effort` are the call-level values; the structural model is selected by
+    `routing` only after the authoritative phase decision below.
+    """
     assert closure.lineage is not None
     lineage = closure.lineage
+    if routing is None:
+        routing = rp.StructuralRouting.pinned(engine.name, model, effort)
+    closure.routing = routing
+    closure.phase_model = None
     plan_contract = mode == cc.BRANCH_MODE and branch_contract_section is not None
     preflight_validation_error = getattr(
         closure, "preflight_validation_error", None,
@@ -2303,9 +2424,14 @@ def _staged_structural_review(
         ), []
     phase_decision = transitions.incoming(transitions.ReviewFacts.capture(
         state, (c.class_id for c in lineage.blocking()),
-    ))
+    ), engine=engine.name)
     rc.set_phase(state, phase_decision.phase, final_engine=phase_decision.final_engine)
     phase = phase_decision.phase
+    # Beta routing: the model is chosen from the authoritative phase, never from round
+    # labels or caller prose. Every call and retry of this role uses this one selection.
+    phase_model = routing.select(phase)
+    closure.phase_model = phase_model
+    model, effort = phase_model.model, phase_model.effort
     correction_gates = (
         rc.correction_gates(
             lineage.active(), correction_control, round_no=round_no,
@@ -2457,7 +2583,7 @@ def _staged_structural_review(
             active_classes=active_classes, existing_debt=existing_debt,
             engine_name=engine.name, model=model, effort=effort,
             web_search=web_search, plan_lines=plan_lines,
-            lane_prompts=lane_prompts,
+            lane_prompts=lane_prompts, policy=routing.policy,
         )
 
         def run_lane(lane: str) -> census.LaneResult:
@@ -2604,6 +2730,10 @@ def _staged_structural_review(
             "checklist": list(sp.CHECKLIST) if role == "final" or closure_candidate else [],
             "artifact": body,
         }
+        if role == "final":
+            stage_task["closed_class_history"] = _closed_class_history(
+                lineage, state.get("debt", []),
+            )
         if mode == cc.PLAN_MODE and role == "correction":
             stage_task["review_scope"] = (
                 "closure_candidate" if closure_candidate else "targeted"
@@ -2713,6 +2843,13 @@ def _staged_structural_review(
         prior_owner=prior_final_owner, engine=engine.name,
     )
     rc.set_phase(state, successor.phase, final_engine=successor.final_engine)
+    if phase == "final" and successor.phase == "clear":
+        state["acceptance"] = routing.acceptance(snapshot=snapshot, phase_model=phase_model)
+    if phase == "final" and review.session_ref:
+        # Transient author for a supplemental repair of this final's settled targets.
+        closure.proposal_final_author = census.AuthorHandle(
+            "final", review.session_ref, engine.name,
+        )
     if successor_facts.unbound_classes:
         state["unbound_class_ids"] = sorted(successor_facts.unbound_classes)
         state.pop("unbound_classes", None)
@@ -2812,7 +2949,7 @@ def _staged_success_trailer(
             class_trailer, structural_trailer, rc.attempt_trailer(attempts),
         ))
     structural_clear = (
-        state.get("phase") == "clear"
+        rc.accepted_clear(state)
         and not any(
             item.get("status") == "open" and item.get("severity") in rc.BLOCKING
             for item in state.get("debt", [])
@@ -3023,6 +3160,57 @@ def _log(
     )
 
 
+def _automatic_proposal_issue(
+    mode: str, engine: Engine, *, one_shot: bool, closure_on: bool, dirty: bool = False,
+) -> str | None:
+    """Why an omitted propose_patch selects no proposal call; None when eligible."""
+    if mode != "auto":
+        return None
+    if type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
+        return "the reviewer engine does not support supplemental repair proposals"
+    if one_shot:
+        return "one-shot review has no tracked settlement to repair"
+    if not closure_on:
+        return "class_closure:false review has no tracked settlement to repair"
+    if dirty:
+        return "a dirty include_uncommitted review has no clean committed preimage"
+    return None
+
+
+def _with_routing_trailer(closure: Any, trailer: str | None) -> str | None:
+    """Prefix the staged trailer with the actual beta routing of this round."""
+    routing = getattr(closure, "routing", None)
+    if not trailer or routing is None:
+        return trailer
+    return routing.trailer(getattr(closure, "phase_model", None)) + "\n" + trailer
+
+
+def _routing_audit(closure: Any) -> dict[str, Any] | None:
+    routing = getattr(closure, "routing", None)
+    if routing is None:
+        return None
+    phase_model = getattr(closure, "phase_model", None)
+    return {
+        "release": rp.BETA_RELEASE, "policy": routing.policy,
+        "policy_source": routing.policy_source, "custom_override": routing.custom,
+        "phase": phase_model.phase if phase_model else None,
+        "tier": phase_model.tier if phase_model else None,
+        "model": phase_model.model if phase_model else None,
+        "effort": phase_model.effort if phase_model else None,
+        "model_source": phase_model.source if phase_model else None,
+        "effort_source": phase_model.effort_source if phase_model else None,
+    }
+
+
+def _inert_proposal(reason: str | None) -> str:
+    if reason is None:
+        return ""
+    return "\n\n" + _proposal_section(
+        None, status="UNAVAILABLE", reason=reason + "; no proposal call was made",
+        context=None,
+    )
+
+
 def critique_branch(
     arguments: dict[str, Any],
     *,
@@ -3032,14 +3220,16 @@ def critique_branch(
     on_progress: Callable[[str], None] | None = None,
     _after_contract_load: Callable[[_BranchContract | None], None] | None = None,
 ) -> str:
-    proposal_requested = bool(arguments.get("propose_patch", PROPOSE_PATCH_DEFAULT))
+    proposal_mode = rp.proposal_mode(arguments)
+    proposal_requested = proposal_mode == "explicit"
     proposal_deadline = (
-        time.monotonic() + PROPOSAL_WHOLE_CALL_SECONDS if proposal_requested else None
+        time.monotonic() + PROPOSAL_WHOLE_CALL_SECONDS if proposal_mode != "off" else None
     )
     if proposal_requested and type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
         raise ValueError("propose_patch=true requires a supported native Codex or Claude engine")
     repo = _require_repo(arguments)
     cfg = load_repo_config(repo)
+    routing = rp.StructuralRouting.resolve(engine, arguments, cfg)
 
     base_ref = resolve("base_ref", arguments.get("base_ref"), cfg, "main")
     head_ref = arguments.get("head_ref", "HEAD")
@@ -3072,6 +3262,12 @@ def critique_branch(
             "propose_patch=true requires converge:true, class_closure:true, and "
             "include_uncommitted:false"
         )
+    proposal_inert = _automatic_proposal_issue(
+        proposal_mode, engine, one_shot=not converge, closure_on=closure_on, dirty=include_unc,
+    )
+    proposal_requested = proposal_requested or (
+        proposal_mode == "auto" and proposal_inert is None
+    )
     if supplied_contract is not None and (not converge or not closure_on):
         raise ValueError(
             "critique_branch plan contracts require converge:true and class_closure:true"
@@ -3181,6 +3377,7 @@ def critique_branch(
             branch_contract=contract, contract_latch_owned=contract_latch_owned,
             stakes_notice=_stakes_notice(no_stakes),
             propose_patch=proposal_requested, proposal_deadline=proposal_deadline,
+            routing=routing, proposal_inert=proposal_inert,
         )
 
     packet = orientation.build_orientation(
@@ -3200,7 +3397,7 @@ def critique_branch(
          {"target": target.description, "model": model,
           "round": arguments.get("round"), "already_raised": already,
           "rendered_trailer": None, "correction_gates": []})
-    return _footer(review, engine) + _stakes_notice(no_stakes)
+    return _footer(review, engine) + _stakes_notice(no_stakes) + _inert_proposal(proposal_inert)
 
 
 def _converge_branch_review(
@@ -3233,6 +3430,8 @@ def _converge_branch_review(
     stakes_notice: str = "",
     propose_patch: bool = False,
     proposal_deadline: float | None = None,
+    routing: rp.StructuralRouting | None = None,
+    proposal_inert: str | None = None,
 ) -> str:
     """Opt-in convergence path: pre-gather a deterministic packet so the reviewer skips
     the re-read/re-grep turns, and review it against an IMMUTABLE materialized worktree
@@ -3314,7 +3513,7 @@ def _converge_branch_review(
                 try:
                     review, trailer, attempt_ledger = _staged_structural_review(
                         engine=engine, cwd=wt, model=model,
-                        effort=effort, mode=cc.BRANCH_MODE,
+                        effort=effort, mode=cc.BRANCH_MODE, routing=routing,
                         body=f"=== REVIEW STAKES ===\n{stakes}\n\n{artifact}",
                         closure=closure, stakes=stakes,
                         snapshot=structural_snapshot,
@@ -3330,6 +3529,7 @@ def _converge_branch_review(
                         closure, stakes=stakes, snapshot=structural_snapshot, error=error,
                         mode=cc.BRANCH_MODE,
                     )
+                trailer = _with_routing_trailer(closure, trailer)
             else:
                 review = engine.run(prompt, wt, model, effort, web_search,
                                     **_progress_kwargs(on_progress))
@@ -3356,7 +3556,8 @@ def _converge_branch_review(
                       "correction_gates": deepcopy(closure.correction_gates) if closure else [],
                       "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
                       "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
-                      "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
+                      "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
+                      "review_routing": _routing_audit(closure)})
                 review_logged = True
                 if review.error:
                     proposal_text = _proposal_section(
@@ -3431,7 +3632,8 @@ def _converge_branch_review(
           ),
           "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
           "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
-          "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None})
+          "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
+          "review_routing": _routing_audit(closure)})
     body = _footer(review, engine) + stakes_notice
     if closure and closure.retry_register:
         # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
@@ -3440,6 +3642,7 @@ def _converge_branch_review(
                  f"round applied:_\n\n{closure.retry_register.strip()}")
     if proposal_text:
         body += "\n\n" + proposal_text
+    body += _inert_proposal(proposal_inert)
     return f"{body}\n\n{trailer}" if trailer else body
 
 
@@ -3534,7 +3737,8 @@ def critique_plan(
     now: Clock = _default_clock,
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
-    proposal_requested = bool(arguments.get("propose_patch", PROPOSE_PATCH_DEFAULT))
+    proposal_mode = rp.proposal_mode(arguments)
+    proposal_requested = proposal_mode == "explicit"
     if proposal_requested and type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
         raise ValueError("propose_patch=true requires a supported native Codex or Claude engine")
     # Proposal-mode incompatibilities are deterministic caller errors.  Reject them
@@ -3543,6 +3747,12 @@ def critique_plan(
     closure_on = bool(arguments.get("class_closure", True))
     if proposal_requested and not closure_on:
         raise ValueError("propose_patch=true requires class_closure:true for plan review")
+    proposal_inert = _automatic_proposal_issue(
+        proposal_mode, engine, one_shot=False, closure_on=closure_on,
+    )
+    proposal_requested = proposal_requested or (
+        proposal_mode == "auto" and proposal_inert is None
+    )
     plan_text = arguments.get("plan_text")
     plan_path = arguments.get("plan_path")
     plan_source_bytes: bytes | None = None
@@ -3598,7 +3808,9 @@ def critique_plan(
         except ValueError:
             pass
     cfg = load_repo_config(repo)
+    routing = rp.StructuralRouting.resolve(engine, arguments, cfg)
 
+    # Claim roles keep this call-level model; staged structural roles route by phase.
     model = resolve("model", arguments.get("model"), cfg, engine.default_model)
     effort = resolve("effort", arguments.get("effort"), cfg,
                      eng.default_effort(model, fallback="high"))
@@ -3896,7 +4108,7 @@ def critique_plan(
                     transitions.incoming(transitions.ReviewFacts.capture(
                         normalized_structural_state,
                         (c.class_id for c in closure.lineage.blocking()),
-                    )).phase
+                    ), engine=engine.name).phase
                     if normalized_structural_state is not None and closure and closure.lineage
                     else "census"
                 )
@@ -3947,7 +4159,7 @@ def critique_plan(
                     try:
                         review, trailer, structural_attempts = _staged_structural_review(
                             engine=reviewer, cwd=review_cwd, model=model, effort=effort,
-                            mode=cc.PLAN_MODE,
+                            mode=cc.PLAN_MODE, routing=routing,
                             body=f"=== REVIEW STAKES ===\n{stakes or ''}\n\n{staged_body}",
                             closure=closure, stakes=stakes or "", snapshot=structural_snapshot,
                             round_no=arguments.get("round") or 1, on_progress=on_progress,
@@ -3958,6 +4170,7 @@ def critique_plan(
                             closure, stakes=stakes or "", snapshot=structural_snapshot,
                             error=error, mode=cc.PLAN_MODE,
                         )
+                    trailer = _with_routing_trailer(closure, trailer)
                     attempt_ledger.extend(structural_attempts)
                 else:
                     review = reviewer.run(
@@ -4022,6 +4235,7 @@ def critique_plan(
                         "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
                         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
                         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
+                        "review_routing": _routing_audit(closure),
                     })
                     review_logged = True
                     if review.error:
@@ -4142,6 +4356,7 @@ def critique_plan(
         "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
+        "review_routing": _routing_audit(closure),
     })
     body_text = _footer(review, engine) + _stakes_notice(no_stakes)
     if closure and closure.retry_register:
@@ -4149,6 +4364,7 @@ def critique_plan(
                       f"round applied:_\n\n{closure.retry_register.strip()}")
     if proposal_text:
         body_text += "\n\n" + proposal_text
+    body_text += _inert_proposal(proposal_inert)
     if trailer:
         return f"{body_text}\n\n{trailer}"
     if claim_verification:
@@ -6024,6 +6240,10 @@ class _ClosureRound:
         self.correction_gates: list[dict[str, Any]] = []
         self.proposal_census: census.CensusResult | None = None
         self.proposal_debt_lanes: dict[str, tuple[str, ...]] = {}
+        # Successful cold-final session for a supplemental repair of that final's targets.
+        self.proposal_final_author: census.AuthorHandle | None = None
+        self.routing: rp.StructuralRouting | None = None
+        self.phase_model: rp.PhaseModel | None = None
         self._latched = latch_owned
         self._settled = False
 

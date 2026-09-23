@@ -1697,7 +1697,8 @@ def test_census_existing_advisory_violation_still_mints_debt():
         phase="census", snapshot="p", round_no=1, engine_name="codex",
     )
     assert state["debt"][0]["class_ids"] == ["class-a"]
-    assert state["phase"] == "clear"
+    # Beta: advisory-only census debt does not block, so the census awaits its cold final.
+    assert (state["phase"], state["final_engine"]) == ("final", "codex")
 
 
 def test_new_class_keeps_independent_severity_and_record_binding():

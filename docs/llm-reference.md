@@ -1,19 +1,31 @@
 # Paranoia Local: LLM operating reference
 
-> Reviewer-authored patch proposals are available as an explicit opt-in under
-> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
-> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
+> **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
+> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> `claude-opus-5-5` (high effort), require an independent strongest-model cold final
+> before `NOT-BLOCKED` (including after a clean census), and request an unapplied
+> repair proposal after a blocked census or blocked cold final by default. Opt out with
+> `review_model_policy: "strongest"` and `propose_patch: false`. See
+> [`docs/beta-tiered-review-plan.md`](beta-tiered-review-plan.md).
 
 Purpose: provide enough precise context for an agent to install, select, and call
 Paranoia Local without inferring behavior from introductory prose. Runtime MCP
 schemas are authoritative.
 
-Patch-proposal selection rule: set `propose_patch: true` for an initial clean,
-committed, tracked PLAN or CODE review when blocking debt appears concretely
-repairable in the reviewed artifact. Inspect or amend the candidate; never apply
-it blindly. Omit or set false for correction/final rounds, dirty or one-shot
-reviews, architectural/authority gaps, or an already complete verified repair.
+Patch-proposal selection rule (beta, default-on): omit `propose_patch`; the server
+proposes only after a blocked census or blocked cold final and reports `NOT-NEEDED` or
+an inert `UNAVAILABLE` otherwise. Inspect or amend every candidate and run your own
+checks; never apply it blindly or treat it as proof of repair. Set `false` for
+architectural/authority gaps or an already complete verified repair.
+
+Beta routing rule: `review_model_policy` defaults to `tiered` (census/final strongest at
+medium, correction `gpt-6-sol` / `claude-opus-5-5` at high); `strongest` keeps every
+structural phase on the strongest model. Do not pass `model` unless you intend a custom
+override that cannot claim beta qualification. Use `effort_by_model` (keys `astra`, `sol`,
+`fable`, `opus`) for per-family effort; it beats the global `effort` and is a custom
+override only if it changes the cold final's release effort. A clean census is followed by a
+required cold final on the same snapshot; parse `REVIEW-ROUTING`, `FINAL-REGRESSION`
+and `BETA-ACCEPTANCE` from the trailer.
 
 ## Identity
 
@@ -272,12 +284,14 @@ reports the agreed option only as `PROVISIONAL-SELECTED`.
 
 ```text
 new -> census
-census clear -> clear
+census clear -> final        (beta: independent cold final still required)
 census blocked -> correction
 correction blocked -> correction
 correction debt closed -> final
-final clear -> clear
+final clear -> clear         (writes the snapshot-bound beta acceptance record)
 final blocked -> correction
+clear without acceptance -> final
+clear, snapshot changed -> census
 ```
 
 After a tracked result:
@@ -285,7 +299,7 @@ After a tracked result:
 1. Read `STRUCTURAL-PHASE`, `STRUCTURAL-DEBT`, `CLASS-CLOSURE`, optional
    `CLAIM-CLOSURE`, and `CONVERGENCE`.
 2. Fix validated in-scope debt and transitive effects.
-3. Increment `round` only after changing the artifact.
+3. Increment `round` after changing the artifact to repair debt. After a clean census or clean correction (`FINAL-REGRESSION: required`), increment `round` and review the unchanged snapshot to run the cold final; edit only to repair debt.
 4. Reuse lineage and stakes.
 5. Stop only at `CONVERGENCE: NOT-BLOCKED`.
 
@@ -347,7 +361,9 @@ Recovery:
 - Codex MCP timeout: set `tool_timeout_sec=8700`.
 - Missing/old CLI: check version, update, and sign in.
 - Failed/rejected tracked call: address the diagnostic and retry the same round.
-- Settled blocked call: edit, increment round, retry the same lineage.
+- Settled blocked call with debt: edit, increment round, retry the same lineage.
+- `FINAL-REGRESSION: required` with no debt: increment round and rerun the unchanged
+  snapshot; do not edit merely to enter the final.
 - Persistence gate: close/replace the class or use the named class-bound rebut.
 - `STATE-UNAVAILABLE`: repair or intentionally abandon the diagnosed state path;
   never synthesize convergence from logs.
