@@ -1490,6 +1490,7 @@ def test_unsubstantiated_agreement_is_unresolved(repo: Path, tmp_path: Path):
     assert trailer_field(report, "SELECTED") == "none"
     assert trailer_field(report, "PROVISIONAL-SELECTED") == "opt-float"
     assert "not substantiated" in report
+    assert "NONE: no decisive citation" in trailer_field(report, "REASON")
 
 
 def test_round_two_runs_on_disjoint_evidence_and_can_converge(repo: Path, tmp_path: Path):
@@ -3426,14 +3427,27 @@ def test_the_field_scenario_now_converges(repo: Path, tmp_path: Path):
 def test_a_flip_onto_uncarried_evidence_is_still_unsubstantiated(repo: Path, tmp_path: Path):
     """The anti-capitulation purpose end to end."""
     (repo / "elsewhere.py").write_text("e\n" * 40)
+    (repo / "other.py").write_text("o\n" * 40)
     commit_all(repo, "elsewhere")
     agent = Agent(
         lambda engine, rnd: "opt-float" if (engine == "codex" and rnd == 1) else "opt-decimal",
-        extra={("codex", 2): {"decisive": "elsewhere.py:20"}},
+        extra={
+            ("codex", 1): {"decisive":"app.py:4"},
+            ("claude", 1): {"decisive":"other.py:20"},
+            ("codex", 2): {"decisive":"elsewhere.py:20"},
+            ("claude", 2): {"decisive":"other.py:20"},
+        },
     )
     report = run(repo, agent, tmp_path)
     assert trailer_field(report, "ARBITRATION") == "UNRESOLVED"
     assert "codex" in report
+    assert trailer_field(report, "ROUNDS") == "2"
+    assert trailer_field(report, "PROVISIONAL-SELECTED") == "opt-decimal"
+    reason = trailer_field(report, "REASON")
+    assert "elsewhere.py:20" in reason
+    assert "resolved decisive citation is outside gained carried evidence" in reason
+    record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert record["reason"] == reason
 
 
 def test_attestation_does_not_cover_fields_the_caller_never_supplied(repo: Path, tmp_path: Path):

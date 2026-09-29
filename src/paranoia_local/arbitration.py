@@ -892,6 +892,7 @@ def compute_outcome(
     *,
     substantiated: Mapping[str, bool],
     failure: str | None = None,
+    diagnostics: Mapping[str, str] | None = None,
 ) -> Outcome:
     """The whole verdict, in evaluation order.
 
@@ -937,7 +938,11 @@ def compute_outcome(
             UNRESOLVED,
             None,
             "agreement not substantiated by resolved evidence: "
-            + ", ".join(sorted(unsubstantiated)),
+            + "; ".join(
+                f"{engine} ({diagnostics[engine]})"
+                if diagnostics and engine in diagnostics else engine
+                for engine in sorted(unsubstantiated)
+            ),
             selected,
         )
     return Outcome(CONVERGED, selected, "unanimous, unblocked, substantiated")
@@ -950,6 +955,7 @@ def substantiation(
     carried: Mapping[str, Sequence[Region]] | None = None,
     moved: Collection[str] | None = None,
     source_packets: Mapping[str, tuple[str, bool]] | None = None,
+    diagnostics: dict[str, str] | None = None,
 ) -> dict[str, bool]:
     """Per-engine substantiation.
 
@@ -974,25 +980,41 @@ def substantiation(
     prior region as its real reason and merely append the novel one.
     """
     out: dict[str, bool] = {}
+    if diagnostics is not None:
+        diagnostics.clear()
+
+    def reject(vote: Vote, reason: str) -> None:
+        out[vote.engine] = False
+        if diagnostics is not None:
+            reference = vote.decisive.render() if vote.decisive is not None else "NONE"
+            diagnostics[vote.engine] = f"{reference}: {reason}"
+
     for vote in votes:
         if vote.decisive is None:
-            out[vote.engine] = False
+            reject(vote, "no decisive citation")
             continue
         if isinstance(vote.decisive, SourceReference):
             packet = (source_packets or {}).get(vote.decisive.packet_id)
-            out[vote.engine] = bool(
-                (carried is None or (moved is not None and vote.engine not in moved))
-                and packet
-                and packet[1]
-                and normalize_text(vote.constraint) == normalize_text(packet[0])
-                and vote.publisher_authority is True
-                and vote.passage_entailment is True
-                and vote.decision_relevance is True
-            )
+            if carried is not None and (moved is None or vote.engine in moved):
+                reject(vote, "source reference cannot ground a moved selection")
+            elif not packet:
+                reject(vote, "source packet is absent")
+            elif not packet[1]:
+                reject(vote, "source packet is not governing-eligible")
+            elif normalize_text(vote.constraint) != normalize_text(packet[0]):
+                reject(vote, "constraint does not match source proposition")
+            elif vote.publisher_authority is not True:
+                reject(vote, "publisher authority is not attested")
+            elif vote.passage_entailment is not True:
+                reject(vote, "passage entailment is not attested")
+            elif vote.decision_relevance is not True:
+                reject(vote, "decision relevance is not attested")
+            else:
+                out[vote.engine] = True
             continue
         region = resolve(vote.decisive)
         if region is None:
-            out[vote.engine] = False
+            reject(vote, "repository citation did not resolve against the pinned snapshot")
             continue
         if carried is None:
             out[vote.engine] = True
@@ -1003,6 +1025,8 @@ def substantiation(
         out[vote.engine] = any(
             anchor_within(region, c) for c in carried.get(vote.engine, ())
         )
+        if not out[vote.engine]:
+            reject(vote, "resolved decisive citation is outside gained carried evidence")
     return out
 
 
