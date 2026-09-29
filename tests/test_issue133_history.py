@@ -25,8 +25,10 @@ def _restore_allowances(before, after):
                 assert all(isinstance(item, str) and item for item in after[key][relative].values())
             after[key] = value
         elif key in {"allowed_later_handlers_diff", "allowed_later_review_census_diff", "allowed_later_plan_claims_diff"}:
-            assert set(after[key]) == set(value) == {"sha256", "scope"}
-            assert all(isinstance(item, str) and item for item in after[key].values())
+            assert set(after[key]) == set(value)
+            assert {"sha256", "scope"} <= set(value) <= {"sha256", "scope", "additions", "deletions"}
+            assert all(type(after[key][field]) is type(item) for field, item in value.items())
+            assert after[key]["sha256"] and after[key]["scope"]
             after[key] = value
         elif isinstance(value, dict):
             _restore_allowances(value, after[key])
