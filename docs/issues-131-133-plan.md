@@ -1,8 +1,7 @@
 # Review recovery and arbitration diagnostics (#131–133)
 
 Implement this bounded repair on main with behavioral regressions before production edits.
-Operator gates: Codex PLAN convergence, implement, Codex CODE convergence, PR, merge,
-then update the local installation. Separate explicit lineages, increment rounds;
+The delivery sequence is defined in the final paragraph. Separate explicit lineages, increment rounds;
 require computed CONVERGENCE: NOT-BLOCKED and preserve historical failed lineages.
 
 ## Frozen stakes
@@ -37,6 +36,16 @@ No Parallax datasets, registries, certificates or trading behavior changes.
    Terminal invalid replies remain failed and mint no substantive debt. Historical
    settled D1 is never deleted or auto-closed: a normal correction reviewer may
    withdraw it with counter-evidence, as for any wrongly raised one-off finding.
+   Required regression matrix: test_consolidation_canonical_evidence_contract runs
+   public critique_plan and critique_branch with validated bare-anchor manifests,
+   initial success, single validation-retry success, and terminal invalid replies.
+   Inspect actual production-composed initial and retry prompts for the input/output
+   distinction and rationale derivation. Successful settlement must retain the exact
+   mapped-source evidence union and highest severity; invalid replies must preserve
+   existing substantive debt and add no new substantive debt. A separate correction
+   fixture must withdraw historical one-off metadata debt only through reviewer output.
+   These deterministic regressions are mandatory delivery gates, not evidence that
+   every possible native consolidator will interpret the prompt correctly.
 2. Bound plan rebut accepts any strictly parsed in-bounds plan anchor against the
    latest stored reviewed plan_line_count, rather than only original debt anchors.
    Use the checkpoint's current snapshot digest for concessions; do not read newer
