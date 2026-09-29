@@ -223,6 +223,16 @@ def _invocation(prompt: str, args: tuple, kwargs: dict) -> dict:
 
 def _historical_no_concession_prompt(prompt: str) -> str:
     """Project a current empty-concession prompt to this pre-cutover artifact."""
+    # Exact inverse of #131's canonical-input explanation, historical replay only.
+    # Original provider bytes and complete equality checks remain authoritative.
+    prompt = prompt.replace(
+        "Canonical manifest evidence intentionally contains bare anchor strings, not provider citation\n"
+        "objects. For the required output citation objects, derive each output rationale from the mapped source summary, remedy and evidence.\n"
+        "Missing source rationale objects are not a defect in the reviewed artifact. Do not invent a\n"
+        "transport-contract finding or replace the supplied substantive findings with a complaint about\n"
+        "this intentional canonical input shape. No source re-review is required to explain its evidence.\n\n",
+        "",
+    )
     # Historical replay only: retain the original prompt and its full comparison.
     prompt = prompt.replace("\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS, "")
     prompt = prompt.replace(

@@ -12,7 +12,24 @@ RECORDS = (
     "arbitration_consequence", "arbitration_context_steering_rejection", "arbitration_steering_rejection",
     "branch_plan_fidelity", "class_occurrence_batch", "class_persistence", "keyed_class_handler",
     "mechanized_predicate", "persistent_correction_gate", "plan_restatement", "plan_review_reliability",
+    "authoritative_capture",
 )
+
+
+def _restore_allowances(before, after):
+    for key, value in before.items():
+        if key == "allowed_later_source_diffs":
+            assert set(after[key]) == set(value)
+            for relative, row in value.items():
+                assert set(after[key][relative]) == set(row) == {"sha256", "scope"}
+                assert all(isinstance(item, str) and item for item in after[key][relative].values())
+            after[key] = value
+        elif key in {"allowed_later_handlers_diff", "allowed_later_review_census_diff", "allowed_later_plan_claims_diff"}:
+            assert set(after[key]) == set(value) == {"sha256", "scope"}
+            assert all(isinstance(item, str) and item for item in after[key].values())
+            after[key] = value
+        elif isinstance(value, dict):
+            _restore_allowances(value, after[key])
 
 
 @pytest.mark.parametrize("prefix", RECORDS)
@@ -23,11 +40,5 @@ def test_issue133_refresh_preserves_original_native_evidence(prefix):
     original = json.loads(subprocess.run(["git", "show", f"{BASE}:{path.relative_to(ROOT)}"],
                                         cwd=ROOT, check=True, capture_output=True, text=True).stdout)
     current = deepcopy(json.loads(path.read_text()))
-    before = original["allowed_later_source_diffs"]
-    after = current["allowed_later_source_diffs"]
-    assert set(after) == set(before)
-    for relative in before:
-        assert set(after[relative]) == set(before[relative]) == {"sha256", "scope"}
-        assert all(isinstance(value, str) and value for value in after[relative].values())
-        after[relative] = before[relative]
+    _restore_allowances(original, current)
     assert current == original

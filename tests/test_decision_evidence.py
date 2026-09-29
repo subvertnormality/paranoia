@@ -164,6 +164,42 @@ def test_round_two_repair_does_not_waive_gained_evidence(repo, tmp_path, holder)
     records = audit(report)["rounds"][1][target]["attempts"]
     assert len(records) == 2 and records[0]["rejection"] and records[1]["rejection"] is None
 
+
+def test_round_two_unanimity_with_missing_decisive_path_preserves_admission_failure(repo, tmp_path):
+    (repo / "other.py").write_text("other\n" * 40)
+    commit_all(repo, "disjoint round-one evidence")
+    scripted = Agent(lambda e, r: "opt-float" if (e == "codex" and r == 1) else "opt-decimal",
+                     extra={("codex", 1):{"decisive":"app.py:4"},
+                            ("claude", 1):{"decisive":"other.py:20"}})
+    rejected = []
+
+    def provider(**kwargs):
+        text = scripted(**kwargs)
+        if kwargs["engine_name"] == "codex" and "CODE REGIONS RELEVANT" in kwargs["body"]:
+            if rejected:
+                assert "DECISIVE-CITATION" in kwargs["body"]
+            text = text.replace("DECISIVE-CITATION: app.py:4", "DECISIVE-CITATION: missing.py:4")
+            rejected.append(text)
+        return text
+
+    report = run(repo, provider, tmp_path)
+    assert trailer_field(report, "ARBITRATION") == "FAILED"
+    # Only round one completed; the second round failed admission, not substantiation.
+    assert trailer_field(report, "ROUNDS") == "1"
+    assert len(rejected) == 2
+    record = audit(report)
+    assert record["reason"] in report
+    assert "DECISIVE-CITATION" in record["reason"]
+    assert "does not resolve to a literal file/line" in record["reason"]
+    assert record["failed_round"]["number"] == 2
+    failed = record["failed_round"]["deciders"]
+    assert failed["claude"]["selected"] == "opt-decimal"
+    attempts = failed["codex"]["attempts"]
+    assert [row["raw"] for row in attempts] == rejected
+    assert all("DECISIVE-CITATION" in row["rejection"] for row in attempts)
+    assert all("DECISIVE-CITATION: missing.py:4" in row for row in rejected)
+    assert all("SELECTED:" in row for row in rejected)
+
 def test_initial_prompt_states_exact_repository_relative_grammar():
     from paranoia_local import prompts
     assert "literal repository-relative" in prompts.ARBITRATE_INSTRUCTIONS
