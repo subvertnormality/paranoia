@@ -176,6 +176,7 @@ def test_round_two_unanimity_with_missing_decisive_path_preserves_admission_fail
     def provider(**kwargs):
         text = scripted(**kwargs)
         if kwargs["engine_name"] == "codex" and "CODE REGIONS RELEVANT" in kwargs["body"]:
+            assert "SELECTED: " + scripted._label_for(kwargs["body"], "opt-decimal") in text
             if rejected:
                 assert "DECISIVE-CITATION" in kwargs["body"]
             text = text.replace("DECISIVE-CITATION: app.py:4", "DECISIVE-CITATION: missing.py:4")
