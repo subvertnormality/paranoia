@@ -210,7 +210,7 @@ Re-examine ONLY the bound finding against the counter-evidence and the actual ar
 
 A validated CONCEDE becomes durable prior adjudication, not a permanent exemption. Later staged review may target the class again only by explicitly challenging that concession with new resolved evidence or a relevant changed premise.
 
-Each evidence item is the provider-schema citation object with a bare resolvable `anchor` and a separate `rationale`; never put prose in `anchor`. Repository citations MUST use `repository/<path>:<line-or-range>` with the literal `repository/` prefix. A plan citation MUST use `plan:<line-or-range>` and may only repeat a plan anchor already present in the bound finding.
+Each evidence item is the provider-schema citation object with a bare resolvable `anchor` and a separate `rationale`; never put prose in `anchor`. Repository citations MUST use `repository/<path>:<line-or-range>` with the literal `repository/` prefix. A plan citation MUST use `plan:<line-or-range>` within the latest reviewed plan's retained line bound. It need not repeat an anchor from the original finding. Cite only the plan already reviewed in this session, not a newer unreviewed revision.
 
 Do not introduce unrelated findings. The server, not you, decides any durable transition after validating this disposition and its exact debt/class/session binding."""
 
@@ -478,6 +478,12 @@ an internal member set that was never recorded."""
 STAGED_CONSOLIDATION_INSTRUCTIONS = """Consolidate validated lane manifests; do not conduct a new
 review. The provider-supplied JSON Schema is the sole structural contract; return only its object,
 without a marker, fence, or prose.
+
+Canonical manifest evidence intentionally contains bare anchor strings, not provider citation
+objects. For the required output citation objects, derive each output rationale from the mapped source summary, remedy and evidence.
+Missing source rationale objects are not a defect in the reviewed artifact. Do not invent a
+transport-contract finding or replace the supplied substantive findings with a complaint about
+this intentional canonical input shape. No source re-review is required to explain its evidence.
 
 Map every source through governing_findings.source_ids, preserve the highest merged severity, and
 cite only evidence present on at least one mapped source. Include the complete union of evidence

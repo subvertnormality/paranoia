@@ -1,5 +1,16 @@
 # Repository agent instructions
 
+Issues #131–133 follow docs/issues-131-133-plan.md. Consolidation receives canonical
+bare-anchor manifests; derive output rationales from validated source summaries,
+remedies and evidence instead of inventing transport-metadata findings. Repeat this
+contract on the existing validation retry. Historical settled metadata debt is not
+auto-closed: normal reviewer correction owns withdrawal. Bound plan rebut may cite
+any coordinate within the latest stored reviewed-plan bound, retaining the original
+finding and separate concession. Arbitration diagnostics name the decisive citation
+and failed substantiation condition without weakening carried grounding. Existing
+historical source-diff allowance metadata may be refreshed for the changed bytes;
+preserve original provider evidence and do not claim renewed native acceptance.
+
 Reviewer-authored patch proposals follow docs/reviewer-patch-proposal-plan.md and
 are delivered as an explicit opt-in. `PROPOSE_PATCH_DEFAULT` is false; omission and
 explicit false preserve ordinary review-only behavior, while explicit true requests
@@ -713,7 +724,7 @@ jumps count and failed labels may retry. Provider/validation failure does not ad
 state, and ambiguous lineage or rebut saves retain the pending latch. The rebut audit retains the
 complete prior target debt row separately while current closed-debt evidence records the concession
 citations.
-Persist the reviewed plan line count in staged plan state and resolve repeated plan rebut anchors
+Persist the reviewed plan line count in staged plan state and resolve current plan rebut anchors
 against that bound; absence of a trustworthy bound refuses plan-anchor settlement.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.
