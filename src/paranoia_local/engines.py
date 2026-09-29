@@ -456,7 +456,7 @@ class CodexEngine(Engine):
     name = "codex"
     default_model = "gpt-6-astra"
     # Release-pinned beta structural-correction model (docs/beta-tiered-review-plan.md).
-    correction_model = "gpt-6-sol"
+    correction_model = "gpt-6.1-sol"
     binary = "codex"
 
     def _evidence_flags(self, *, resumed: bool = False) -> list[str]:

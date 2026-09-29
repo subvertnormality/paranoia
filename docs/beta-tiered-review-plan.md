@@ -1,5 +1,13 @@
 # Beta: phase-based review models and default repair proposals
 
+2026-09-29 model-pin amendment: targeted Codex correction uses `gpt-6.1-sol`
+at the existing high effort. Astra census/final routing is unchanged. The retained
+2026-09-23 qualification records describe the previous Sol pin and remain historical.
+Validation: 107 beta-routing and engine tests passed. A minimal live call on
+2026-09-29 with Codex CLI 0.156.1 and the local ChatGPT account rejected
+`gpt-6.1-sol` as unsupported; native Sol 6.1 usability is not established.
+Tiered correction remains fail-closed until the CLI/account offers that model.
+
 Status: implemented on this branch with deterministic public-handler tests
 (`tests/test_beta_tiered_review.py`); see §10 for the bounded implementation decisions that
 close gaps found while grounding this contract in code. CODE convergence reached
@@ -25,7 +33,7 @@ Paranoia never applies a proposal or treats one as proof of repair.
 | Phase | Codex | Claude | Automatic proposal |
 | --- | --- | --- | --- |
 | Census lanes and consolidation | gpt-6-astra | claude-fable-5-1 | After eligible blocked settlement |
-| Structural correction | gpt-6-sol | claude-opus-5-5 | No additional proposal call |
+| Structural correction | gpt-6.1-sol | claude-opus-5-5 | No additional proposal call |
 | Independent cold final | gpt-6-astra | claude-fable-5-1 | After eligible blocked settlement |
 | Proposal and validation retry | Source review's actual model | Source review's actual model | One attempt plus existing single validation retry |
 
@@ -267,7 +275,7 @@ not add scope.
    inside `_staged_structural_review` *after* `transitions.incoming` has chosen the
    authoritative phase. An explicit `model` (argument or `.paranoia.toml`) pins every
    structural phase and marks the run `custom-override`; effort follows decision 7.
-2. **Pinned model IDs.** Codex correction: `gpt-6-sol`; Claude correction:
+2. **Pinned model IDs.** Codex correction: `gpt-6.1-sol`; Claude correction:
    `claude-opus-5-5`. Census and final use each engine's existing `default_model`.
    The arbitration cleaner (`claude-opus-5`) is out of scope and unchanged. There is no
    pre-flight model probe; the model is passed verbatim with `--model`, and a CLI
@@ -276,7 +284,9 @@ not add scope.
    not offered `gpt-6-sol` ("model is not supported when using Codex with a ChatGPT
    account") and the correction round failed visibly as designed; 0.156.1 (and the
    0.155 desktop build) is offered it. Tiered Codex routing therefore needs a current
-   Codex CLI; otherwise update the CLI or use `review_model_policy: "strongest"`.
+   Codex CLI/account offering the current pin; the observations above qualify only
+   the previous `gpt-6-sol` pin, not Sol 6.1. Otherwise update the CLI or use
+   `review_model_policy: "strongest"`.
 3. **Cached census reuse.** When validated lanes are reused after a consolidation
    rejection, no fresh author session exists; the automatic proposal reports
    `UNAVAILABLE` with that reason. The author handle is not persisted in the cache.

@@ -7,7 +7,7 @@ separate promotion decision. Omitted `propose_patch` means automatic eligibility
 coerced to a boolean); false makes zero proposal calls; explicit true keeps its preflight
 rejection. Proposals run only after a blocked census or blocked cold final, resuming that
 source session with its actual model/effort. Structural roles route by durable phase
-(`review_model_policy`, default `tiered`: census/final strongest, correction Sol/Opus 5.5
+(`review_model_policy`, default `tiered`: census/final strongest, correction `gpt-6.1-sol`/Opus 5.5
 at high); effort resolves per model family (`effort_by_model`, then global `effort`,
 then release family default); claim roles, query, rebut and arbitrate are not routed. Every beta acceptance
 needs a strongest-model cold final bound by the durable `acceptance` record to the exact

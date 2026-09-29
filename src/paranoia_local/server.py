@@ -109,7 +109,7 @@ _REVIEW_MODEL_POLICY = {
         f"BETA ({review_policy.BETA_RELEASE}) structural model routing for tracked staged "
         "reviews (default tiered; precedence: argument, .paranoia.toml, release default). "
         "tiered: census and cold final use the strongest model (gpt-6-astra / "
-        "claude-fable-5-1), targeted correction uses gpt-6-sol / claude-opus-5-5. "
+        "claude-fable-5-1), targeted correction uses gpt-6.1-sol / claude-opus-5-5. "
         "strongest: every structural phase uses the strongest model. An explicit model pins "
         "every structural phase as a custom override that cannot claim beta qualification. "
         "Effort resolves per model family (effort_by_model, then effort, then release "

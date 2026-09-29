@@ -25,7 +25,7 @@ from tests.test_review_census import _task_from_prompt, lane, payload, wire
 GOOD_PLAN = "The value is two.\n"
 BAD_PLAN = "The value is broken.\n"
 ENGINES = {
-    "codex": (engines.CodexEngine, "gpt-6-astra", "gpt-6-sol"),
+    "codex": (engines.CodexEngine, "gpt-6-astra", "gpt-6.1-sol"),
     "claude": (engines.ClaudeEngine, "claude-fable-5-1", "claude-opus-5-5"),
 }
 
@@ -418,7 +418,7 @@ def test_repository_config_policy_and_argument_precedence(tmp_path, monkeypatch)
     h.repair()
     seen = len(h.provider.calls)
     out = h.review(propose_patch=False, review_model_policy="tiered")
-    assert call_models(h, seen) == {("correction", "gpt-6-sol", "high")}
+    assert call_models(h, seen) == {("correction", "gpt-6.1-sol", "high")}
     assert "policy=tiered policy-source=argument" in out
 
 
@@ -426,11 +426,11 @@ def test_explicit_model_pins_every_phase_and_cannot_claim_beta_qualification(
     tmp_path, monkeypatch,
 ):
     h = Harness(tmp_path, monkeypatch, mode="branch", engine_name="codex")
-    h.review(model="gpt-6-sol", propose_patch=False)
+    h.review(model="gpt-6.1-sol", propose_patch=False)
     h.repair()
-    h.review(model="gpt-6-sol", propose_patch=False)
-    custom = h.review(model="gpt-6-sol", propose_patch=False)
-    assert {row["model"] for row in h.provider.calls} == {"gpt-6-sol"}
+    h.review(model="gpt-6.1-sol", propose_patch=False)
+    custom = h.review(model="gpt-6.1-sol", propose_patch=False)
+    assert {row["model"] for row in h.provider.calls} == {"gpt-6.1-sol"}
     assert "custom-override=yes (not beta-qualified)" in custom
     assert "BETA-ACCEPTANCE: custom-override (not beta-qualified)" in custom
     assert h.state()["acceptance"]["custom_override"] is True
@@ -449,7 +449,7 @@ def test_explicit_effort_wins_and_is_a_custom_override(tmp_path, monkeypatch):
     h.review(effort="low", propose_patch=False)
     final = h.review(effort="low", propose_patch=False)
     assert {row["effort"] for row in h.provider.calls} == {"low"}
-    assert {row["model"] for row in h.provider.calls} == {"gpt-6-astra", "gpt-6-sol"}
+    assert {row["model"] for row in h.provider.calls} == {"gpt-6-astra", "gpt-6.1-sol"}
     assert "custom-override=yes (not beta-qualified)" in final
     assert "BETA-ACCEPTANCE: custom-override (not beta-qualified)" in final
     assert h.state()["acceptance"]["custom_override"] is True
@@ -619,7 +619,7 @@ def test_effort_by_model_beats_global_effort_and_keeps_final_qualified(tmp_path,
     corrected = h.review(propose_patch=False, **efforts)
     final = h.review(propose_patch=False, **efforts)
     assert h.provider.roles()[-2:] == [
-        ("correction", "gpt-6-sol", "high"), ("final", "gpt-6-astra", "medium"),
+        ("correction", "gpt-6.1-sol", "high"), ("final", "gpt-6-astra", "medium"),
     ]
     assert {row["effort"] for row in h.provider.calls if row["role"] != "correction"} == {
         "medium",

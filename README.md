@@ -1,7 +1,7 @@
 # Paranoia
 
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
 > `claude-opus-5-5` (high effort), require an independent strongest-model cold final
 > before `NOT-BLOCKED` (including after a clean census), and request an unapplied
 > repair proposal after a blocked census or blocked cold final by default. Opt out with
@@ -313,12 +313,12 @@ phases:
 
 Beta model routing (`review_model_policy`, default `tiered`): census lanes, consolidation
 and the cold final use the engine's strongest model (`gpt-6-astra` / `claude-fable-5-1`,
-medium effort); targeted correction uses `gpt-6-sol` / `claude-opus-5-5` at high effort.
+medium effort); targeted correction uses `gpt-6.1-sol` / `claude-opus-5-5` at high effort.
 `strongest` uses the strongest model for every structural phase. Tiered Codex routing
-needs a Codex CLI recent enough to be offered `gpt-6-sol` (0.156.1 verified; 0.153.3 on a
-ChatGPT account is refused with "model is not supported"), which fails visibly rather
-than substituting a model: update the CLI or pass `review_model_policy: "strongest"`. Set effort per model
-family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
+needs a Codex CLI/account that offers `gpt-6.1-sol`. An unsupported model fails visibly
+rather than substituting a model: update the CLI or pass `review_model_policy: "strongest"`.
+The 2026-09-23 CLI qualification covered the previous `gpt-6-sol` pin, not Sol 6.1. A 2026-09-29 live check on CLI 0.156.1 with the local ChatGPT
+account rejected Sol 6.1 as unsupported. Set effort per model family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
 merged per family); a family entry beats the global `effort`, so
 `{"sol": "high", "opus": "high"}` keeps correction at high. The model is chosen from
 the authoritative durable phase, never from round labels. An explicit `model` (argument or
