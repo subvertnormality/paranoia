@@ -599,6 +599,56 @@ def test_round_one_requires_a_resolved_decisive_citation():
     assert got == {"codex": True, "claude": False}
 
 
+@pytest.mark.parametrize("case,expected", [
+    ("none", "no decisive citation"),
+    ("missing", "repository citation did not resolve"),
+    ("uncarried", "outside gained carried evidence"),
+    ("source-moved", "source reference cannot ground a moved selection"),
+    ("source-missing", "source packet is absent"),
+    ("source-ineligible", "source packet is not governing-eligible"),
+    ("source-constraint", "constraint does not match source proposition"),
+    ("source-authority", "publisher authority is not attested"),
+    ("source-entailment", "passage entailment is not attested"),
+    ("source-relevance", "decision relevance is not attested"),
+])
+def test_substantiation_names_decisive_evidence_failure(case, expected):
+    reference = arb.SourceReference("src-" + "a" * 16)
+    arguments = {"resolve":_resolver(missing={"gone.py"})}
+    fields = {"decisive":Citation("a.py", 10)}
+    if case == "none":
+        fields["decisive"] = None
+    elif case == "missing":
+        fields["decisive"] = Citation("gone.py", 4)
+    elif case == "uncarried":
+        arguments.update(carried={"codex":[Region("snap", "b.py", 17, 23, 20)]}, moved={"codex"})
+    else:
+        fields.update(decisive=reference, constraint="proposition", publisher_authority=True,
+                      passage_entailment=True, decision_relevance=True)
+        arguments["source_packets"] = {reference.packet_id:("proposition", True)}
+        if case == "source-moved":
+            arguments.update(carried={}, moved={"codex"})
+        elif case == "source-missing":
+            arguments["source_packets"] = {}
+        elif case == "source-ineligible":
+            arguments["source_packets"] = {reference.packet_id:("proposition", False)}
+        elif case == "source-constraint":
+            fields["constraint"] = "other"
+        else:
+            fields[{"source-authority":"publisher_authority", "source-entailment":"passage_entailment",
+                    "source-relevance":"decision_relevance"}[case]] = False
+    diagnostics = {}
+    result = arb.substantiation([vote("codex", "opt-a", **fields)], diagnostics=diagnostics, **arguments)
+    assert result == {"codex":False}
+    assert expected in diagnostics["codex"]
+    assert (fields["decisive"].render() if fields["decisive"] else "NONE") in diagnostics["codex"]
+
+
+def test_substantiation_diagnostics_do_not_retain_an_earlier_failure():
+    diagnostics = {"codex":"stale"}
+    assert arb.substantiation([vote("codex", "opt-a")], resolve=_resolver(), diagnostics=diagnostics) == {"codex":True}
+    assert diagnostics == {}
+
+
 def test_a_citation_that_does_not_resolve_does_not_substantiate():
     votes = [vote("codex", "opt-a", decisive=Citation("gone.py", 4))]
     assert arb.substantiation(votes, resolve=_resolver(missing={"gone.py"})) == {"codex": False}

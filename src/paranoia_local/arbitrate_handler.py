@@ -1488,10 +1488,12 @@ def _arbitrate(
         item.packet_id: (item.proposition, item.governing)
         for item in packet.research_packets
     }
+    substantiation_diagnostics: dict[str, str] = {}
     sub1 = arb.substantiation(
         round1, resolve=resolve_region, source_packets=source_map,
+        diagnostics=substantiation_diagnostics,
     )
-    outcome = arb.compute_outcome(round1, substantiated=sub1)
+    outcome = arb.compute_outcome(round1, substantiated=sub1, diagnostics=substantiation_diagnostics)
     rounds = 1
     carried_note = "round 2 not run"
 
@@ -1549,8 +1551,9 @@ def _arbitrate(
                 carried={e: list(g) for e, g in gained.items()},
                 moved=moved,
                 source_packets=source_map,
+                diagnostics=substantiation_diagnostics,
             )
-            outcome = arb.compute_outcome(round2, substantiated=sub2)
+            outcome = arb.compute_outcome(round2, substantiated=sub2, diagnostics=substantiation_diagnostics)
             rounds = 2
             carried_regions = carried_bodies
             carried_note = f"{len(sent)} region(s) carried to both deciders"

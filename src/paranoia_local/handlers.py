@@ -2684,8 +2684,9 @@ def _staged_structural_review(
                     role="census",
                 ),
                 retry_context=(
-                    _plan_anchor_retry_context(plan_lines)
-                    if plan_lines is not None else None
+                    prompts.staged_consolidation_instructions(mode, plan_contract=plan_contract)
+                    + ("\n\n" + _plan_anchor_retry_context(plan_lines)
+                       if plan_lines is not None else "")
                 ),
             )
         except rc.CensusError as error:
@@ -6094,20 +6095,6 @@ def rebut(
                 disposition = parsed["disposition"]
                 citation_rows = list(parsed["evidence"])
                 rebut_evidence = [item["anchor"] for item in citation_rows]
-                prior_plan_anchors = {
-                    item for item in (prior_target_debt or {}).get("evidence", [])
-                    if isinstance(item, str) and item.startswith("plan:")
-                }
-                plan_anchors = [
-                    item for item in rebut_evidence if item.startswith("plan:")
-                ]
-                if lineage_mode == cc.PLAN_MODE and any(
-                    item not in prior_plan_anchors for item in plan_anchors
-                ):
-                    raise sp.ProtocolError(
-                        "/evidence: plan-mode rebut may reuse only plan anchors already "
-                        "resolved for the target debt"
-                    )
                 plan_lines = (
                     (
                         review_state.get("plan_line_count")
