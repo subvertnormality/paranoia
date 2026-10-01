@@ -1,6 +1,10 @@
 # Issue 138: caller disposition of supplemental proposals
 
 Beta scope: caller accounting, never proof of repair, claim support or clearance.
+The stored-receipt, eligibility/transition and accounting sections below are the
+respective authoritative contracts; summaries and documentation defer to them.
+The executing agent SHOULD use the proposed diff as its repair starting point,
+inspect and validate it, and give a concrete reason for each target where it departs.
 Use one bounded optional proposal_receipt in the existing atomic lineage file.
 After a validated PROPOSED/PARTIAL patch has a supplemental audit receipt, save
 round, structural snapshot, patch digest, audit name and addressed target IDs under
@@ -9,7 +13,8 @@ settled original review and exact trailer. No audit scan, extra store or model c
 Historical lineages without this field remain valid.
 
 The next tracked round accepts optional prior_proposal_disposition as a closed
-object with status (applied, partially-applied, departed) and departed_targets:
+object with proposal_audit (the exact PROPOSAL-AUDIT-JSON basename), status
+(applied, partially-applied, departed) and departed_targets:
 exact addressed target IDs mapped to nonempty one-line reasons, at most 500 chars.
 Applied requires an empty map; departed all targets; partial a nonempty proper subset.
 Reject malformed, unknown, misbound or one-shot input before provider work. Bind the
@@ -20,7 +25,8 @@ audit field. Do not infer application from added-line overlap or pass dispositio
 to reviewers; substantive settlement is unchanged.
 
 Both tool descriptions require reading and dispositioning a proposal before the
-next round. The optional API preserves ordinary omitted review behavior.
+next round, using the diff unless a specific departure is justified. The optional
+API preserves ordinary omitted review behavior; omission remains visibly unaccounted.
 
 Authoritative stored receipt (closed version 1 object): version, round (caller
 label), structural_snapshot, patch_sha256, audit (supplemental receipt basename),
@@ -31,6 +37,8 @@ means no historical receipt; malformed retained receipt blocks existing state lo
 Eligibility and transitions:
 - A receipt is pending exactly when its round equals durable review_state.last_round.
   A supplied disposition without a pending receipt is rejected before provider work.
+  Its proposal_audit must exactly equal receipt.audit. A replaced receipt or another
+  lineage's receipt rejects even for applied with an empty map or identical targets.
 - Snapshot changes and forward caller-round jumps keep that pending receipt usable.
 - Failure/rejection does not advance last_round: retain the receipt for the same
   failed-label retry. The attempt's audit still records its caller declaration.
