@@ -1,7 +1,19 @@
 # How Paranoia Local works
 
+Proposal disposition is bounded caller accounting in the existing atomic lineage
+state. After a successful supplemental audit, a receipt pins its basename, round,
+snapshot, patch digest and addressed targets. Only the next successfully settled
+round consumes its pending status; failed rounds retain it. The caller SHOULD use
+the proposed diff after inspecting and validating it, explaining each departed
+target. The server validates and renders this declaration before provider admission,
+then copies the same object to the audit and `PROPOSAL-DISPOSITION` trailer. It is
+never reviewer evidence and cannot clear debt. Omission reports `none-recorded`;
+historical receipts are inert. A receipt-save failure preserves the settled review,
+reports supplemental `UNAVAILABLE`, and retains the existing pending latch so an
+ambiguous write cannot be silently reused.
+
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
 > `claude-opus-5-5` (high effort), require an independent strongest-model cold final
 > before `NOT-BLOCKED` (including after a clean census), and request an unapplied
 > repair proposal after a blocked census or blocked cold final by default. Opt out with

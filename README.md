@@ -1,8 +1,14 @@
 # Paranoia
 
-Issue #138's planned beta proposal-accounting contract is recorded in
+Issue #138's beta proposal-accounting contract is recorded in
 [proposal-disposition-138-plan.md](docs/proposal-disposition-138-plan.md).
 Disposition reports the caller's choice; it does not establish that a repair works.
+The executing agent SHOULD use the proposed diff after inspecting and validating it.
+On the next tracked round, pass `prior_proposal_disposition` with the exact
+`PROPOSAL-AUDIT-JSON` basename, `status` (`applied`, `partially-applied`, or `departed`),
+and `departed_targets` mapping each departed addressed target to a one-line reason.
+Omission is allowed and reports `PROPOSAL-DISPOSITION: none-recorded` for a pending
+proposal. See the [caller contract](docs/tool-reference.md#proposal-disposition).
 
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
 > and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /

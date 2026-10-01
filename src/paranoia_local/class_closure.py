@@ -388,6 +388,8 @@ class Lineage:
     #: and is never swept; a branch lineage is swept against a repo snapshot. Opening
     #: one as the other is undefined, not merely surprising — see `load_lineage`.
     mode: str = BRANCH_MODE
+    #: Latest issued proposal, independent of substantive review normalization.
+    proposal_receipt: dict[str, Any] | None = None
 
     def active(self) -> list[TrackedClass]:
         return [c for c in self.classes.values() if c.status != SUPERSEDED]
@@ -471,6 +473,10 @@ def load_lineage(root: Path, lineage_id: str, *, stamp: str,
 def _from_json(
     lineage_id: str, raw: dict[str, Any], *, migrate_legacy_members: bool = False,
 ) -> Lineage:
+    from .proposal_disposition import validate_receipt
+    receipt = raw.get("proposal_receipt")
+    if receipt is not None:
+        receipt = validate_receipt(receipt)
     return Lineage(
         lineage_id=lineage_id,
         # Absent means branch: every lineage that existed before plan mode was one, so
@@ -497,6 +503,7 @@ def _from_json(
         claim_reverify_required=bool(raw.get("claim_reverify_required", False)),
         review_state=deepcopy(raw.get("review_state", {})),
         branch_contract=deepcopy(raw.get("branch_contract")),
+        proposal_receipt=receipt,
     )
 
 
@@ -569,6 +576,9 @@ def _to_json(lineage: Lineage) -> dict[str, Any]:
     }
     if lineage.branch_contract is not None:
         payload["branch_contract"] = lineage.branch_contract
+    if lineage.proposal_receipt is not None:
+        from .proposal_disposition import validate_receipt
+        payload["proposal_receipt"] = validate_receipt(lineage.proposal_receipt)
     return payload
 
 
@@ -679,6 +689,7 @@ def copy_lineage(lineage: Lineage) -> Lineage:
         claim_reverify_required=lineage.claim_reverify_required,
         review_state=deepcopy(lineage.review_state),
         branch_contract=deepcopy(lineage.branch_contract),
+        proposal_receipt=deepcopy(lineage.proposal_receipt),
     )
 
 

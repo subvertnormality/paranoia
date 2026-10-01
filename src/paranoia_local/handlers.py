@@ -34,6 +34,7 @@ from . import engines as eng, external_sources, git_objects, inert_git, inert_tr
 from . import logs, orientation, patch_proposals as pp, plan_claims as pc, prompts, review_census as rc
 from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions, review_policy as rp
+from . import proposal_disposition as pd
 from .config import load_repo_config, resolve
 from .engines import Engine, Review, claude_provider_guidance
 from .worktree import worktree_at
@@ -737,6 +738,55 @@ def _repository_proposal_sources(
     return tuple(entries), read
 
 
+def _prepare_proposal_disposition(closure: "_ClosureRound", arguments: dict[str, Any]) -> None:
+    if closure.lineage is None:
+        if "prior_proposal_disposition" in arguments:
+            raise ValueError("prior_proposal_disposition requires available lineage state")
+        return
+    value = pd.accounting(
+        closure.lineage.proposal_receipt,
+        closure.lineage.review_state.get("last_round")
+        if isinstance(closure.lineage.review_state, dict) else None, arguments,
+    )
+    # Construct both representations before provider admission. Never send to reviewers.
+    line = pd.render(value)
+    closure.proposal_disposition = value
+    closure.proposal_disposition_line = line
+
+
+def _disposition_trailer(closure: "_ClosureRound | None", trailer: str | None) -> str | None:
+    line = getattr(closure, "proposal_disposition_line", None)
+    if line is None or trailer is None or line in trailer.splitlines():
+        return trailer
+    return trailer + "\n" + line
+
+
+def _save_proposal_receipt(
+    closure: "_ClosureRound", result: pp.ProposalResult, audit: Path,
+    structural_snapshot: str,
+) -> None:
+    if result.status not in {"proposed", "partial"}:
+        return
+    assert closure.lineage is not None and closure._settled
+    if closure.lineage.review_state.get("last_round") != closure.round_no:
+        raise ValueError("proposal receipt requires a confirmed staged predecessor")
+    draft = cc.copy_lineage(closure.lineage)
+    draft.proposal_receipt = pd.validate_receipt({
+        "version": 1, "round": closure.round_no,
+        "structural_snapshot": structural_snapshot,
+        "patch_sha256": result.patch_sha256, "audit": audit.name,
+        "target_ids": list(result.addressed_ids),
+    })
+    try:
+        cc.save_lineage(closure.state_root, draft)
+    except Exception:
+        # Substantive settlement is already confirmed, but this second write isn't.
+        # Preserve its original trailer and retain the existing latch for admission.
+        closure._settled = False
+        raise
+    closure.lineage = draft
+
+
 def _proposal_section(
     execution: _ProposalExecution | None, *, status: str, reason: str | None,
     context: pp.ProposalContext | None, audit_path: Path | None = None,
@@ -813,6 +863,7 @@ def _proposal_section(
             "deliberately, run appropriate tests, and submit the changed artifact in the same "
             "lineage with the next lawful round label. A stale proposal requires a new review."
         )
+    lines.append("CALLER: " + pd.CALLER_EXPECTATION)
     return "\n".join(lines)
 
 
@@ -1066,6 +1117,8 @@ def _branch_patch_supplement(
         if proposal_audit is None:
             status = "UNAVAILABLE"
             reason = "supplemental proposal audit receipt unavailable"
+        else:
+            _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
     else:
         _log(log_dir, "critique_branch_patch_proposal", engine,
              Review(text=reason or "proposal unavailable",
@@ -1213,6 +1266,8 @@ def _plan_patch_supplement(
         if proposal_audit is None:
             status = "UNAVAILABLE"
             reason = "supplemental proposal audit receipt unavailable"
+        else:
+            _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
     else:
         _log(log_dir, "critique_plan_patch_proposal", engine,
              Review(text=reason or "proposal unavailable",
@@ -3220,6 +3275,8 @@ def critique_branch(
     on_progress: Callable[[str], None] | None = None,
     _after_contract_load: Callable[[_BranchContract | None], None] | None = None,
 ) -> str:
+    if "prior_proposal_disposition" in arguments:
+        pd.validate_input(arguments["prior_proposal_disposition"])
     proposal_mode = rp.proposal_mode(arguments)
     proposal_requested = proposal_mode == "explicit"
     proposal_deadline = (
@@ -3257,6 +3314,8 @@ def critique_branch(
     # scope; ROUND (per-call, raised each convergence round) sets the severity floor.
     closure_on = bool(resolve("class_closure", arguments.get("class_closure"), cfg, True))
     _require_converge(converge, closure_on)
+    if "prior_proposal_disposition" in arguments and not closure_on:
+        raise ValueError("prior_proposal_disposition requires tracked review")
     if proposal_requested and (not converge or not closure_on or include_unc):
         raise ValueError(
             "propose_patch=true requires converge:true, class_closure:true, and "
@@ -3467,6 +3526,7 @@ def _converge_branch_review(
     if closure:
         try:
             closure.require_forward_round()
+            _prepare_proposal_disposition(closure, closure_args or {})
         except BaseException:
             closure.abandon()
             closure.release()
@@ -3537,6 +3597,7 @@ def _converge_branch_review(
                 # must see the same materialized snapshot the review did.
                 trailer = closure.settle(review, engine, wt, model, effort, web_search,
                                          on_progress) if closure else None
+            trailer = _disposition_trailer(closure, trailer)
             if propose_patch:
                 review_log_path = _log(log_dir, "critique_branch", engine, review, now,
                      {"target": target.description, "model": model, "mode": "converge-packet",
@@ -3557,7 +3618,8 @@ def _converge_branch_review(
                       "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
                       "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
                       "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
-                      "review_routing": _routing_audit(closure)})
+                      "review_routing": _routing_audit(closure),
+                      "proposal_disposition": getattr(closure, "proposal_disposition", None)})
                 review_logged = True
                 if review.error:
                     proposal_text = _proposal_section(
@@ -3633,7 +3695,8 @@ def _converge_branch_review(
           "rejected_payloads": getattr(closure, "rejected_payloads", None) if closure else None,
           "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
           "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
-          "review_routing": _routing_audit(closure)})
+          "review_routing": _routing_audit(closure),
+          "proposal_disposition": getattr(closure, "proposal_disposition", None)})
     body = _footer(review, engine) + stakes_notice
     if closure and closure.retry_register:
         # Same reason, for the operator: a CLOSED or a corrected predicate that the retry
@@ -3737,6 +3800,8 @@ def critique_plan(
     now: Clock = _default_clock,
     on_progress: Callable[[str], None] | None = None,
 ) -> str:
+    if "prior_proposal_disposition" in arguments:
+        pd.validate_input(arguments["prior_proposal_disposition"])
     proposal_mode = rp.proposal_mode(arguments)
     proposal_requested = proposal_mode == "explicit"
     if proposal_requested and type(engine) not in (eng.CodexEngine, eng.ClaudeEngine):
@@ -3745,6 +3810,8 @@ def critique_plan(
     # before repository/provider capability admission so an unsupported request cannot
     # spend a CLI probe or evidence call.
     closure_on = bool(arguments.get("class_closure", True))
+    if "prior_proposal_disposition" in arguments and not closure_on:
+        raise ValueError("prior_proposal_disposition requires tracked review")
     if proposal_requested and not closure_on:
         raise ValueError("propose_patch=true requires class_closure:true for plan review")
     proposal_inert = _automatic_proposal_issue(
@@ -3882,6 +3949,13 @@ def critique_plan(
                 "settlement": None,
             })
             return f"{_footer(review, engine)}{_stakes_notice(no_stakes)}\n\n{trailer}"
+        except BaseException:
+            closure.abandon()
+            closure.release()
+            raise
+
+        try:
+            _prepare_proposal_disposition(closure, arguments)
         except BaseException:
             closure.abandon()
             closure.release()
@@ -4180,6 +4254,7 @@ def critique_plan(
                     )
                 if closure:
                     closure.deadline = plan_deadline
+                trailer = _disposition_trailer(closure, trailer)
                 if proposal_requested:
                     normalized_for_log = pc.normalize_state(claim_state)
                     claim_failed_for_log = bool(
@@ -4236,6 +4311,7 @@ def critique_plan(
                         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
                         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
                         "review_routing": _routing_audit(closure),
+                        "proposal_disposition": getattr(closure, "proposal_disposition", None),
                     })
                     review_logged = True
                     if review.error:
@@ -4317,6 +4393,7 @@ def critique_plan(
         trailer += "\n" + rc.attempt_trailer(attempt_ledger).replace(
             "STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1,
         )
+    trailer = _disposition_trailer(closure, trailer)
     if not review_logged:
         _log(log_dir, "critique_plan", engine, review, now, {
         "grounded": bool(repo), "model": model,
@@ -4357,6 +4434,7 @@ def critique_plan(
         "staged_manifests": getattr(closure, "staged_manifests", None) if closure else None,
         "staged_settlement": getattr(closure, "staged_settlement", None) if closure else None,
         "review_routing": _routing_audit(closure),
+        "proposal_disposition": getattr(closure, "proposal_disposition", None),
     })
     body_text = _footer(review, engine) + _stakes_notice(no_stakes)
     if closure and closure.retry_register:

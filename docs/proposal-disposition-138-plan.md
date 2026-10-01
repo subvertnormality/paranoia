@@ -104,6 +104,8 @@ critique_branch and critique_plan (both CodexEngine and ClaudeEngine adapters):
 - test_disposition_escaping_and_schema: quotes, backslashes and Unicode round-trip
   from the one-line suffix to the exact audit object; controls cannot forge lines;
   actual MCP schemas accept every legal object and reject illegal objects.
+These tests defer to the authoritative wire, transition and failure contracts above;
+their summaries do not introduce alternative semantics.
 Any missing or failing assertion blocks delivery. Native acceptance must exercise
 critique_branch itself, reload the issued receipt, pass its exact target IDs on
 correction, then reach a cold final; retain each actual audit and returned output.

@@ -1,7 +1,7 @@
 # Paranoia Local: LLM operating reference
 
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
 > `claude-opus-5-5` (high effort), require an independent strongest-model cold final
 > before `NOT-BLOCKED` (including after a clean census), and request an unapplied
 > repair proposal after a blocked census or blocked cold final by default. Opt out with
@@ -18,8 +18,16 @@ an inert `UNAVAILABLE` otherwise. Inspect or amend every candidate and run your 
 checks; never apply it blindly or treat it as proof of repair. Set `false` for
 architectural/authority gaps or an already complete verified repair.
 
+The executing agent SHOULD use the proposed diff as the repair starting point after
+inspection and validation. On the next tracked round send `prior_proposal_disposition`:
+`{"proposal_audit":"<exact PROPOSAL-AUDIT-JSON basename>","status":"applied","departed_targets":{}}`.
+For `departed`, give a concrete one-line reason for every addressed target; for
+`partially-applied`, give reasons for a nonempty proper subset. Target IDs come from
+the proposal's addressed IDs. The optional API reports `none-recorded` on omission
+with a pending receipt. This accounting never establishes repair or clearance.
+
 Beta routing rule: `review_model_policy` defaults to `tiered` (census/final strongest at
-medium, correction `gpt-6-sol` / `claude-opus-5-5` at high); `strongest` keeps every
+medium, correction `gpt-6.1-sol` / `claude-opus-5-5` at high); `strongest` keeps every
 structural phase on the strongest model. Do not pass `model` unless you intend a custom
 override that cannot claim beta qualification. Use `effort_by_model` (keys `astra`, `sol`,
 `fable`, `opus`) for per-family effort; it beats the global `effort` and is a custom

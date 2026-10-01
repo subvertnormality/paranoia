@@ -23,6 +23,12 @@ from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
 
 
+def without_disposition(text):
+    # Accounting may differ; every original review/trailer line must remain identical.
+    return "\n".join(line for line in text.split("\n")
+                     if not line.startswith("PROPOSAL-DISPOSITION:"))
+
+
 def context_and_reader():
     data = b"value = 1\n"
     entry = pp.ProposalEntry("app.py", "file", "100644", git_objects.blob_oid(data, 40))
@@ -1123,6 +1129,7 @@ def install_settled_census(monkeypatch, *, blocking=True):
             debt=debt,
         )
         closure.lineage.review_state = state
+        handlers.cc.save_lineage(closure.state_root, closure.lineage)
         closure._settled = True
         closure.register_status = "staged census parsed — NONE"
         handle = census.AuthorHandle(lane, "lane-session", "codex")
@@ -1461,10 +1468,10 @@ def test_enabled_plan_proposal_does_not_change_durable_state_or_trailer(
         engine=engines.CodexEngine(), log_dir=tmp_path / "logs-enabled",
     )
     disabled_state = handlers.cc.load_lineage(
-        state_root, "plan-state-disabled", stamp="READ",
+        state_root, "plan-state-disabled", stamp="READ", mode=cc.PLAN_MODE,
     )
     enabled_state = handlers.cc.load_lineage(
-        state_root, "plan-state-enabled", stamp="READ",
+        state_root, "plan-state-enabled", stamp="READ", mode=cc.PLAN_MODE,
     )
     assert disabled_state.review_state == enabled_state.review_state
     assert disabled_state.classes == enabled_state.classes
@@ -1617,7 +1624,7 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
         assert states[False].review_state == states[True].review_state
         assert states[False].classes == states[True].classes
         trailer = outputs[False][outputs[False].rfind("LINEAGE:"):]
-        assert outputs[True].endswith(trailer)
+        assert without_disposition(outputs[True]).endswith(trailer)
         return outputs, states
 
     first, first_states = paired(1)
@@ -1798,7 +1805,7 @@ def test_plan_production_lifecycle_is_state_independent_with_wrong_and_correct_r
         assert states[False].classes == states[True].classes
         assert states[False].claim_state == states[True].claim_state
         trailer = outputs[False][outputs[False].rfind("LINEAGE:"):]
-        assert outputs[True].endswith(trailer)
+        assert without_disposition(outputs[True]).endswith(trailer)
         return outputs, states
 
     first, first_states = paired(1)
@@ -2033,7 +2040,7 @@ def test_verified_plan_public_lifecycle_reverifies_wrong_weakening_and_correct_r
         assert states[False].review_state == states[True].review_state
         assert states[False].classes == states[True].classes
         assert states[False].claim_state == states[True].claim_state
-        assert outputs[True].endswith(outputs[False][outputs[False].rfind("LINEAGE:"):])
+        assert without_disposition(outputs[True]).endswith(outputs[False][outputs[False].rfind("LINEAGE:"):])
         return outputs, states
 
     first, first_states = paired(1)

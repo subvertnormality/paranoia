@@ -1,7 +1,7 @@
 # Paranoia Local tool reference
 
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6-sol` /
+> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
 > `claude-opus-5-5` (high effort), require an independent strongest-model cold final
 > before `NOT-BLOCKED` (including after a clean census), and request an unapplied
 > repair proposal after a blocked census or blocked cold final by default. Opt out with
@@ -98,6 +98,7 @@ default and returns cited findings plus a computed convergence trailer.
 | `exempt` | object array | `[]` | Exempt exact `{class_id,path,line,line_text}` predicate matches |
 | `unexempt` | object array | `[]` | Revoke exact `{class_id,path,line}` exemptions |
 | `propose_patch` | boolean | omitted = automatic (beta) | Omitted: request a supplemental unapplied candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
+| `prior_proposal_disposition` | object | omitted | Caller accounting for the pending proposal; see [proposal disposition](#proposal-disposition) |
 
 Rules:
 
@@ -154,6 +155,7 @@ runs before structural review by default.
 | `stakes` | string | Modest internal-tool assumptions | Scope and consequence boundary |
 | `already_raised` | string array | `[]` | Accepted cited findings from earlier rounds |
 | `propose_patch` | boolean | omitted = automatic (beta) | Omitted: request a supplemental unapplied plan-text candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
+| `prior_proposal_disposition` | object | omitted | Caller accounting for the pending proposal; see [proposal disposition](#proposal-disposition) |
 
 Rules:
 
@@ -416,3 +418,37 @@ Use comparable factual options and a shared decision criterion. Example request 
 State any measured costs with evidence. Avoid labels such as “safe solution” or “reckless workaround”.
 Cleaning makes the smallest faithful edits, preserves substantive asymmetry and
 leaves neutral wording unchanged; independent fidelity and advocacy checks remain.
+
+## Proposal disposition
+
+The executing agent SHOULD use the proposed diff as the repair starting point after
+inspection and validation. If it departs from the diff, give a concrete reason for
+each addressed target handled differently. Both tracked tools accept this optional
+closed object on the next round in the same lineage:
+
+```json
+{
+  "prior_proposal_disposition": {
+    "proposal_audit": "<exact PROPOSAL-AUDIT-JSON basename>",
+    "status": "applied",
+    "departed_targets": {}
+  }
+}
+```
+
+Use the addressed target IDs from the proposal. `applied` requires an empty map;
+`departed` requires a reason for every addressed target; `partially-applied` requires
+a nonempty proper subset. Reasons are nonblank single lines, at most 500 characters,
+without controls. Unknown keys/targets, mismatched proposal basenames, absent or
+historical receipts and one-shot input reject before provider spend. `proposal_audit`
+is the basename, not a path. Omission with a pending receipt reports `none-recorded`.
+
+The `PROPOSAL-DISPOSITION:` trailer contains the status and escaped canonical JSON
+with the exact receipt and reason map also stored as `proposal_disposition` in the
+main audit. A receipt identifies the issuing round, full structural snapshot and
+patch digests, audit basename and ordered addressed IDs. A successful next round
+consumes its pending status, including a forward round jump; failed rounds retain
+it for retry. Only a validated proposed/partial candidate with a successful
+supplemental audit and receipt save creates a new receipt. Other statuses do not.
+No pending receipt means no accounting line and a null audit field. Disposition is
+the caller's declaration: it never changes reviewer prompts, debt or clearance.

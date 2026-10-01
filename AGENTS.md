@@ -3,6 +3,10 @@
 Issue #138 on beta follows docs/proposal-disposition-138-plan.md. Caller proposal
 disposition is bounded lineage-bound accounting only, never repair or clearance
 authority. Preserve the original settled review on supplemental receipt failure.
+Executing agents SHOULD use the proposed diff after inspection and validation.
+Give a concrete one-line reason for every addressed target repaired differently;
+send the exact proposal audit basename and disposition on the next tracked round.
+Omission remains API-compatible and visibly reports none-recorded, never acceptance.
 
 On branch `codex/beta-tiered-review`, docs/beta-tiered-review-plan.md is the bounded
 contract for the user-approved (2026-09-23) default-on beta. It supersedes the opt-in

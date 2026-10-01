@@ -19,6 +19,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from . import arbitrate_handler, handlers, review_policy, telemetry, session_routing
+from . import proposal_disposition as pd
 from .engines import MODEL_FAMILY_EFFORT, get_engine
 from .logs import DEFAULT_LOG_DIR
 
@@ -144,6 +145,7 @@ TOOLS: list[Tool] = [
             "a five-section critique with severity tags. Reviews an isolated worktree of the ref by "
             "default; can review the dirty working tree with include_uncommitted. "
             + review_policy.BETA_NOTICE
+            + " " + pd.CALLER_EXPECTATION
         ),
         inputSchema={
             "type": "object",
@@ -219,6 +221,7 @@ TOOLS: list[Tool] = [
                     ),
                 },
                 "review_model_policy": _REVIEW_MODEL_POLICY,
+                "prior_proposal_disposition": pd.INPUT_SCHEMA,
                 "effort_by_model": _EFFORT_BY_MODEL,
                 "lineage": {
                     "type": "string",
@@ -292,6 +295,7 @@ TOOLS: list[Tool] = [
             "code to test the plan's premises about current behaviour — a plan built on an inverted "
             "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags. "
             + review_policy.BETA_NOTICE
+            + " " + pd.CALLER_EXPECTATION
         ),
         inputSchema={
             "type": "object",
@@ -340,6 +344,7 @@ TOOLS: list[Tool] = [
                     ),
                 },
                 "review_model_policy": _REVIEW_MODEL_POLICY,
+                "prior_proposal_disposition": pd.INPUT_SCHEMA,
                 "effort_by_model": _EFFORT_BY_MODEL,
                 "claim_verification": {
                     "type": "boolean",
