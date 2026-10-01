@@ -54,6 +54,15 @@ the full successful LFS lifecycle on committed source `74f6179`, with seven comp
 attempts and no validation retry. It now binds current critical bytes; the first
 LFS record remains historical and unchanged. The helper is now 63 lines. CODE
 convergence continues in the same lineage, preserving all earlier attempts.
+The final canonical-pointer broad run passed 2,690 tests with the same five
+pre-existing failures in 330.91 seconds; current/historical LFS replay and edge
+coverage passed 37 focused checks. All 35 production files independently matched
+the fresh native record byte for byte.
+CODE round 4's first invocation failed strict citation validation after its allowed
+repairs (six attempts, 174.40 seconds), without settling the new snapshot. Its
+same-label retry retained that evidence, repaired two invalid initial citations,
+and settled an empty census (six attempts, 161.45 seconds). The resulting snapshot
+requires its normal strongest-model cold final; no validator or authority was relaxed.
 
 The broad pre-metadata-refresh suite recorded 2,655 passes and 34 failures, mostly
 existing historical allowances made stale by the new handler/docs bytes. Only
