@@ -3374,13 +3374,22 @@ def critique_branch(
                 lineage = cc.load_lineage(
                     cc.default_state_root(), lineage_id, stamp=now(), mode=cc.BRANCH_MODE,
                 )
+                accounting = pd.accounting(
+                    lineage.proposal_receipt,
+                    lineage.review_state.get("last_round")
+                    if isinstance(lineage.review_state, dict) else None, arguments,
+                )
+                accounting_line = pd.render(accounting)
                 review, trailer, attempts = _round_order_review(
                     lineage, message=message,
                 )
+                if accounting_line is not None:
+                    trailer += "\n" + accounting_line
                 _log(log_dir, "critique_branch", engine, review, now, {
                     "target": target.description, "model": model,
                     "mode": "round-order-preflight", "round": arguments.get("round"),
                     "lineage": lineage_id, "attempt_ledger": attempts,
+                    "proposal_disposition": accounting,
                     "rendered_trailer": trailer, "correction_gates": [],
                     "plan_digest": supplied_contract.digest if supplied_contract else None,
                     "plan_digest_assertion": (
@@ -3927,9 +3936,16 @@ def critique_plan(
         try:
             closure.require_forward_round()
         except ValueError as exc:
+            try:
+                _prepare_proposal_disposition(closure, arguments)
+            except BaseException:
+                closure.abandon()
+                closure.release()
+                raise
             review, trailer, attempt_ledger = _round_order_review(
                 closure.lineage, message=str(exc),
             )
+            trailer = _disposition_trailer(closure, trailer)
             closure.abandon()
             closure.release()
             _log(log_dir, "critique_plan", engine, review, now, {
@@ -3944,6 +3960,7 @@ def critique_plan(
                 "claim_status": "not-started", "claim_duration_ms": None,
                 "claim_model_calls": 0, "claim_counts": None,
                 "retry_register": None, "attempt_ledger": attempt_ledger,
+                "proposal_disposition": getattr(closure, "proposal_disposition", None),
                 "rendered_trailer": trailer, "correction_gates": [],
                 "rejected_payloads": None, "lane_manifests": None,
                 "settlement": None,

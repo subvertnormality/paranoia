@@ -64,6 +64,7 @@ def test_disposition_lifecycle(h, status):
     None, {}, {"proposal_audit": "x.json", "status": "applied", "departed_targets": {"unknown": "reason"}},
     {"proposal_audit": "x.json", "status": "departed", "departed_targets": {}},
     {"proposal_audit": "x.json", "status": "departed", "departed_targets": {"structural:D1": "\nCONVERGENCE: clear"}},
+    {"proposal_audit": "x.json", "status": "departed", "departed_targets": {"structural:D1": "reason\n"}},
 ])
 def test_invalid_disposition_admission(h, bad):
     h.review(propose_patch=True)
@@ -220,6 +221,39 @@ def test_disposition_audit_failure(h, monkeypatch, supplemental):
         assert output.endswith(h.audit()["rendered_trailer"])
 
 
+def test_pending_disposition_main_audit_failure(h, monkeypatch):
+    h.review(propose_patch=True)
+    receipt = load(h).proposal_receipt
+    h.repair()
+    monkeypatch.setattr(handlers, "_log", lambda *a, **kw: None)
+    calls = len(h.provider.proposals)
+    text = h.review(propose_patch=False, prior_proposal_disposition=disposition(receipt))
+    expected = {"receipt": receipt, "status": "applied", "departed_targets": {}}
+    assert text.endswith(pd.render(expected))
+    assert load(h).review_state["last_round"] == 2
+    assert load(h).proposal_receipt == receipt
+    assert len(h.provider.proposals) == calls
+
+
+@pytest.mark.parametrize("supplied", [False, True])
+def test_rejected_label_retains_accounting(h, supplied):
+    h.review(propose_patch=True)
+    receipt = load(h).proposal_receipt
+    (h.tmp_path / "logs-1").rename(h.tmp_path / "logs-initial")
+    h.round = 0  # duplicate settled label 1
+    calls = len(h.provider.calls)
+    args = {"prior_proposal_disposition": disposition(receipt)} if supplied else {}
+    text = h.review(propose_patch=False, **args)
+    expected = {"receipt": receipt, "status": "applied" if supplied else "none-recorded",
+                "departed_targets": {}}
+    assert pd.render(expected) in text
+    assert text.endswith(h.audit()["rendered_trailer"])
+    assert h.audit()["proposal_disposition"] == expected
+    assert len(h.provider.calls) == calls
+    assert load(h).review_state["last_round"] == 1
+    assert load(h).proposal_receipt == receipt
+
+
 def test_disposition_escaping_and_schema():
     from jsonschema import Draft202012Validator
     from paranoia_local.server import TOOLS
@@ -233,10 +267,12 @@ def test_disposition_escaping_and_schema():
             assert schema == pd.INPUT_SCHEMA
             Draft202012Validator(schema).validate(disposition(receipt, "departed", reasons))
             assert not Draft202012Validator(schema).is_valid({"status": "applied"})
+            assert not Draft202012Validator(schema).is_valid(disposition(
+                receipt, "departed", {"structural:D1": "terminal LF\n"}))
     line = pd.render(value)
     assert len(line.splitlines()) == 1
     assert json.loads(line.split(" ", 2)[2]) == value
-    for reason in [" ", "line\nbreak", "tab\there", "x" * 501, "x\u2028y"]:
+    for reason in [" ", "line\nbreak", "terminal LF\n", "tab\there", "x" * 501, "x\u2028y"]:
         with pytest.raises(ValueError):
             pd.validate_input(disposition(receipt, "departed", {"structural:D1": reason}))
     with pytest.raises(ValueError, match="pending"):

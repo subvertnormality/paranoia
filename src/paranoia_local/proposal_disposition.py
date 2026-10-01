@@ -13,9 +13,9 @@ from .patch_proposals import MAX_TARGETS
 STATUSES = ("applied", "partially-applied", "departed")
 MAX_REASON_CHARS = 500
 _AUDIT = {"type": "string", "minLength": 1, "maxLength": 255,
-          "pattern": r"^[^/\\\x00-\x1f]+\.json$"}
+          "pattern": r"^[^/\\\x00-\x1f]+\.json$(?![\s\S])"}
 _TARGET = {"type": "string", "minLength": 1, "maxLength": 200,
-           "pattern": r"^[A-Za-z0-9:._-]+$"}
+           "pattern": r"^[A-Za-z0-9:._-]+$(?![\s\S])"}
 INPUT_SCHEMA = {
     "type": "object", "additionalProperties": False,
     "required": ["proposal_audit", "status", "departed_targets"],
@@ -27,7 +27,7 @@ INPUT_SCHEMA = {
             "propertyNames": _TARGET,
             "additionalProperties": {
                 "type": "string", "minLength": 1, "maxLength": MAX_REASON_CHARS,
-                "pattern": r"^(?=.*\S)[^\x00-\x1f\x7f\x85\u2028\u2029]+$",
+                "pattern": r"^(?=.*\S)[^\x00-\x1f\x7f\x85\u2028\u2029]+$(?![\s\S])",
             },
         },
     },
