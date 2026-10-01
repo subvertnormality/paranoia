@@ -233,3 +233,13 @@ def test_lfs_identity_with_sha256_git_objects(tmp_path):
     head = git(repo, "rev-parse", "HEAD")
     assert len(head) == 64
     assert handlers._branch_proposal_admission_issue(repo, head) is None
+
+
+def test_empty_lfs_passthrough_is_clean_but_size_zero_pointer_is_not(tmp_path):
+    repo = repository(tmp_path)
+    add_lfs(repo, data=b"", pinned=pointer(b""))
+    head = git(repo, "rev-parse", "HEAD")
+    assert handlers._branch_proposal_admission_issue(repo, head) is not None
+    # Canonical LFS empty-file behavior is the ordinary empty blob.
+    add_lfs(repo, data=b"", pinned=b"")
+    assert handlers._branch_proposal_admission_issue(repo, git(repo, "rev-parse", "HEAD")) is None

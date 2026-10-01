@@ -16,7 +16,7 @@ LFS_POINTER_LIMIT = 1024  # Git LFS spec: pointer bytes must be strictly below t
 _LFS_POINTER = re.compile(
     rb"version https://git-lfs.github.com/spec/v1\n"
     rb"oid sha256:([0-9a-f]{64})\n"
-    rb"size (0|[1-9][0-9]*)\n"
+    rb"size ([1-9][0-9]*)\n"
 )
 
 
@@ -44,6 +44,8 @@ def regular_file_matches(
         return False
     if digest.hexdigest() == oid:
         return True
+    # LFS passes empty files through as empty Git blobs, never a size-zero
+    # three-line pointer. Exact empty blobs were already accepted above.
     if not 0 < blob_size < LFS_POINTER_LIMIT:
         return False
     pointer, = git_objects.read_batch(repo, [git_objects.BlobRequest(oid, blob_size)])
