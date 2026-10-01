@@ -11,7 +11,8 @@ from paranoia_local import proposal_disposition as pd
 ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize("name,current", [
     ("proposal_disposition_acceptance_2026-10-01.json", False),
-    ("proposal_disposition_acceptance_2026-10-01-integration.json", True),
+    ("proposal_disposition_acceptance_2026-10-01-integration.json", False),
+    ("proposal_disposition_acceptance_2026-10-01-delivery.json", True),
 ])
 def test_native_proposal_disposition_acceptance(name, current):
     record = json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))

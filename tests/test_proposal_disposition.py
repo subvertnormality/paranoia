@@ -204,6 +204,26 @@ def test_disposition_render_failure(h, monkeypatch):
     assert load(h).review_state["last_round"] == 1
 
 
+def test_proposal_render_failure_creates_no_receipt(h, monkeypatch):
+    render = handlers._proposal_section
+    def fail(*args, **kwargs):
+        if kwargs["status"] == "PROPOSED":
+            raise RuntimeError("candidate rendering failed")
+        return render(*args, **kwargs)
+    monkeypatch.setattr(handlers, "_proposal_section", fail)
+    text = h.review(propose_patch=True)
+    assert "PATCH-PROPOSAL: UNAVAILABLE" in text
+    assert text.endswith(h.audit()["rendered_trailer"])
+    state = load(h)
+    assert state.proposal_receipt is None
+    assert state.review_state["last_round"] == 1
+    assert not cc._paths(h.state_root, h.lineage)[1].exists()
+    attempts = [json.loads(p.read_text()) for p in (h.tmp_path / "logs-1").glob("*patch_proposal*.json")]
+    assert any(a["proposal_attempt_ledger"][0]["outcome"] == "completed" for a in attempts)
+    next_round = h.review(propose_patch=False)
+    assert "PROPOSAL-DISPOSITION:" not in next_round
+
+
 @pytest.mark.parametrize("supplemental", [False, True])
 def test_disposition_audit_failure(h, monkeypatch, supplemental):
     log = handlers._log

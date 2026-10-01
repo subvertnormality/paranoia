@@ -1117,8 +1117,6 @@ def _branch_patch_supplement(
         if proposal_audit is None:
             status = "UNAVAILABLE"
             reason = "supplemental proposal audit receipt unavailable"
-        else:
-            _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
     else:
         _log(log_dir, "critique_branch_patch_proposal", engine,
              Review(text=reason or "proposal unavailable",
@@ -1134,11 +1132,14 @@ def _branch_patch_supplement(
             "proposal_duration_ms": execution.duration_ms,
             "failure": reason,
         })
-    return _proposal_section(
+    section = _proposal_section(
         execution, status=status, reason=reason, context=context,
         audit_path=proposal_audit,
         application_suitability=application_suitability,
     )
+    if proposal_audit is not None and execution.result is not None:
+        _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
+    return section
 
 
 def _plan_patch_supplement(
@@ -1266,8 +1267,6 @@ def _plan_patch_supplement(
         if proposal_audit is None:
             status = "UNAVAILABLE"
             reason = "supplemental proposal audit receipt unavailable"
-        else:
-            _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
     else:
         _log(log_dir, "critique_plan_patch_proposal", engine,
              Review(text=reason or "proposal unavailable",
@@ -1282,10 +1281,13 @@ def _plan_patch_supplement(
             "rejected_payloads": list(execution.rejected_payloads),
             "proposal_duration_ms": execution.duration_ms, "failure": reason,
         })
-    return _proposal_section(
+    section = _proposal_section(
         execution, status=status, reason=reason, context=context,
         audit_path=proposal_audit, application_suitability=application_suitability,
     )
+    if proposal_audit is not None and execution.result is not None:
+        _save_proposal_receipt(closure, execution.result, proposal_audit, structural_snapshot)
+    return section
 
 
 def _review_failure_projection(review: Review) -> dict[str, Any]:
