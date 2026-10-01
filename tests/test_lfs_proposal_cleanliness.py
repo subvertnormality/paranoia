@@ -203,3 +203,33 @@ def test_smudged_bytes_never_become_patch_preimage(tmp_path):
     assert handlers._branch_proposal_suitability(repo, head, result) == "STALE"
     (repo / "data.bin").write_bytes(pinned)
     assert handlers._branch_proposal_suitability(repo, head, result) == "CURRENT"
+
+
+@pytest.mark.parametrize("failure", ["read", "object"])
+def test_operational_failures_keep_phase_specific_behavior(tmp_path, monkeypatch, failure):
+    repo = repository(tmp_path)
+    add_lfs(repo)
+    head = git(repo, "rev-parse", "HEAD")
+    if failure == "read":
+        original = Path.open
+        def fail_read(path, *args, **kwargs):
+            if path == repo / "data.bin": raise OSError("checkout read failed")
+            return original(path, *args, **kwargs)
+        monkeypatch.setattr(Path, "open", fail_read)
+    else:
+        def fail_object(*args, **kwargs): raise RuntimeError("pinned object read failed")
+        monkeypatch.setattr(checkout.git_objects, "read_batch", fail_object)
+    assert "cleanliness could not be established" in handlers._branch_proposal_admission_issue(repo, head)
+    assert handlers._branch_proposal_suitability(repo, head, SimpleNamespace(files=())) == "STALE"
+
+
+def test_lfs_identity_with_sha256_git_objects(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git(repo, "init", "-q", "--object-format=sha256")
+    git(repo, "config", "user.name", "fixture")
+    git(repo, "config", "user.email", "fixture@localhost")
+    add_lfs(repo)
+    head = git(repo, "rev-parse", "HEAD")
+    assert len(head) == 64
+    assert handlers._branch_proposal_admission_issue(repo, head) is None

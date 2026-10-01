@@ -59,6 +59,9 @@ acknowledgement. Failure injection across both handlers and both native adapters
 checks the original returned/audited suffix, retained completed attempts, no receipt
 and no subsequent accounting obligation. The focused suite recorded 221 passes.
 The [delivery native record](proposal_disposition_acceptance_2026-10-01-delivery.json)
-passed the same complete live lifecycle on committed source `f45fb8d` and is now the
-replay bound to current critical production bytes. Earlier records remain historical.
+passed the same complete live lifecycle on committed source `f45fb8d`. Issue #139's
+[LFS native record](lfs_proposal_acceptance_2026-10-01.json) now binds the current
+critical production bytes, including `proposal_checkout.py`, through that complete
+proposal/disposition/correction/cold-final lifecycle. All earlier records remain
+historical, including the original delivery record; their provider evidence is fixed.
 Acknowledgement remains optional, as confirmed by the user; omission is visible.

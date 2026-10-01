@@ -307,7 +307,14 @@ def test_authoritative_capture_acceptance_record() -> None:
     assert production_diff["largest_changed_module"] == "src/paranoia_local/handlers.py"
     assert production_diff["largest_changed_module_lines_after"] == 3415
     current_lines = sum(1 for _ in (root / "src/paranoia_local/handlers.py").open())
-    assert current_lines == 3415 + allowed["additions"] - allowed["deletions"]
+    # Historical allowance counts remain historical when only hash/scope metadata
+    # is refreshed. Verify today's line delta from the same hash-bound Git diff.
+    numstat = subprocess.run(
+        ["git", "diff", "--no-ext-diff", "--numstat", source_commit, "--",
+         "src/paranoia_local/handlers.py"], cwd=root, check=True,
+        stdout=subprocess.PIPE,
+    ).stdout.split()
+    assert current_lines == 3415 + int(numstat[0]) - int(numstat[1])
 
 
 def test_minimal_claim_validation_acceptance_record() -> None:

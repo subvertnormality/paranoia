@@ -12,11 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.mark.parametrize("name,current", [
     ("proposal_disposition_acceptance_2026-10-01.json", False),
     ("proposal_disposition_acceptance_2026-10-01-integration.json", False),
-    ("proposal_disposition_acceptance_2026-10-01-delivery.json", True),
+    ("proposal_disposition_acceptance_2026-10-01-delivery.json", False),
+    ("lfs_proposal_acceptance_2026-10-01.json", True),
 ])
 def test_native_proposal_disposition_acceptance(name, current):
     record = json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
-    assert record["kind"] == "issue138-native-proposal-disposition"
+    expected_kind = "issue139-native-lfs-proposal" if current else "issue138-native-proposal-disposition"
+    assert record["kind"] == expected_kind
     assert record["outcome"] == "passed"
     revision = record["source"]["revision"]
     runner = "scripts/run_proposal_disposition_acceptance.py"
@@ -29,9 +31,18 @@ def test_native_proposal_disposition_acceptance(name, current):
     # not a blanket claim that historical evidence exercises later changed bytes.
     if current:
         for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
-                     "patch_proposals.py", "engines.py", "review_census.py", "prompts.py"):
+                     "patch_proposals.py", "engines.py", "review_census.py", "prompts.py",
+                     "proposal_checkout.py"):
             relative = f"src/paranoia_local/{path}"
             assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == record["source"]["files"][relative]
+        fixture = record["lfs_fixture"]
+        assert fixture["git_lfs_version"].startswith("git-lfs/")
+        assert fixture["status"] == ""
+        assert fixture["pointer"] == (
+            "version https://git-lfs.github.com/spec/v1\n"
+            f"oid sha256:{fixture['sha256']}\nsize {fixture['size']}\n"
+        )
+        assert "APPLICATION-SUITABILITY: CURRENT" in record["rounds"][0]["result"]
     rounds = record["rounds"]
     assert [r["round"] for r in rounds] == [1, 2, 3]
     receipt = rounds[0]["durable_lineage"]["proposal_receipt"]
