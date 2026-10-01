@@ -82,6 +82,11 @@ critique_branch and critique_plan (both CodexEngine and ClaudeEngine adapters):
   receipt, last_round, accounting object, returned/audited suffix and no stale use.
 - test_invalid_disposition_admission: invalid shape, coverage, reasons, no receipt
   and one-shot input must reject with zero provider calls and no receipt consumption.
+- test_proposal_identity_binding: for both handlers and both native adapters,
+  reject another lineage's receipt and a replaced receipt, including applied with
+  an empty map and identical addressed IDs. Assert zero provider calls and unchanged
+  receipt/last_round. Accept the matching receipt after reload, a failed-round retry
+  and a forward jump. These assertions are required by the same delivery gate.
 - test_failed_round_retry: execution/validation/substantive-save failure retains
   the receipt; ordinary failed-label retry reuses it only when the latch permits.
 - test_receipt_save_failure: inject the second save failure before and after its
