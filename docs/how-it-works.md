@@ -95,7 +95,11 @@ edits remain supported. A clean caller checkout is required before dispatch, and
 caller ref plus application preimages are checked again before return.
 Both cleanliness checks compare the reviewed HEAD, index, untracked inventory,
 filesystem kinds/modes, and raw content identities without invoking repository
-clean/process filters. Every tracked leaf is reached only through real checkout
+clean/process filters. Clean expanded Git LFS files gain the bounded exception
+in [issue #139's contract](lfs-proposal-cleanliness-139-plan.md): streamed bytes
+must match the pinned pointer's size and SHA-256, with the cached LFS attribute.
+This never changes exact committed patch sources or edited-file preimages.
+Every tracked leaf is reached only through real checkout
 directories; a symlinked or non-directory ancestor refuses admission or makes
 the returned proposal stale. Proposed creates are checked as one prospective inventory:
 case-folded file/file, file/directory, and ancestor-component collisions reject

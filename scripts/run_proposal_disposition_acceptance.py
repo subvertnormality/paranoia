@@ -35,14 +35,14 @@ PATCH = (
 )
 
 
-def run(output: Path) -> None:
+def run(output: Path, *, lfs: bool = False) -> None:
     output.mkdir(parents=True, exist_ok=False)
     source = source_record(ROOT)
     repo = output / "repo"
     repo.mkdir()
     state_root = output / "state"
     os.environ["PARANOIA_STATE_ROOT"] = str(state_root)
-    lineage_id = "issue138-live-branch"
+    lineage_id = "issue139-live-lfs" if lfs else "issue138-live-branch"
 
     def git(*args: str) -> str:
         return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
@@ -50,6 +50,16 @@ def run(output: Path) -> None:
     git("init", "-q")
     git("config", "user.name", "Paranoia acceptance")
     git("config", "user.email", "acceptance@localhost")
+    lfs_fixture = None
+    if lfs:
+        git("lfs", "install", "--local", "--skip-smudge")
+        (repo / ".gitattributes").write_text("data.bin filter=lfs diff=lfs merge=lfs -text\n")
+        payload = b"inert dataset\x00\xff\n" * 16384
+        (repo / "data.bin").write_bytes(payload)
+        lfs_fixture = {
+            "size": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
+            "git_lfs_version": git("lfs", "version"),
+        }
     (repo / "divide.py").write_text(GOOD, encoding="utf-8")
     (repo / "README.md").write_text(
         "Contract: divide(numerator, denominator) returns numerator divided by "
@@ -62,13 +72,26 @@ def run(output: Path) -> None:
     git("add", ".")
     git("-c", "commit.gpgsign=false", "commit", "-qm", "inverted operands")
     record = {
-        "kind": "issue138-native-proposal-disposition", "source": source,
+        "kind": "issue139-native-lfs-proposal" if lfs else "issue138-native-proposal-disposition",
+        "source": source,
         "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "stakes": STAKES, "baseline": baseline, "rounds": [], "outcome": "incomplete",
     }
+    if lfs:
+        lfs_fixture["pointer"] = git("show", "HEAD:data.bin") + "\n"
+        lfs_fixture["status"] = git("status", "--porcelain")
+        assert lfs_fixture["status"] == ""
+        assert lfs_fixture["pointer"] == (
+            "version https://git-lfs.github.com/spec/v1\n"
+            f"oid sha256:{lfs_fixture['sha256']}\nsize {lfs_fixture['size']}\n"
+        )
+        record["lfs_fixture"] = lfs_fixture
     receipt = None
     for round_no in (1, 2, 3):
         validate_source(source)
+        if lfs:
+            assert hashlib.sha256((repo / "data.bin").read_bytes()).hexdigest() == lfs_fixture["sha256"]
+            assert git("status", "--porcelain") == ""
         logs = output / f"logs-{round_no}"
         args = dict(
             repo_path=str(repo), base_ref=baseline, head_ref="HEAD", lineage=lineage_id,
@@ -95,6 +118,7 @@ def run(output: Path) -> None:
         (output / "acceptance.json").write_text(json.dumps(record, indent=2) + "\n")
         if round_no == 1:
             assert "PATCH-PROPOSAL: PROPOSED" in text
+            assert "APPLICATION-SUITABILITY: CURRENT" in text
             receipt = lineage.proposal_receipt
             patch = text.split("```diff\n", 1)[1].split("```", 1)[0]
             assert patch == PATCH  # inspect by exact allowlist before any execution
@@ -134,4 +158,6 @@ def run(output: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
-    run(parser.parse_args().output.resolve())
+    parser.add_argument("--lfs", action="store_true", help="Native issue-139 LFS fixture")
+    args = parser.parse_args()
+    run(args.output.resolve(), lfs=args.lfs)

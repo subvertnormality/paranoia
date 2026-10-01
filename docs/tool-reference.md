@@ -51,7 +51,7 @@ Beta structural routing applies only to tracked staged `critique_branch` and
 | Phase | Codex | Claude | Effort |
 |---|---|---|---|
 | Census lanes and consolidation | `gpt-6-astra` | `claude-fable-5-1` | medium |
-| Correction (`tiered`) | `gpt-6-sol` | `claude-opus-5-5` | high |
+| Correction (`tiered`) | `gpt-6.1-sol` | `claude-opus-5-5` | high |
 | Correction (`strongest`) | `gpt-6-astra` | `claude-fable-5-1` | medium |
 | Cold final | `gpt-6-astra` | `claude-fable-5-1` | medium |
 | Proposal and its validation retry | source review's model | source review's model | source review's effort |

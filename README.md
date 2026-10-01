@@ -1,5 +1,8 @@
 # Paranoia
 
+Issue #139's beta fix recognizes clean expanded Git LFS files without
+executing repository filters; see [the bounded contract](docs/lfs-proposal-cleanliness-139-plan.md).
+
 Issue #138's beta proposal-accounting contract is recorded in
 [proposal-disposition-138-plan.md](docs/proposal-disposition-138-plan.md).
 Disposition reports the caller's choice; it does not establish that a repair works.
@@ -170,6 +173,9 @@ locally validated against pinned source, separately audited, and never applied
 or tested by Paranoia. The original verdict, durable state, and convergence
 trailer remain authoritative. A dirty caller tree blocks branch proposal spend;
 later ref or preimage movement marks a returned candidate stale.
+Clean expanded Git LFS files are recognized by verified pointer size and SHA-256
+without running repository filters. Unsupported pointers remain unavailable;
+proposed edits still require exact committed preimages.
 
 For executing agents: inspect and amend the candidate deliberately, run appropriate
 checks, and submit the changed artifact in the next round. A proposal is never proof of

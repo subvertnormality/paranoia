@@ -1,5 +1,11 @@
 # Repository agent instructions
 
+Issue #139 follows docs/lfs-proposal-cleanliness-139-plan.md. Proposal cleanliness
+may recognize canonical extension-free v1 Git LFS pointers through exact size and
+SHA-256 of streamed checkout bytes plus the cached lfs attribute. Never execute
+clean/process filters. Preserve exact committed proposal preimages and all existing
+HEAD/index, filesystem, sparse-checkout, submodule and post-response checks.
+
 Issue #138 on beta follows docs/proposal-disposition-138-plan.md. Caller proposal
 disposition is bounded lineage-bound accounting only, never repair or clearance
 authority. Preserve the original settled review on supplemental receipt failure.

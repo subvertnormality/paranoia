@@ -35,6 +35,7 @@ from . import logs, orientation, patch_proposals as pp, plan_claims as pc, promp
 from . import staged_protocol as sp, census_execution as census
 from . import review_transitions as transitions, review_policy as rp
 from . import proposal_disposition as pd
+from . import proposal_checkout
 from .config import load_repo_config, resolve
 from .engines import Engine, Review, claude_provider_guidance
 from .worktree import worktree_at
@@ -870,24 +871,27 @@ def _proposal_section(
 def _branch_proposal_raw_cleanliness_issue(
     repo: Path, expected_head: str, *, depth: int = 0,
 ) -> str | None:
-    """Compare HEAD, index and raw checkout bytes without invoking Git filters."""
+    """Compare HEAD/index and checkout identity, including verified filter-free LFS."""
     if depth > 8:
         return "nested submodule depth exceeds the filter-free cleanliness limit"
     if not orientation.has_head(repo) or orientation.resolve_head(repo) != expected_head:
         return "caller checkout HEAD moved after review"
 
     expected: dict[bytes, tuple[str, str]] = {}
+    blob_sizes: dict[bytes, int] = {}
     for record in inert_git.run(
-        repo, ["ls-tree", "-rz", "--full-tree", expected_head],
+        repo, ["ls-tree", "-rlz", "--full-tree", expected_head],
     ).split(b"\0"):
         if not record:
             continue
         metadata, separator, raw_path = record.partition(b"\t")
         fields = metadata.split()
-        if not separator or len(fields) != 3:
+        if not separator or len(fields) != 4:
             raise RuntimeError("malformed filter-free HEAD inventory")
-        mode, unused_kind, oid = fields
+        mode, kind, oid, raw_size = fields
         expected[raw_path] = (mode.decode("ascii"), oid.decode("ascii"))
+        if kind == b"blob":
+            blob_sizes[raw_path] = int(raw_size)
 
     indexed: dict[bytes, tuple[str, str]] = {}
     for record in inert_git.run(
@@ -972,15 +976,18 @@ def _branch_proposal_raw_cleanliness_issue(
                 return f"tracked symlink {path_text!r} changed filesystem kind"
             data = os.fsencode(os.readlink(path))
             actual_mode = "120000"
+            content_matches = git_objects.blob_oid(data, len(oid)) == oid
         else:
             if not stat.S_ISREG(info.st_mode):
                 return f"tracked file {path_text!r} changed filesystem kind"
-            data = path.read_bytes()
             actual_mode = (
                 indexed_mode if not file_mode_reliable
                 else "100755" if info.st_mode & stat.S_IXUSR else "100644"
             )
-        if actual_mode != indexed_mode or git_objects.blob_oid(data, len(oid)) != oid:
+            content_matches = actual_mode == indexed_mode and proposal_checkout.regular_file_matches(
+                repo, path, raw_path, oid, blob_sizes[raw_path], info.st_size,
+            )
+        if actual_mode != indexed_mode or not content_matches:
             return f"tracked path {path_text!r} differs from the reviewed HEAD"
     return None
 
