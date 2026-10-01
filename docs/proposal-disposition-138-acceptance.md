@@ -44,10 +44,21 @@ retry retained the rejected out-of-range citation; only the corrected reply sett
 Integration preserves the newer remote beta merge `237b9c6` (#131–133). The same
 live primary capability passed again on committed integrated source `3685766`;
 the [new retained record](proposal_disposition_acceptance_2026-10-01-integration.json)
-is checked against current critical production bytes, while the earlier record is
-still checked against its own historical source. Both replay tests passed.
+is preserved against its own recorded source, alongside the earlier record. Both
+historical replay tests passed.
 The integrated suite recorded 2646 passes and eight historical acceptance failures
 (native replay tests ran separately). All eight identities were already in the
 pre-change beta failure inventory. Existing allowance metadata was refreshed without
 changing provider evidence; historical plan-replay failures remain failed evidence.
 The integrated code artifact must pass its own broad CODE gate before publication.
+
+The integrated CODE census and cold final reached `NOT-BLOCKED` on rounds 4–5.
+Final inspection then repaired supplemental write ordering: candidate output is
+prepared before saving a receipt, so rendering `UNAVAILABLE` cannot create a pending
+acknowledgement. Failure injection across both handlers and both native adapters
+checks the original returned/audited suffix, retained completed attempts, no receipt
+and no subsequent accounting obligation. The focused suite recorded 221 passes.
+The [delivery native record](proposal_disposition_acceptance_2026-10-01-delivery.json)
+passed the same complete live lifecycle on committed source `f45fb8d` and is now the
+replay bound to current critical production bytes. Earlier records remain historical.
+Acknowledgement remains optional, as confirmed by the user; omission is visible.
