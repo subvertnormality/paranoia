@@ -1,5 +1,9 @@
 # Paranoia
 
+Issue #138's planned beta proposal-accounting contract is recorded in
+[proposal-disposition-138-plan.md](docs/proposal-disposition-138-plan.md).
+Disposition reports the caller's choice; it does not establish that a repair works.
+
 > **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
 > and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
 > `claude-opus-5-5` (high effort), require an independent strongest-model cold final

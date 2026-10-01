@@ -1,5 +1,9 @@
 # Repository agent instructions
 
+Issue #138 on beta follows docs/proposal-disposition-138-plan.md. Caller proposal
+disposition is bounded lineage-bound accounting only, never repair or clearance
+authority. Preserve the original settled review on supplemental receipt failure.
+
 On branch `codex/beta-tiered-review`, docs/beta-tiered-review-plan.md is the bounded
 contract for the user-approved (2026-09-23) default-on beta. It supersedes the opt-in
 proposal default below for this branch only; stable main keeps opt-in behavior until a
