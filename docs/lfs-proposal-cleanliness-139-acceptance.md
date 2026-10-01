@@ -38,8 +38,10 @@ digest `f4998a3c3377566ce91412be57f3963ff2d33b6c6c8371d08b1b10d07d4c848b`.
 It correctly blocked on the absent retained native record/current-source replay at
 that snapshot. Five attempts included one repaired out-of-range evidence citation;
 wall time was 580.74 seconds. Its failed snapshot remains failed evidence. The new
-record/replay and this documentation address that debt; delivery still requires
-correction and a strongest-model cold final on the resulting CODE snapshot.
+record/replay and this documentation address that debt. CODE round 2 used
+`gpt-6.1-sol` at high effort, closed D1 and advanced to final with one completed
+attempt, no validation retry and measured wall time 208.58 seconds. The delivery
+gate also includes a strongest-model cold final on the resulting CODE snapshot.
 
 The broad pre-metadata-refresh suite recorded 2,655 passes and 34 failures, mostly
 existing historical allowances made stale by the new handler/docs bytes. Only
@@ -49,6 +51,9 @@ The authoritative-capture test now derives today's line count from its hash-boun
 Git diff instead of treating immutable historical counts as today's measurement.
 The focused history/LFS/replay run then had 63 passes and the same five pre-existing
 plan-restatement replay failures; those remain failed historical evidence.
+The final broad suite recorded 2,688 passes and those same five failures in
+283.12 seconds. All current LFS/proposal/replay checks passed; no historical failed
+review or provider result was reinterpreted as successful.
 
 Implementation at `060a70a`: 9 files, 379 additions/12 deletions. Production changes
 are the 61-line `proposal_checkout.py` plus a 19-line handler diff; the inherited
