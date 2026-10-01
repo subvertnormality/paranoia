@@ -8,6 +8,17 @@ Give a concrete one-line reason for every addressed target repaired differently;
 send the exact proposal audit basename and disposition on the next tracked round.
 Omission remains API-compatible and visibly reports none-recorded, never acceptance.
 
+Issues #131–133 follow docs/issues-131-133-plan.md. Consolidation receives canonical
+bare-anchor manifests; derive output rationales from validated source summaries,
+remedies and evidence instead of inventing transport-metadata findings. Repeat this
+contract on the existing validation retry. Historical settled metadata debt is not
+auto-closed: normal reviewer correction owns withdrawal. Bound plan rebut may cite
+any coordinate within the latest stored reviewed-plan bound, retaining the original
+finding and separate concession. Arbitration diagnostics name the decisive citation
+and failed substantiation condition without weakening carried grounding. Existing
+historical source-diff allowance metadata may be refreshed for the changed bytes;
+preserve original provider evidence and do not claim renewed native acceptance.
+
 On branch `codex/beta-tiered-review`, docs/beta-tiered-review-plan.md is the bounded
 contract for the user-approved (2026-09-23) default-on beta. It supersedes the opt-in
 proposal default below for this branch only; stable main keeps opt-in behavior until a

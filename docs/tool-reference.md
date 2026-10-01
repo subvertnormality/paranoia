@@ -227,7 +227,10 @@ closes only the named debt and closes the class only when no sibling blocker
 remains. It never grants convergence. The session must be the durable current
 session for the active blocking class, and ambiguous or invalid state refuses
 settlement. Bound citations use the staged anchor grammar and resolve before any
-write; plan anchors also require the retained reviewed-plan line bound. Mechanized
+write; plan anchors may name any strictly parsed in-bounds coordinate in the latest
+reviewed plan, including coordinates absent from the original finding. The stored
+checkpoint snapshot and line bound govern; a newer unreviewed plan is not rebut
+authority. Mechanized
 branch classes are refused before provider spend because
 their canonical predicate sweep, not a model concession, owns closure.
 A conceded debt retains the original finding and a separate durable concession.
@@ -311,12 +314,22 @@ the deciders.
 When the final votes are unanimous but not substantiated, the result remains
 `UNRESOLVED`: `SELECTED` is `none`, while `PROVISIONAL-SELECTED` reports the
 common option as non-binding diagnostic information.
+`REASON` names each unsubstantiated engine, its decisive citation, and the failed
+substantiation condition. A resolving citation outside gained carried evidence is
+distinct from an unresolved repository citation: movers must ground their decisive
+reason in the carried evidence, while already-substantiated holders need only a
+resolving citation. Supporting citations do not discharge that requirement.
 
 `ADVISORY: human-owner` is informational. `SNAPSHOT` is provenance, not a durable
 replay handle, unless `retain_snapshot: true` was used. That option is the only
 ordinary Paranoia mode that writes a Git ref.
 
 ## Review output
+
+Consolidation consumes canonical lane manifests whose evidence is bare citation
+strings. It derives required output citation rationales from validated source
+summaries, remedies and evidence, on both initial and validation-retry calls.
+Missing rationale objects in that canonical input are not reviewed-artifact defects.
 
 A completed review uses these headings in order: `What works`, `What doesn't
 work`, `Risks`, `Gaps`, and `Improvements`.
