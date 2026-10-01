@@ -60,7 +60,7 @@ checks the original returned/audited suffix, retained completed attempts, no rec
 and no subsequent accounting obligation. The focused suite recorded 221 passes.
 The [delivery native record](proposal_disposition_acceptance_2026-10-01-delivery.json)
 passed the same complete live lifecycle on committed source `f45fb8d`. Issue #139's
-[LFS native record](lfs_proposal_acceptance_2026-10-01.json) now binds the current
+[LFS delivery record](lfs_proposal_acceptance_2026-10-01-delivery.json) now binds the current
 critical production bytes, including `proposal_checkout.py`, through that complete
 proposal/disposition/correction/cold-final lifecycle. All earlier records remain
 historical, including the original delivery record; their provider evidence is fixed.

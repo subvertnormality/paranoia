@@ -42,6 +42,18 @@ record/replay and this documentation address that debt. CODE round 2 used
 `gpt-6.1-sol` at high effort, closed D1 and advanced to final with one completed
 attempt, no validation retry and measured wall time 208.58 seconds. The delivery
 gate also includes a strongest-model cold final on the resulting CODE snapshot.
+CODE round 3 reached `NOT-BLOCKED` in 171.41 seconds with one same-session citation
+repair (two attempts); its snapshot remains historical after the final parser fix.
+
+Final inspection reproduced a noncanonical zero-size pointer accepting an empty
+checkout even though real Git LFS reports it modified. The parser now rejects
+three-line size-zero pointers; canonical empty files retain exact empty-blob identity.
+The focused suite including this regression passed 239 tests in 34.90 seconds.
+The [delivery native record](lfs_proposal_acceptance_2026-10-01-delivery.json) repeats
+the full successful LFS lifecycle on committed source `74f6179`, with seven completed
+attempts and no validation retry. It now binds current critical bytes; the first
+LFS record remains historical and unchanged. The helper is now 63 lines. CODE
+convergence continues in the same lineage, preserving all earlier attempts.
 
 The broad pre-metadata-refresh suite recorded 2,655 passes and 34 failures, mostly
 existing historical allowances made stale by the new handler/docs bytes. Only

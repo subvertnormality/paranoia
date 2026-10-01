@@ -13,11 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
     ("proposal_disposition_acceptance_2026-10-01.json", False),
     ("proposal_disposition_acceptance_2026-10-01-integration.json", False),
     ("proposal_disposition_acceptance_2026-10-01-delivery.json", False),
-    ("lfs_proposal_acceptance_2026-10-01.json", True),
+    ("lfs_proposal_acceptance_2026-10-01.json", False),
+    ("lfs_proposal_acceptance_2026-10-01-delivery.json", True),
 ])
 def test_native_proposal_disposition_acceptance(name, current):
     record = json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
-    expected_kind = "issue139-native-lfs-proposal" if current else "issue138-native-proposal-disposition"
+    expected_kind = ("issue139-native-lfs-proposal" if name.startswith("lfs_")
+                     else "issue138-native-proposal-disposition")
     assert record["kind"] == expected_kind
     assert record["outcome"] == "passed"
     revision = record["source"]["revision"]
@@ -35,7 +37,11 @@ def test_native_proposal_disposition_acceptance(name, current):
                      "proposal_checkout.py"):
             relative = f"src/paranoia_local/{path}"
             assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == record["source"]["files"][relative]
+    if name.startswith("lfs_"):
         fixture = record["lfs_fixture"]
+        payload = b"inert dataset\x00\xff\n" * 16384
+        assert fixture["size"] == len(payload)
+        assert fixture["sha256"] == hashlib.sha256(payload).hexdigest()
         assert fixture["git_lfs_version"].startswith("git-lfs/")
         assert fixture["status"] == ""
         assert fixture["pointer"] == (
