@@ -67,6 +67,34 @@ target coverage, escaped trailer text, audit/save failure and unchanged clearanc
 Verify actual tool schemas. Exercise native public-handler branch proposal,
 dispositioned correction and cold final. Keep implementation convergence on CODE.
 
+Executable acceptance in tests/test_proposal_disposition.py, parametrized over
+critique_branch and critique_plan (both CodexEngine and ClaudeEngine adapters):
+- test_disposition_lifecycle: issue a proposal, reload, change the artifact, submit
+  each valid status or omit, then reload for a third round. Assert exact stored
+  receipt, last_round, accounting object, returned/audited suffix and no stale use.
+- test_invalid_disposition_admission: invalid shape, coverage, reasons, no receipt
+  and one-shot input must reject with zero provider calls and no receipt consumption.
+- test_failed_round_retry: execution/validation/substantive-save failure retains
+  the receipt; ordinary failed-label retry reuses it only when the latch permits.
+- test_receipt_save_failure: inject the second save failure before and after its
+  atomic replacement. Assert original returned/audited trailer and substantive
+  state, exact receipt visibility, supplemental UNAVAILABLE, retained latch, and
+  subsequent admission refusing with zero provider calls. No automatic repair.
+- test_disposition_render_failure: validate and render the bounded accounting
+  object before provider admission. An injected construction/rendering exception
+  propagates as a visible local error, leaves the receipt/last_round unchanged,
+  releases an unambiguous admission latch and makes zero provider calls.
+- test_disposition_audit_failure: main audit failure preserves the finalized
+  returned suffix and ordinary confirmed settlement, claims no successful receipt,
+  and suppresses new proposal generation. Supplemental audit failure creates no
+  receipt and leaves the exact main audit/trailer unchanged.
+- test_disposition_escaping_and_schema: quotes, backslashes and Unicode round-trip
+  from the one-line suffix to the exact audit object; controls cannot forge lines;
+  actual MCP schemas accept every legal object and reject illegal objects.
+Any missing or failing assertion blocks delivery. Native acceptance must exercise
+critique_branch itself, reload the issued receipt, pass its exact target IDs on
+correction, then reach a cold final; retain each actual audit and returned output.
+
 Frozen model: one trusted operator and OS; untrusted static repository/plan/proposal
 data; ordinary edits block/retry. Exclude hostile local races, compromised OS,
 corrupted-state recovery, multi-tenancy and formal proof. Tens to low hundreds of
