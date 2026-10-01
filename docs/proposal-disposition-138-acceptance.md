@@ -36,3 +36,18 @@ reinterpreted as passing evidence for current behavior.
 PLAN review reached `NOT-BLOCKED` before implementation. Delivery also requires
 broad CODE correction and cold-final convergence on the implementation branch;
 the native fixture alone is not that broad code gate.
+
+The pre-integration CODE lineage reached `NOT-BLOCKED` on round 3 after correction
+closed the acceptance blocker and both advisory classes. Its one final validation
+retry retained the rejected out-of-range citation; only the corrected reply settled.
+
+Integration preserves the newer remote beta merge `237b9c6` (#131–133). The same
+live primary capability passed again on committed integrated source `3685766`;
+the [new retained record](proposal_disposition_acceptance_2026-10-01-integration.json)
+is checked against current critical production bytes, while the earlier record is
+still checked against its own historical source. Both replay tests passed.
+The integrated suite recorded 2646 passes and eight historical acceptance failures
+(native replay tests ran separately). All eight identities were already in the
+pre-change beta failure inventory. Existing allowance metadata was refreshed without
+changing provider evidence; historical plan-replay failures remain failed evidence.
+The integrated code artifact must pass its own broad CODE gate before publication.

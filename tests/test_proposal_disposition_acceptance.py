@@ -4,14 +4,17 @@ import json
 from pathlib import Path
 import subprocess
 
+import pytest
+
 from paranoia_local import proposal_disposition as pd
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACT = ROOT / "docs/proposal_disposition_acceptance_2026-10-01.json"
-
-
-def test_native_proposal_disposition_acceptance():
-    record = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+@pytest.mark.parametrize("name,current", [
+    ("proposal_disposition_acceptance_2026-10-01.json", False),
+    ("proposal_disposition_acceptance_2026-10-01-integration.json", True),
+])
+def test_native_proposal_disposition_acceptance(name, current):
+    record = json.loads((ROOT / "docs" / name).read_text(encoding="utf-8"))
     assert record["kind"] == "issue138-native-proposal-disposition"
     assert record["outcome"] == "passed"
     revision = record["source"]["revision"]
@@ -23,10 +26,11 @@ def test_native_proposal_disposition_acceptance():
         assert hashlib.sha256(blob(path)).hexdigest() == digest
     # This retained acceptance applies to the current critical production route,
     # not a blanket claim that historical evidence exercises later changed bytes.
-    for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
-                 "patch_proposals.py", "engines.py", "review_census.py"):
-        relative = f"src/paranoia_local/{path}"
-        assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == record["source"]["files"][relative]
+    if current:
+        for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
+                     "patch_proposals.py", "engines.py", "review_census.py", "prompts.py"):
+            relative = f"src/paranoia_local/{path}"
+            assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == record["source"]["files"][relative]
     rounds = record["rounds"]
     assert [r["round"] for r in rounds] == [1, 2, 3]
     receipt = rounds[0]["durable_lineage"]["proposal_receipt"]
