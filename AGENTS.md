@@ -6,7 +6,7 @@ SHA-256 of streamed checkout bytes plus the cached lfs attribute. Never execute
 clean/process filters. Preserve exact committed proposal preimages and all existing
 HEAD/index, filesystem, sparse-checkout, submodule and post-response checks.
 
-Issue #138 on beta follows docs/proposal-disposition-138-plan.md. Caller proposal
+Issue #138 follows docs/proposal-disposition-138-plan.md. Caller proposal
 disposition is bounded lineage-bound accounting only, never repair or clearance
 authority. Preserve the original settled review on supplemental receipt failure.
 Executing agents SHOULD use the proposed diff after inspection and validation.
@@ -25,21 +25,23 @@ and failed substantiation condition without weakening carried grounding. Existin
 historical source-diff allowance metadata may be refreshed for the changed bytes;
 preserve original provider evidence and do not claim renewed native acceptance.
 
-On branch `codex/beta-tiered-review`, docs/beta-tiered-review-plan.md is the bounded
-contract for the user-approved (2026-09-23) default-on beta. It supersedes the opt-in
-proposal default below for this branch only; stable main keeps opt-in behavior until a
-separate promotion decision. Omitted `propose_patch` means automatic eligibility (never
+Tiered review is the default on main (promoted 2026-10-02 from `codex/beta-tiered-review`;
+wire release name `tiered-review-beta-1`, kept stable). docs/beta-tiered-review-plan.md is its
+design record and remains the bounded contract for this behaviour; it supersedes the opt-in
+proposal default below. Omitted `propose_patch` means automatic eligibility (never
 coerced to a boolean); false makes zero proposal calls; explicit true keeps its preflight
 rejection. Proposals run only after a blocked census or blocked cold final, resuming that
 source session with its actual model/effort. Structural roles route by durable phase
 (`review_model_policy`, default `tiered`: census/final strongest, correction `gpt-6.1-sol`/Opus 5.5
-at high); effort resolves per model family (`effort_by_model`, then global `effort`,
-then release family default); claim roles, query, rebut and arbitrate are not routed. Every beta acceptance
-needs a strongest-model cold final bound by the durable `acceptance` record to the exact
-snapshot, including after a clean census; legacy or custom-override clear never
-qualifies. Historical acceptance records change only existing allowance hash/scope
-metadata for beta-changed files (plan §10.8); never add entries or alter provider evidence. Do not claim savings or unchanged quality; they remain hypotheses. Native
-qualification on both providers is a delivery gate that has not yet run.
+at high; `gpt-6.1-sol` needs Codex CLI 0.159.3 or later); effort resolves per model family
+(`effort_by_model`, then global `effort`, then release family default); claim roles, query, rebut
+and arbitrate are not routed. Every tiered acceptance needs a strongest-model cold final bound
+by the durable `acceptance` record to the exact snapshot, including after a clean census; legacy
+or custom-override clear never qualifies. Historical acceptance records change only existing
+allowance hash/scope metadata for changed files (plan §10.8); never add entries or alter provider
+evidence. Do not claim savings or unchanged quality: a 2026-10-02 controlled comparison (Claude
+engine, one frozen target, n=3 per arm) found review quality not distinguishable from the prior
+default and cost per round roughly equal, which supports neither claim.
 
 Historical opt-in contract: reviewer-authored patch proposals follow
 docs/reviewer-patch-proposal-plan.md and were delivered as an explicit opt-in on main.
