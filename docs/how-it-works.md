@@ -1,10 +1,5 @@
 # How Paranoia Local works
 
-> Reviewer-authored patch proposals are available as an explicit opt-in under
-> [`reviewer-patch-proposal-plan.md`](reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
-> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
-
 This guide explains the behavior behind the public tools. Start with the
 [README](../README.md) for installation or the [tool reference](tool-reference.md)
 for exact inputs.
@@ -34,9 +29,65 @@ that default is deliberate.
 
 Tracked review is the default for `critique_branch` and `critique_plan`.
 
-### Opt-in patch supplement
+1. **Census:** three independent cold lanes inspect the complete artifact. A
+   separate call consolidates their validated findings into durable debt.
+2. **Correction:** later rounds target open debt, claimed fixes, and their
+   transitive effects.
+3. **Final:** after debt closes, one fresh whole-artifact regression must pass.
 
-With explicit propose_patch: true, a successful fresh census author may be
+For plan review only, a correction that starts with one or two blocking units is
+a closure candidate. Its existing single reviewer call also receives the full
+nine-item checklist and must search the complete plan for sibling occurrences,
+cross-reference contradictions, and repair-created regressions before closing
+debt. A blocking unit is an active blocking class, plus an unbound blocking debt
+that has no such class. This broader search is intended to reduce repeated
+correction/final cycles; it does not guarantee a fixed round count and cannot
+clear the lineage. The independent cold final remains mandatory. Branch
+correction is unchanged and remains targeted.
+
+A clear census proceeds to its cold final. Increase `round` after each successfully
+settled edit that repairs debt. After a clean census or clean correction (`FINAL-REGRESSION: required`), increment `round` and review the unchanged snapshot to run the cold final; edit only to repair debt. Failed or rejected rounds may reuse their label.
+Repeated or backward labels after settlement block without provider spend.
+
+### Phase routing and independent acceptance
+
+Tracked review selects the structural model from the durable phase
+chosen by `review_transitions.incoming` under the lineage latch, never from round labels
+or caller prose. With the default `tiered` policy, census lanes, consolidation and the
+cold final use the engine's strongest model at medium effort; correction uses
+`gpt-6.1-sol` / `claude-opus-5-5` at high effort. `strongest` keeps every structural phase
+on the strongest model. Effort resolves per model family: an `effort_by_model` entry,
+then the global `effort`, then the release family default. Validation retries keep their role's model, effort and session.
+Claim discovery, binding and attestation keep the call-level model, so routing a
+correction never weakens external claim adjudication.
+Model IDs pass verbatim; an unsupported model fails the round visibly and is never
+substituted. On a ChatGPT account Codex CLI 0.156.1 rejected `gpt-6.1-sol` (2026-09-29) and
+0.159.3 accepted it (2026-10-02), so tiered Codex review needs 0.159.3 or later, or
+`review_model_policy: "strongest"`.
+
+A clean census advances to a cold final owned by its engine instead of clearing.
+A final that settles clear writes a closed `acceptance` record (release, engine, model,
+effort, policy, override flag, snapshot). `CONVERGENCE: NOT-BLOCKED` requires that
+record on the exact current snapshot; `clear` state without it (lineages settled before this routing, the
+zero-call legacy claim-only migration) renders `FINAL-REGRESSION: required` and the next
+round runs one strongest cold final. A custom model/effort override may clear but is
+labelled `custom-override`; a later run without the override re-verifies with its own
+final. Leaving `clear` drops the record. The final receives `closed_class_history`
+(closed classes' invariants and closing debt) as context only; closed classes still owe
+their ordinary outcome, and a violation reopens through the existing evidenced path.
+
+The `REVIEW-ROUTING` trailer names the routing release `tiered-review-beta-1`, and clear
+results carry a `BETA-ACCEPTANCE` field; both are stable wire names from the original
+release, not an opt-in. The design record is [`beta-tiered-review-plan.md`](beta-tiered-review-plan.md).
+
+### Patch supplement (default-on)
+
+Omitting `propose_patch` requests one supplemental candidate after a blocked census
+(resuming the successful census lane author) or a blocked cold final (resuming that
+final's own session, never an older census session), using the source review's model and
+effort. Correction rounds, cached-census reuse, dirty, one-shot and closure-disabled
+reviews render an inert UNAVAILABLE reason and make no call; false makes zero calls;
+explicit true keeps its preflight rejection of unsupported modes. The author is
 resumed once to produce closed structured edits and once more only for local
 validation repair. This happens after the normal review is durably settled. The
 proposal route is read-only and web-disabled; Paranoia never applies the patch,
@@ -52,7 +103,11 @@ edits remain supported. A clean caller checkout is required before dispatch, and
 caller ref plus application preimages are checked again before return.
 Both cleanliness checks compare the reviewed HEAD, index, untracked inventory,
 filesystem kinds/modes, and raw content identities without invoking repository
-clean/process filters. Every tracked leaf is reached only through real checkout
+clean/process filters. Clean expanded Git LFS files gain the bounded exception
+in [issue #139's contract](lfs-proposal-cleanliness-139-plan.md): streamed bytes
+must match the pinned pointer's size and SHA-256, with the cached LFS attribute.
+This never changes exact committed patch sources or edited-file preimages.
+Every tracked leaf is reached only through real checkout
 directories; a symlinked or non-directory ancestor refuses admission or makes
 the returned proposal stale. Proposed creates are checked as one prospective inventory:
 case-folded file/file, file/directory, and ancestor-component collisions reject
@@ -87,25 +142,19 @@ proposal UNAVAILABLE, not a clean NOT-NEEDED result. When verification is
 explicitly disabled, retained inactive claim history does not create proposal
 targets or change a structurally clean NOT-NEEDED result.
 
-1. **Census:** three independent cold lanes inspect the complete artifact. A
-   separate call consolidates their validated findings into durable debt.
-2. **Correction:** later rounds target open debt, claimed fixes, and their
-   transitive effects.
-3. **Final:** after debt closes, one fresh whole-artifact regression must pass.
+### Proposal disposition
 
-For plan review only, a correction that starts with one or two blocking units is
-a closure candidate. Its existing single reviewer call also receives the full
-nine-item checklist and must search the complete plan for sibling occurrences,
-cross-reference contradictions, and repair-created regressions before closing
-debt. A blocking unit is an active blocking class, plus an unbound blocking debt
-that has no such class. This broader search is intended to reduce repeated
-correction/final cycles; it does not guarantee a fixed round count and cannot
-clear the lineage. The independent cold final remains mandatory. Branch
-correction is unchanged and remains targeted.
-
-A clear census can converge immediately. Otherwise, increase `round` after each
-successfully settled edit. Failed or rejected rounds may reuse their label.
-Repeated or backward labels after settlement block without provider spend.
+Proposal disposition is bounded caller accounting in the existing atomic lineage
+state. After a successful supplemental audit, a receipt pins its basename, round,
+snapshot, patch digest and addressed targets. Only the next successfully settled
+round consumes its pending status; failed rounds retain it. The caller SHOULD use
+the proposed diff after inspecting and validating it, explaining each departed
+target. The server validates and renders this declaration before provider admission,
+then copies the same object to the audit and `PROPOSAL-DISPOSITION` trailer. It is
+never reviewer evidence and cannot clear debt. Omission reports `none-recorded`;
+historical receipts are inert. A receipt-save failure preserves the settled review,
+reports supplemental `UNAVAILABLE`, and retains the existing pending latch so an
+ambiguous write cannot be silently reused.
 
 ## Findings, classes, and closure
 

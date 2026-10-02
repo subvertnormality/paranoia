@@ -1,5 +1,19 @@
 # Repository agent instructions
 
+Issue #139 follows docs/lfs-proposal-cleanliness-139-plan.md. Proposal cleanliness
+may recognize canonical extension-free v1 Git LFS pointers through exact size and
+SHA-256 of streamed checkout bytes plus the cached lfs attribute. Never execute
+clean/process filters. Preserve exact committed proposal preimages and all existing
+HEAD/index, filesystem, sparse-checkout, submodule and post-response checks.
+
+Issue #138 follows docs/proposal-disposition-138-plan.md. Caller proposal
+disposition is bounded lineage-bound accounting only, never repair or clearance
+authority. Preserve the original settled review on supplemental receipt failure.
+Executing agents SHOULD use the proposed diff after inspection and validation.
+Give a concrete one-line reason for every addressed target repaired differently;
+send the exact proposal audit basename and disposition on the next tracked round.
+Omission remains API-compatible and visibly reports none-recorded, never acceptance.
+
 Issues #131–133 follow docs/issues-131-133-plan.md. Consolidation receives canonical
 bare-anchor manifests; derive output rationales from validated source summaries,
 remedies and evidence instead of inventing transport-metadata findings. Repeat this
@@ -11,17 +25,30 @@ and failed substantiation condition without weakening carried grounding. Existin
 historical source-diff allowance metadata may be refreshed for the changed bytes;
 preserve original provider evidence and do not claim renewed native acceptance.
 
-Reviewer-authored patch proposals follow docs/reviewer-patch-proposal-plan.md and
-are delivered as an explicit opt-in. `PROPOSE_PATCH_DEFAULT` is false; omission and
-explicit false preserve ordinary review-only behavior, while explicit true requests
-the qualified supplemental path. The user declined the expensive paired campaign and
-approved this narrower opt-in merge; do not claim campaign-proven speed/cost benefit
-or publish default-on wording without a separate decision and default-on repair.
-Executing agents should set `propose_patch: true` on an initial clean, committed,
-tracked PLAN or CODE review when blocking debt appears concretely repairable in the
-reviewed artifact. Inspect the candidate rather than applying it blindly. Leave the
-flag false or omitted for correction/final rounds, dirty or one-shot reviews,
-architectural/authority gaps, or when a complete verified repair is already prepared.
+Tiered review is the default on main (promoted 2026-10-02 from `codex/beta-tiered-review`;
+wire release name `tiered-review-beta-1`, kept stable). docs/beta-tiered-review-plan.md is its
+design record and remains the bounded contract for this behaviour; it supersedes the opt-in
+proposal default below. Omitted `propose_patch` means automatic eligibility (never
+coerced to a boolean); false makes zero proposal calls; explicit true keeps its preflight
+rejection. Proposals run only after a blocked census or blocked cold final, resuming that
+source session with its actual model/effort. Structural roles route by durable phase
+(`review_model_policy`, default `tiered`: census/final strongest, correction `gpt-6.1-sol`/Opus 5.5
+at high; `gpt-6.1-sol` needs Codex CLI 0.159.3 or later); effort resolves per model family
+(`effort_by_model`, then global `effort`, then release family default); claim roles, query, rebut
+and arbitrate are not routed. Every tiered acceptance needs a strongest-model cold final bound
+by the durable `acceptance` record to the exact snapshot, including after a clean census; legacy
+or custom-override clear never qualifies. Historical acceptance records change only existing
+allowance hash/scope metadata for changed files (plan §10.8); never add entries or alter provider
+evidence. Do not claim savings or unchanged quality: a 2026-10-02 controlled comparison (Claude
+engine, one frozen target, n=3 per arm) found review quality not distinguishable from the prior
+default and cost per round roughly equal, which supports neither claim.
+
+Historical opt-in contract: reviewer-authored patch proposals follow
+docs/reviewer-patch-proposal-plan.md and were delivered as an explicit opt-in on main.
+The user declined the expensive paired campaign and approved that narrower opt-in merge;
+do not claim campaign-proven speed/cost benefit. Inspect every candidate rather than
+applying it blindly, and pass false for architectural/authority gaps or when a complete
+verified repair is already prepared.
 Proposal generation is supplemental after durable settlement: ordinary proposal-local
 preparation, provider, validation, logging and rendering failures must return the original
 review and exact trailer with an inert UNAVAILABLE diagnostic; retain every completed proposal
@@ -724,7 +751,7 @@ jumps count and failed labels may retry. Provider/validation failure does not ad
 state, and ambiguous lineage or rebut saves retain the pending latch. The rebut audit retains the
 complete prior target debt row separately while current closed-debt evidence records the concession
 citations.
-Persist the reviewed plan line count in staged plan state and resolve current plan rebut anchors
+Persist the reviewed plan line count in staged plan state and resolve repeated plan rebut anchors
 against that bound; absence of a trustworthy bound refuses plan-anchor settlement.
 Keep `rendered_trailer` as the exact returned suffix and `correction_gates` as its ordered pre-call
 server-owned audit projection.

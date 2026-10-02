@@ -59,7 +59,7 @@ def test_multibyte_pipe_roundtrip(tmp_path, run):
 ])
 def test_class_only_incoming_never_invents_final_owner(phase, owner, expected):
     state = {"phase":phase, "debt":[], "final_engine":owner}
-    decision = tr.incoming(tr.ReviewFacts.capture(state, ["a"]))
+    decision = tr.incoming(tr.ReviewFacts.capture(state, ["a"]), engine="codex")
     assert decision.phase == expected
     assert decision.final_engine == (owner if expected == "final" else None)
 

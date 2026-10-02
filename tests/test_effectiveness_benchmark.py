@@ -72,7 +72,9 @@ def test_real_public_handlers_bind_fixture_attempts_outputs_and_clear(pilot_slot
     assert not slot["errors"], (slot["errors"], custody.read(directory / "terminal.json"))
     assert slot["execution_success"]
     assert slot["clear_eligible"]
-    assert slot["calls"] == (1 if arm == "single" else 4)
+    # Beta (docs/beta-tiered-review-plan.md §4): the worker's existing phase=="final"
+    # round runs the required cold final after a clean census, as a product gate.
+    assert slot["calls"] == (1 if arm == "single" else 5)
     assert all(row["process_channels"]["stderr"]["bytes"] > 0 for row in slot["attempts"])
 
 

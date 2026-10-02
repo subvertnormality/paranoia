@@ -12,6 +12,24 @@ def _isolate_class_closure_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     would write a lineage into the operator's real ~/.paranoia."""
     monkeypatch.setenv(cc.STATE_ROOT_ENV, str(tmp_path / "state"))
 
+
+@pytest.fixture(autouse=True)
+def _no_real_proposal_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Beta proposals are default-on, so a handler test that scripts `run` but not
+    `resume_proposal` would otherwise launch the real provider CLI after a blocked
+    settlement. Tests that exercise proposals patch `resume_proposal` themselves."""
+    from paranoia_local import engines
+
+    def unavailable(self, session_ref, prompt, cwd, model, effort, **kwargs):
+        detail = "provider CLI is not available in the test suite"
+        return engines.Review(
+            text=detail, session_ref=None, raw="", returncode=127, error=True,
+            failure_detail=detail,
+        )
+
+    for engine_cls in (engines.CodexEngine, engines.ClaudeEngine):
+        monkeypatch.setattr(engine_cls, "resume_proposal", unavailable)
+
 _GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",
     "GIT_AUTHOR_EMAIL": "test@example.com",

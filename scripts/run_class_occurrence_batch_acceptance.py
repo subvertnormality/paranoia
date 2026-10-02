@@ -514,7 +514,14 @@ def validate_artifact(
             _historical_no_concession_prompt(prompt) for prompt in replay_prompts
         ] != [row["prompt_text"] for row in calls]:
             raise ValueError("retained inputs do not reproduce the exact provider prompts")
-        if replay_result != artifact["result_text"]:
+        # The beta prefixes one REVIEW-ROUTING trailer line the historical run predates.
+        routing_lines = [
+            line for line in replay_result.split("\n") if line.startswith("REVIEW-ROUTING: ")
+        ]
+        if len(routing_lines) != 1:
+            raise ValueError("replay did not render exactly one beta routing line")
+        historical_result = replay_result.replace(routing_lines[0] + "\n", "", 1)
+        if historical_result != artifact["result_text"]:
             raise ValueError("public-handler replay does not reproduce retained result")
         replayed_classes = []
         for row in durable.classes.values():
@@ -549,6 +556,9 @@ def _arguments(repo: Path) -> dict:
         "project_summary":"A small application with runtime configuration files.",
         "diff_intent":"Change runtime mode settings.",
         "focus":"Assess the complete diff and supplied active class using normal branch-review instructions.",
+        # Pre-beta protocol: proposals were opt-in; keep them off explicitly now that the
+        # beta default is automatic (docs/beta-tiered-review-plan.md).
+        "propose_patch":False,
     }
 
 

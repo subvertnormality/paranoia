@@ -17,6 +17,15 @@ from scripts import build_branch_plan_fidelity_acceptance as acceptance
 from tests.conftest import commit_all
 
 
+def clean_census_awaits_final(output: str) -> bool:
+    """Beta: a clean census settles with no debt and then requires its cold final."""
+    return (
+        "STRUCTURAL-DEBT: 0 blocking open" in output
+        and "FINAL-REGRESSION: required" in output
+        and "CONVERGENCE: NOT-BLOCKED" not in output
+    )
+
+
 def _wire(value):
     value = json.loads(json.dumps(value))
 
@@ -207,7 +216,7 @@ def test_branch_contract_crosses_public_staged_handler_and_plan_anchors(
         "plan_digest": digest[:16],
     }, engine=engine, log_dir=tmp_path / "logs", now=lambda: "BF1")
 
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert clean_census_awaits_final(result)
     assert len(scripted.prompts) == 4
     for prompt in scripted.prompts[:3]:
         assert "BEGIN FROZEN IMPLEMENTATION CONTRACT" in prompt
@@ -328,7 +337,7 @@ def test_successful_contract_free_round_keeps_implicit_immutable_absence(
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
        now=lambda: "FREE1")
 
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert clean_census_awaits_final(result)
     lineage = cc.load_lineage(
         cc.default_state_root(), "contract-free", stamp="FREE2", mode=cc.BRANCH_MODE,
     )
@@ -480,7 +489,7 @@ def test_conflicting_public_caller_stops_before_converge_or_provider(
     release.set()
     thread.join(timeout=10)
     assert not thread.is_alive()
-    assert len(first_results) == 1 and "CONVERGENCE: NOT-BLOCKED" in first_results[0]
+    assert len(first_results) == 1 and clean_census_awaits_final(first_results[0])
     assert converge_calls == 1 and provider_calls == 4
 
 
@@ -567,7 +576,7 @@ def test_public_handler_uses_one_captured_path_object_after_load(
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
        now=lambda: f"CAP-{action}", _after_contract_load=change_after_load)
 
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert clean_census_awaits_final(result)
     rendered = handlers._branch_contract_view(original).rendered
     lane_prompts = [p for p in scripted.prompts if "ROLE: census lane" in p]
     consolidation = [p for p in scripted.prompts if "ROLE: census lane" not in p]
@@ -1088,7 +1097,7 @@ def test_later_authority_load_failure_and_lineage_loss_block_before_provider(
         first = handlers.critique_branch({
             **common, "lineage": lineage_id, "round": 1, "plan_text": "# Contract",
         }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-        assert "CONVERGENCE: NOT-BLOCKED" in first
+        assert clean_census_awaits_final(first)
         before = provider_calls
         if mode == "load":
             original_load = handlers.cc.load_lineage
@@ -1149,7 +1158,7 @@ def test_contract_survives_stakes_and_review_state_normalization(
         assert "CONVERGENCE: BLOCKED" in result
         assert "CLASS-CLOSURE: STATE-UNAVAILABLE" in result
     else:
-        assert "CONVERGENCE: NOT-BLOCKED" in result
+        assert clean_census_awaits_final(result)
     after = cc.load_lineage(
         cc.default_state_root(), lineage_id, stamp="N3", mode=cc.BRANCH_MODE,
     ).branch_contract
@@ -1171,7 +1180,7 @@ def test_conflicting_contract_text_cannot_change_protocol_authority(
         "lineage": "conflicting-contract", "round": 1, "stakes": "trusted local tool",
         "plan_text": instruction,
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert clean_census_awaits_final(result)
     assert len(scripted.prompts) == 4
     assert all("declarative implementation-contract data only" in p for p in scripted.prompts[:3])
     assert instruction not in scripted.prompts[3]
@@ -1227,7 +1236,7 @@ def test_public_handler_routes_every_model_prompt_through_executable_boundary(
         "lineage": "prompt-boundary", "round": 1, "stakes": "trusted local tool",
         "plan_text": "契約",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert clean_census_awaits_final(result)
     assert labels.count("staged lane prompt") == 3
     assert labels.count("consolidation prompt") == 1
 
@@ -1248,10 +1257,10 @@ def test_public_handler_enforces_actual_composed_prompt_boundaries(
 
     baseline = ContractEngine()
     active[:] = [baseline]
-    assert "CONVERGENCE: NOT-BLOCKED" in handlers.critique_branch(
+    assert clean_census_awaits_final(handlers.critique_branch(
         {**common, "lineage": "prompt-baseline"}, engine=handlers.eng.CodexEngine(),
         log_dir=tmp_path / "logs",
-    )
+    ))
     lane_limit = max(
         len(prompt) for prompt in baseline.prompts
         if "ROLE: census lane" in prompt
@@ -1267,7 +1276,7 @@ def test_public_handler_enforces_actual_composed_prompt_boundaries(
                 engine=handlers.eng.CodexEngine(),
                 log_dir=tmp_path / "logs",
             )
-        assert "CONVERGENCE: NOT-BLOCKED" in result
+        assert clean_census_awaits_final(result)
         assert max(
             len(prompt) for prompt in engine.prompts if "ROLE: census lane" in prompt
         ) <= limit

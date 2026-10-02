@@ -807,6 +807,15 @@ def test_closure_candidate_directives_are_absent_from_excluded_followups(
     addition = "\n\n" + prompts.CLASS_AUTHORING_INSTRUCTIONS
     assert prompt.count(addition) == 1
     historical_prompt = prompt.replace(addition, "", 1)
+    # The beta final (docs/beta-tiered-review-plan.md §4) appends one server-owned
+    # `closed_class_history` context key; remove only that key to keep this oracle.
+    assert ("closed_class_history" in task) == (phase == "final")
+    if phase == "final":
+        head, marker, body = historical_prompt.partition("===== TASK INPUT =====\n\n")
+        historical_task = json.loads(body)
+        assert list(historical_task)[-1] == "closed_class_history"
+        historical_task.pop("closed_class_history")
+        historical_prompt = head + marker + json.dumps(historical_task, ensure_ascii=False)
     assert hashlib.sha256(historical_prompt.encode("utf-8")).hexdigest() == prompt_sha256
     assert hashlib.sha256(
         json.dumps(schema, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -3134,7 +3143,9 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
         now=lambda: "ACTIVE",
     )
 
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    # Beta: a clean census settles and then requires its strongest-model cold final.
+    assert "STRUCTURAL-DEBT: 0 blocking open" in result
+    assert "FINAL-REGRESSION: required engine=codex" in result
     assert "its integrity assessment verdict is 'satisfied', so reclassify" in retry_prompts[0]
     audit = json.loads(
         next((tmp_path / "logs").glob("ACTIVE-critique_branch-*.json")).read_text()
@@ -3154,7 +3165,7 @@ def test_branch_census_retry_preserves_seeded_integrity_outcome_durably(
         cc.default_state_root(), lineage_id, stamp="after", mode=cc.BRANCH_MODE,
     )
     assert settled.classes[class_id].status == cc.CLOSED
-    assert settled.review_state["phase"] == "clear"
+    assert settled.review_state["phase"] == "final"  # beta: clean census awaits cold final
     assert "staged_failure" not in settled.review_state
     assert "STAGED-ATTEMPTS: total=5 validation-retries=1 " \
            "validation-invalid=1 execution-failed=0" in result
@@ -4484,6 +4495,12 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
                 if row.startswith("ROLE: census lane")
             )
             text = lane(lane_name)
+        elif _task_from_prompt(prompt)["role"] == "final":
+            text = wire({
+                "role":"final", "governing_findings":[], "debt_outcomes":[],
+                "class_outcomes":{}, "class_actions":{},
+                "coverage":payload(lane())["coverage"],
+            })
         else:
             text = wire({
                 "role":"census", "governing_findings":[], "debt_outcomes":[],
@@ -4492,20 +4509,27 @@ def test_structural_only_tracked_plan_still_uses_staged_census(repo, tmp_path, m
         return Review(text=text, session_ref="s", raw=text)
 
     monkeypatch.setattr(handlers.eng.CodexEngine, "run", run)
-    out = handlers.critique_plan({
+    common = {
         "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo), "lineage":"structural-only",
-        "round":1, "claim_verification":False, "stakes":"trusted local tool",
-    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
+        "claim_verification":False, "stakes":"trusted local tool", "propose_patch":False,
+    }
+    out = handlers.critique_plan(
+        {**common, "round":1}, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+    )
     assert len(calls) == 4
     assert "## What works" in out
+    assert "STRUCTURAL-PHASE: final" in out  # beta: a clean census awaits its cold final
+    out = handlers.critique_plan(
+        {**common, "round":2}, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+    )
+    assert len(calls) == 5
     assert "STRUCTURAL-PHASE: clear" in out
     (repo / "app.py").write_text("changed = True\n")
-    out = handlers.critique_plan({
-        "plan_text":"# Plan\n\nDo it.", "repo_path":str(repo), "lineage":"structural-only",
-        "round":2, "claim_verification":False, "stakes":"trusted local tool",
-    }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs")
-    assert len(calls) == 8
-    assert "STRUCTURAL-PHASE: clear" in out
+    out = handlers.critique_plan(
+        {**common, "round":3}, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs",
+    )
+    assert len(calls) == 9
+    assert "STRUCTURAL-PHASE: final" in out
 
 
 def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
@@ -4549,7 +4573,7 @@ def test_disabled_claims_do_not_gate_or_render_stale_claim_debt(tmp_path):
         on_progress=None, plan_lines=1,
     )
     closure.release()
-    assert "STRUCTURAL-PHASE: clear" in trailer
+    assert "STRUCTURAL-PHASE: final" in trailer  # beta: cold final next
     assert "CLAIM-" not in trailer
 
 
@@ -5746,7 +5770,9 @@ def test_branch_reuses_complete_census_after_settlement_rejection(
         {**args, "round":2}, engine=handlers.eng.CodexEngine(),
         log_dir=tmp_path / "logs", now=lambda: "C2",
     )
-    assert "CONVERGENCE: NOT-BLOCKED" in second
+    # Beta: the reused clean census settles and then requires its cold final.
+    assert "STRUCTURAL-DEBT: 0 blocking open" in second
+    assert "FINAL-REGRESSION: required engine=codex" in second
     assert calls.count("consolidation") == 2
     assert sum(call.startswith("lane:") for call in calls) == 3
     lineage = cc.load_lineage(
@@ -5881,6 +5907,14 @@ def test_branch_codex_runs_the_staged_census_path(
             for row in value["coverage"]:
                 row["evidence"] = ["repository/README.md:1"]
             text = wire(value)
+        elif _task_from_prompt(prompt)["role"] == "final":
+            coverage = payload(lane())["coverage"]
+            for row in coverage:
+                row["evidence"] = ["repository/README.md:1"]
+            text = wire({
+                "role":"final", "governing_findings":[], "debt_outcomes":[],
+                "class_outcomes":{}, "class_actions":{}, "coverage":coverage,
+            })
         else:
             debt_outcomes = []
             if '"legacy-register"' in prompt:
@@ -5909,7 +5943,7 @@ def test_branch_codex_runs_the_staged_census_path(
     assert web_flags == [True] * 4
     assert sum(prompts.STAGED_CENSUS_INSTRUCTIONS.splitlines()[0] in call for call in calls) == 3
     assert all("Follow the blast radius" in call for call in calls[:3])
-    assert "STRUCTURAL-PHASE: clear" in result
+    assert "STRUCTURAL-PHASE: final" in result  # beta: clean census needs a cold final
     audit = json.loads(next((tmp_path / "logs").glob("B1-critique_branch-*.json")).read_text())
     assert len(audit["staged_manifests"]) == 3
     lineage = cc.load_lineage(
@@ -5927,7 +5961,9 @@ def test_branch_codex_runs_the_staged_census_path(
         "lineage":"staged-branch", "round":2, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B2")
     assert len(calls) == 4
-    assert "CONVERGENCE: NOT-BLOCKED" in result
+    # Beta: the legacy-debt re-audit census settles clean and then owes its cold final.
+    assert "FINAL-REGRESSION: required engine=codex" in result
+    assert "STRUCTURAL-DEBT: 0 blocking open" in result
     migrated = cc.load_lineage(
         cc.default_state_root(), "staged-branch", stamp="B3", mode=cc.BRANCH_MODE,
     )
@@ -5952,8 +5988,10 @@ def test_branch_codex_runs_the_staged_census_path(
         "repo_path":str(repo_with_branch), "base_ref":"moved-base", "head_ref":"feature",
         "lineage":"staged-branch", "round":3, "stakes":"trusted local tool",
     }, engine=handlers.eng.CodexEngine(), log_dir=tmp_path / "logs", now=lambda: "B3")
-    assert len(calls) == 4
+    # The owned pending final runs once, broad and cold, on the moved-base snapshot.
+    assert len(calls) == 1
     assert "CONVERGENCE: NOT-BLOCKED" in result
+    assert "BETA-ACCEPTANCE: qualified" in result
 
 
 def test_tracked_branch_rejects_pathspec_magic_on_fresh_and_retry(

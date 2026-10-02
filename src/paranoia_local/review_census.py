@@ -37,7 +37,11 @@ STATE_KEYS = frozenset({
     "version", "stakes_digest", "stakes", "phase", "snapshot_digest", "debt",
     "last_round", "format_debt", "validation_debt", "staged_failure",
     "census_cache", "unbound_classes", "unbound_class_ids",
-    "correction_control", "plan_line_count", "final_engine",
+    "correction_control", "plan_line_count", "final_engine", "acceptance",
+})
+ACCEPTANCE_KEYS = frozenset({
+    "version", "release", "engine", "model", "effort", "policy", "custom_override",
+    "snapshot_digest",
 })
 DEBT_KEYS = frozenset({
     "id", "finding_id", "status", "severity", "summary", "evidence", "remedy",
@@ -174,6 +178,8 @@ class Attempt:
     rejected_reply_excerpt: str | None = None
     requested_timeout_sec: int | None = None
     provider_duration_ms: int | None = None
+    model: str | None = None
+    effort: str | None = None
 
     def json(self) -> dict[str, Any]:
         return vars(self)
@@ -202,6 +208,23 @@ def rendered_diagnostic(text: str) -> str:
 def trailer_diagnostic(text: Any) -> str:
     """Encode a diagnostic as JSON string content on exactly one trailer line."""
     return json.dumps(str(text), ensure_ascii=True)[1:-1]
+
+
+MAX_ROUTING_VALUE_CHARS = 200
+
+
+def routing_value(value: Any) -> str:
+    """Render caller/config-controlled routing metadata as one inert trailer token.
+
+    Repository configuration is untrusted data. Bound it, keep it on one line, and
+    escape field delimiters so a value can never read as another trailer field or as a
+    `CONVERGENCE:` substring.
+    """
+    bounded = bounded_diagnostic(str(value), MAX_ROUTING_VALUE_CHARS)
+    return (
+        trailer_diagnostic(bounded)
+        .replace(":", "\\u003a").replace(" ", "\\u0020").replace("=", "\\u003d")
+    )
 
 
 def rejected_payload(
@@ -317,6 +340,31 @@ def set_phase(
         state["final_engine"] = final_engine
     else:
         state.pop("final_engine", None)
+    if phase != "clear":
+        # Beta acceptance belongs only to the clear state its cold final created.
+        state.pop("acceptance", None)
+
+
+def accepted_clear(state: Mapping[str, Any]) -> bool:
+    """Clear with a cold-final acceptance bound to the exact current snapshot."""
+    record = state.get("acceptance")
+    return (
+        state.get("phase") == "clear"
+        and isinstance(record, Mapping)
+        and record.get("snapshot_digest") == state.get("snapshot_digest")
+    )
+
+
+def _validate_acceptance(value: Any) -> None:
+    if not isinstance(value, Mapping) or set(value) != ACCEPTANCE_KEYS:
+        raise CensusError("/acceptance: invalid persisted acceptance record")
+    if type(value["version"]) is not int or value["version"] != 1:
+        raise CensusError("/acceptance/version: invalid persisted acceptance version")
+    for key in ("release", "model", "effort", "policy", "snapshot_digest"):
+        _persisted_text(value.get(key), f"/acceptance/{key}")
+    _validate_engine_name(value.get("engine"), "/acceptance/engine")
+    if type(value["custom_override"]) is not bool:
+        raise CensusError("/acceptance/custom_override: invalid persisted flag")
 
 
 def _persisted_text(value: Any, pointer: str, *, optional: bool = False) -> None:
@@ -567,6 +615,10 @@ def validate_persisted_state(
         _validate_engine_name(state.get("final_engine"), "/final_engine")
     elif "final_engine" in state:
         raise CensusError("/final_engine: permitted only while final is required")
+    if "acceptance" in state:
+        if state["phase"] != "clear":
+            raise CensusError("/acceptance: permitted only while structural state is clear")
+        _validate_acceptance(state["acceptance"])
     if "last_round" in state and (
         type(state["last_round"]) is not int or state["last_round"] < 1
     ):
@@ -1097,7 +1149,25 @@ def trailer(
         suffix = f" engine={trailer_diagnostic(owner)}" if owner else ""
         lines.append(f"FINAL-REGRESSION: required{suffix}")
         lines.append("CONVERGENCE: BLOCKED — cold final regression is required.")
+    elif phase == "clear" and not debt and not accepted_clear(state):
+        lines.append(
+            "FINAL-REGRESSION: required tier=strongest — no beta cold-final acceptance "
+            "is bound to this snapshot"
+        )
+        lines.append(
+            "CONVERGENCE: BLOCKED — an independent strongest-model cold final is required."
+        )
     elif phase == "clear" and not debt:
+        record = state["acceptance"]
+        lines.append(
+            "BETA-ACCEPTANCE: "
+            + ("custom-override (not beta-qualified)" if record["custom_override"]
+               else "qualified")
+            + f" engine={routing_value(record['engine'])}"
+            f" model={routing_value(record['model'])}"
+            f" effort={routing_value(record['effort'])}"
+            f" policy={routing_value(record['policy'])}"
+        )
         lines.append("CONVERGENCE: NOT-BLOCKED — staged structural debt is clear.")
     else:
         lines.append("CONVERGENCE: BLOCKED — staged structural debt remains open.")

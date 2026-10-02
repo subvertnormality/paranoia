@@ -10,6 +10,7 @@ error.
 from __future__ import annotations
 
 import asyncio
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
@@ -17,8 +18,9 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-from . import arbitrate_handler, handlers, telemetry, session_routing
-from .engines import get_engine
+from . import arbitrate_handler, handlers, review_policy, telemetry, session_routing
+from . import proposal_disposition as pd
+from .engines import MODEL_FAMILY_EFFORT, get_engine
 from .logs import DEFAULT_LOG_DIR
 
 Clock = Callable[[], str]
@@ -101,6 +103,39 @@ _STAKES_REQUIRED = {
     ),
 }
 
+_REVIEW_MODEL_POLICY = {
+    "type": "string",
+    "enum": list(review_policy.POLICIES),
+    "description": (
+        f"BETA ({review_policy.BETA_RELEASE}) structural model routing for tracked staged "
+        "reviews (default tiered; precedence: argument, .paranoia.toml, release default). "
+        "tiered: census and cold final use the strongest model (gpt-6-astra / "
+        "claude-fable-5-1), targeted correction uses gpt-6.1-sol / claude-opus-5-5. "
+        "strongest: every structural phase uses the strongest model. An explicit model pins "
+        "every structural phase as a custom override that cannot claim beta qualification. "
+        "Effort resolves per model family (effort_by_model, then effort, then release "
+        "default) and blocks qualification only when it changes the cold final's release "
+        "effort. Claim verification, query, rebut and arbitrate are not routed."
+    ),
+}
+
+_EFFORT_BY_MODEL = {
+    "type": "object",
+    "properties": {
+        family: {"type": "string", "enum": list(review_policy.EFFORTS)}
+        for family in MODEL_FAMILY_EFFORT
+    },
+    "additionalProperties": False,
+    "description": (
+        "BETA per model-family effort for routed structural phases (also a "
+        ".paranoia.toml table; argument keys win per family). A family's entry beats "
+        "the global effort for that family's model; e.g. {\"sol\": \"high\", "
+        "\"opus\": \"high\"} keeps correction at high whatever the global effort. "
+        "Defaults: astra/fable medium, sol/opus high. Changing the strongest model's "
+        "final effort marks the run custom-override (not beta-qualified)."
+    ),
+}
+
 TOOLS: list[Tool] = [
     Tool(
         name="critique_branch",
@@ -108,7 +143,9 @@ TOOLS: list[Tool] = [
             "Adversarially review a git branch/diff. A cold, strongest-frontier reviewer on the "
             "OTHER engine reads the repo directly (full read access, its own subscription) and returns "
             "a five-section critique with severity tags. Reviews an isolated worktree of the ref by "
-            "default; can review the dirty working tree with include_uncommitted."
+            "default; can review the dirty working tree with include_uncommitted. "
+            + review_policy.BETA_NOTICE
+            + " " + pd.CALLER_EXPECTATION
         ),
         inputSchema={
             "type": "object",
@@ -126,7 +163,7 @@ TOOLS: list[Tool] = [
                 },
                 "converge": {
                     "type": "boolean",
-                    "description": "Convergence mode (default TRUE): review an immutable evidence packet through a broad three-lane census, targeted correction debt, and one cold final regression. A clear census may converge immediately. Pass false with class_closure:false for the legacy one-shot path.",
+                    "description": "Convergence mode (default TRUE): review an immutable evidence packet through a broad three-lane census, targeted correction debt, and one cold final regression. BETA: a clear census still requires the cold final; increment round and rerun the unchanged snapshot for it. Pass false with class_closure:false for the legacy one-shot path.",
                 },
                 "max_packet_chars": {
                     "type": "integer",
@@ -173,15 +210,19 @@ TOOLS: list[Tool] = [
                 "propose_patch": {
                     "type": "boolean",
                     "description": (
-                        "Explicit opt-in for a reviewer-authored unapplied patch proposal. "
-                        "Use true on an initial clean, committed, tracked review when blocking "
-                        "debt appears concretely repairable in the reviewed code; omitted/false "
-                        "keeps ordinary review-only behavior. Leave it off for correction/final, "
-                        "dirty or one-shot reviews, architectural or authority gaps, or when a "
-                        "complete verified repair already exists. It never applies changes or "
-                        "runs tests."
+                        "BETA default-on reviewer-authored unapplied patch proposals. Omit it "
+                        "for automatic selection: after a blocked census or blocked cold final "
+                        "on a clean, committed, tracked review the source reviewer session is "
+                        "asked for one candidate; clean results report NOT-NEEDED, and dirty, "
+                        "one-shot, closure-disabled and correction-phase reviews report an inert "
+                        "UNAVAILABLE with no proposal call. false makes zero proposal calls; true "
+                        "is an explicit request that rejects unsupported modes. It never applies "
+                        "changes, runs tests, or alters the review verdict."
                     ),
                 },
+                "review_model_policy": _REVIEW_MODEL_POLICY,
+                "prior_proposal_disposition": pd.INPUT_SCHEMA,
+                "effort_by_model": _EFFORT_BY_MODEL,
                 "lineage": {
                     "type": "string",
                     "description": (
@@ -252,7 +293,9 @@ TOOLS: list[Tool] = [
         description=(
             "Adversarially review a plan or design doc. The reviewer reads the actual "
             "code to test the plan's premises about current behaviour — a plan built on an inverted "
-            "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags."
+            "premise is the most dangerous kind. Returns the five-section critique with FATAL/MAJOR/MINOR tags. "
+            + review_policy.BETA_NOTICE
+            + " " + pd.CALLER_EXPECTATION
         ),
         inputSchema={
             "type": "object",
@@ -291,15 +334,18 @@ TOOLS: list[Tool] = [
                 "propose_patch": {
                     "type": "boolean",
                     "description": (
-                        "Explicit opt-in for a reviewer-authored unapplied plan-text proposal. "
-                        "Use true on an initial tracked review when blocking debt appears "
-                        "concretely repairable in the plan; omitted/false keeps ordinary "
-                        "review-only behavior. Leave it off for correction/final or one-shot "
-                        "reviews, architectural or authority gaps, or when a complete verified "
-                        "repair already exists. It never mutates the source plan or repository "
-                        "and never runs tests."
+                        "BETA default-on reviewer-authored unapplied plan-text proposals. Omit "
+                        "it for automatic selection after a blocked census or blocked cold "
+                        "final of a tracked review; clean results report NOT-NEEDED, and "
+                        "one-shot or correction-phase reviews report an inert UNAVAILABLE with "
+                        "no proposal call. false makes zero proposal calls; true is an explicit "
+                        "request that rejects unsupported modes. It never mutates the source "
+                        "plan or repository and never runs tests."
                     ),
                 },
+                "review_model_policy": _REVIEW_MODEL_POLICY,
+                "prior_proposal_disposition": pd.INPUT_SCHEMA,
+                "effort_by_model": _EFFORT_BY_MODEL,
                 "claim_verification": {
                     "type": "boolean",
                     "description": (
@@ -637,5 +683,7 @@ def _progress_callback(
 
 
 async def run_stdio(server_obj: Server) -> None:
+    # Beta notice on stderr only: stdout is the MCP stdio transport.
+    print(f"paranoia-local: {review_policy.BETA_NOTICE}", file=sys.stderr, flush=True)
     async with stdio_server() as (read, write):
         await server_obj.run(read, write, server_obj.create_initialization_options())

@@ -23,6 +23,12 @@ from paranoia_local import review_census as rc
 from paranoia_local import staged_protocol as sp
 
 
+def without_disposition(text):
+    # Accounting may differ; every original review/trailer line must remain identical.
+    return "\n".join(line for line in text.split("\n")
+                     if not line.startswith("PROPOSAL-DISPOSITION:"))
+
+
 def context_and_reader():
     data = b"value = 1\n"
     entry = pp.ProposalEntry("app.py", "file", "100644", git_objects.blob_oid(data, 40))
@@ -1123,6 +1129,7 @@ def install_settled_census(monkeypatch, *, blocking=True):
             debt=debt,
         )
         closure.lineage.review_state = state
+        handlers.cc.save_lineage(closure.state_root, closure.lineage)
         closure._settled = True
         closure.register_status = "staged census parsed — NONE"
         handle = census.AuthorHandle(lane, "lane-session", "codex")
@@ -1363,26 +1370,38 @@ def test_plan_path_newlines_preserve_disabled_review_identity_and_only_gate_patc
     assert enabled.endswith(trailer)
 
 
-def test_public_omitted_and_false_make_zero_proposal_calls(tmp_path, monkeypatch):
+def test_public_false_makes_zero_proposal_calls_and_omission_is_automatic(
+    tmp_path, monkeypatch,
+):
+    # Beta (docs/beta-tiered-review-plan.md): omission selects automatic eligibility.
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
-    install_settled_census(monkeypatch)
-    monkeypatch.setattr(
-        engines.CodexEngine, "resume_proposal",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("proposal called")),
+    trailer = install_settled_census(monkeypatch)
+    calls = []
+
+    def resume(self, session, prompt, cwd, model, effort, **kwargs):
+        calls.append(session)
+        text = proposal_reply("branch")
+        return engines.Review(text, "proposal-session", text)
+
+    monkeypatch.setattr(engines.CodexEngine, "resume_proposal", resume)
+    common = {
+        "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
+        "round": 1, "stakes": "local", "web_search": False,
+    }
+    disabled = handlers.critique_branch(
+        {**common, "lineage": "disabled", "propose_patch": False},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-disabled",
     )
-    for index, proposal_value in enumerate((None, False), start=1):
-        args = {
-            "repo_path": str(repo), "base_ref": "main", "head_ref": "feature",
-            "round": 1, "lineage": f"disabled-{index}", "stakes": "local",
-            "web_search": False,
-        }
-        if proposal_value is not None:
-            args["propose_patch"] = proposal_value
-        output = handlers.critique_branch(
-            args, engine=engines.CodexEngine(), log_dir=tmp_path / f"logs-{index}",
-        )
-        assert "PATCH-PROPOSAL" not in output
+    assert "PATCH-PROPOSAL" not in disabled
+    assert calls == []
+    automatic = handlers.critique_branch(
+        {**common, "lineage": "automatic"},
+        engine=engines.CodexEngine(), log_dir=tmp_path / "logs-automatic",
+    )
+    assert "PATCH-PROPOSAL: PROPOSED" in automatic
+    assert automatic.endswith(trailer)
+    assert calls == ["lane-session"]
 
 
 def test_enabled_proposal_does_not_change_durable_state_or_existing_trailer(
@@ -1449,10 +1468,10 @@ def test_enabled_plan_proposal_does_not_change_durable_state_or_trailer(
         engine=engines.CodexEngine(), log_dir=tmp_path / "logs-enabled",
     )
     disabled_state = handlers.cc.load_lineage(
-        state_root, "plan-state-disabled", stamp="READ",
+        state_root, "plan-state-disabled", stamp="READ", mode=cc.PLAN_MODE,
     )
     enabled_state = handlers.cc.load_lineage(
-        state_root, "plan-state-enabled", stamp="READ",
+        state_root, "plan-state-enabled", stamp="READ", mode=cc.PLAN_MODE,
     )
     assert disabled_state.review_state == enabled_state.review_state
     assert disabled_state.classes == enabled_state.classes
@@ -1605,7 +1624,7 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
         assert states[False].review_state == states[True].review_state
         assert states[False].classes == states[True].classes
         trailer = outputs[False][outputs[False].rfind("LINEAGE:"):]
-        assert outputs[True].endswith(trailer)
+        assert without_disposition(outputs[True]).endswith(trailer)
         return outputs, states
 
     first, first_states = paired(1)
@@ -1621,14 +1640,14 @@ def test_production_lifecycle_is_state_independent_with_nonempty_debt_and_class(
     assert wrong_states[False].review_state["debt"]
     assert "CONVERGENCE: BLOCKED" in wrong[False]
     assert "PATCH-PROPOSAL: UNAVAILABLE" in wrong[True]
-    assert "no successful fresh-census author session" in wrong[True]
+    assert "correction-phase review is proposal-ineligible" in wrong[True]
 
     (repo / "app.py").write_text("value = 2\n", encoding="utf-8")
     git(repo, "add", "app.py")
     git(repo, "-c", "commit.gpgsign=false", "commit", "-qm", "repair")
     corrected, corrected_states = paired(3)
     assert corrected_states[False].review_state["phase"] == "final"
-    assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
+    assert "correction-phase review is proposal-ineligible" in corrected[True]
 
     final, final_states = paired(4)
     assert final_states[False].review_state["phase"] == "clear"
@@ -1786,7 +1805,7 @@ def test_plan_production_lifecycle_is_state_independent_with_wrong_and_correct_r
         assert states[False].classes == states[True].classes
         assert states[False].claim_state == states[True].claim_state
         trailer = outputs[False][outputs[False].rfind("LINEAGE:"):]
-        assert outputs[True].endswith(trailer)
+        assert without_disposition(outputs[True]).endswith(trailer)
         return outputs, states
 
     first, first_states = paired(1)
@@ -1804,7 +1823,7 @@ def test_plan_production_lifecycle_is_state_independent_with_wrong_and_correct_r
     current["text"] = "The value is two.\n"
     corrected, corrected_states = paired(3)
     assert corrected_states[False].review_state["phase"] == "final"
-    assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
+    assert "correction-phase review is proposal-ineligible" in corrected[True]
 
     final, final_states = paired(4)
     assert final_states[False].review_state["phase"] == "clear"
@@ -2021,7 +2040,7 @@ def test_verified_plan_public_lifecycle_reverifies_wrong_weakening_and_correct_r
         assert states[False].review_state == states[True].review_state
         assert states[False].classes == states[True].classes
         assert states[False].claim_state == states[True].claim_state
-        assert outputs[True].endswith(outputs[False][outputs[False].rfind("LINEAGE:"):])
+        assert without_disposition(outputs[True]).endswith(outputs[False][outputs[False].rfind("LINEAGE:"):])
         return outputs, states
 
     first, first_states = paired(1)
@@ -2051,7 +2070,7 @@ def test_verified_plan_public_lifecycle_reverifies_wrong_weakening_and_correct_r
     assert len(current_claims) == 1 and current_claims[0]["verdict"] == "supported"
     assert current_claims[0]["current_adjudication"] == "full-evidence-packet"
     assert corrected_states[False].review_state["phase"] == "final"
-    assert "PATCH-PROPOSAL: NOT-NEEDED" in corrected[True]
+    assert "correction-phase review is proposal-ineligible" in corrected[True]
 
     final, final_states = paired(5)
     assert final_states[False].review_state["phase"] == "clear"

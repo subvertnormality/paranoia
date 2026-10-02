@@ -2,6 +2,8 @@
 
 > Paranoia Local is a local MCP server for cross-vendor adversarial review. Claude Code can run Codex as a read-only reviewer, Codex can run Claude Code, and arbitration uses both independently over pinned evidence.
 
+Tracked reviews route census/final to the strongest model and correction to Sol 6.1/Opus 5.5 at high effort (`review_model_policy: "strongest"` opts out), require a cold final before `NOT-BLOCKED`, and request unapplied repair proposals after blocked census/final by default (`propose_patch: false` opts out); callers may report what they did with a proposal through `prior_proposal_disposition`. See docs/how-it-works.md#the-tracked-lifecycle.
+
 Use the quickstart for installation. Use the LLM operating reference when selecting or calling a tool. Runtime MCP schemas are authoritative if prose differs from the installed version. The five tools are `critique_branch`, `critique_plan`, `query`, `rebut`, and `arbitrate`.
 
 ## Core documentation

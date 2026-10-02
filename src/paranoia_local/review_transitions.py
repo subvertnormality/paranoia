@@ -38,7 +38,7 @@ class ReviewFacts:
         )
 
 
-def incoming(facts: ReviewFacts) -> PhaseDecision:
+def incoming(facts: ReviewFacts, *, engine: str) -> PhaseDecision:
     """Choose a role after authoritative normalization, never invent final ownership."""
     phase, owner = facts.phase, facts.final_engine
     if phase == "census" and facts.unbound_marker and facts.blocking_debt:
@@ -47,6 +47,10 @@ def incoming(facts: ReviewFacts) -> PhaseDecision:
         if phase == "final" and owner:
             return PhaseDecision("final", owner, "owned-class-closure")
         return PhaseDecision("census", None, "unowned-class-closure")
+    if phase == "clear" and not facts.blocking_debt:
+        # Beta: a same-snapshot clear (legacy, migrated, custom-model, or already
+        # accepted) is re-verified only by an independent strongest-model cold final.
+        return PhaseDecision("final", engine, "clear-needs-cold-final")
     return PhaseDecision(phase, owner if phase == "final" else None, "retained-phase")
 
 
@@ -55,8 +59,9 @@ def after_debt(
 ) -> PhaseDecision:
     if blocking_debt:
         return PhaseDecision("correction", None, "blocking-findings")
-    if phase == "correction":
-        return PhaseDecision("final", engine, "correction-needs-cold-final")
+    if phase in {"census", "correction"}:
+        # Beta: a clean census still needs independent cold acceptance on this snapshot.
+        return PhaseDecision("final", engine, f"{phase}-needs-cold-final")
     if phase == "final" and final_engine != engine:
         return PhaseDecision("final", final_engine, "foreign-final")
     return PhaseDecision("clear", None, "review-debt-clear")

@@ -1,0 +1,1201 @@
+{
+  "kind": "issue138-native-proposal-disposition",
+  "source": {
+    "path": "/home/andy/tools/paranoia-local/.worktrees/beta-sol-6-1",
+    "revision": "3685766ec9c9ec708dbd77500f867bfd758cade8",
+    "files": {
+      "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+      "src/paranoia_local/arbitrate_handler.py": "b69e2cde45ea2edede6ec09fd059aa2f2522437be2d2973378f9865f05c089f7",
+      "src/paranoia_local/arbitration.py": "1abf862841ece8db197ba347d431df9aa89679d74a900b93a922c1a65aeb32df",
+      "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+      "src/paranoia_local/census_execution.py": "b7975f6d223e74e098c2d3010f1d290d5d6c405ebbe8d76475bef722219437e6",
+      "src/paranoia_local/class_closure.py": "6cfbcc72000d84d46b0504f84e66af537ae457bc38b66cdd744f6bab6e98fb59",
+      "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+      "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+      "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+      "src/paranoia_local/engines.py": "fa1e137e03bfe79f6cf870c37193bd369f812992d59b48f00d4da47c33ab99a9",
+      "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+      "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+      "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+      "src/paranoia_local/handlers.py": "74b2a3ea78abcbbc3cb44944246452b0934247c787e0d19a086ab0127314e8cc",
+      "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+      "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+      "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+      "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+      "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+      "src/paranoia_local/patch_experiments.py": "d0a50131f91d3a2fa9770cd83445a284eb6d7f386f7cf8dc49e720d4d57f87e7",
+      "src/paranoia_local/patch_proposals.py": "891e0d4a984ebf7bd548816951440e45502181d6212b5ecc2e32e9d6e1327dd8",
+      "src/paranoia_local/plan_claims.py": "7cf4b345824bb8c83c0d11f8cd99c6530c26002fd53b7c26af8bfd12cd878027",
+      "src/paranoia_local/prompts.py": "e9a2f04a93f79eabc97a906a411473074b6e3494a99b91cf89422f153250c793",
+      "src/paranoia_local/proposal_disposition.py": "e5bb87aee073e8613b570f11e69915c1c3fa2ebf182125b8f96c41edce38f5c1",
+      "src/paranoia_local/review_census.py": "48097d3bb7e27890dc7c8d0462ed3707a2095a2927a4e2080bfc311b00827d0f",
+      "src/paranoia_local/review_policy.py": "3fca61e52e1d4ad1ebac158b4c82ef26934aa712217e30a2b5447dbeea557928",
+      "src/paranoia_local/review_transitions.py": "b657111ed0db8ea6fd1afdaa4c297ffbcec6915d658e16300829300231d0cac7",
+      "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+      "src/paranoia_local/server.py": "7ae8ea916d06e0927f437f9c1272085750f86e473a22c0ed6ec3d96a4e897266",
+      "src/paranoia_local/session_routing.py": "349014898c1f2aa9292f1f7e5c0b6e8860e6bb1db9dabf791141a60ab7d9a30e",
+      "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+      "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+      "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+      "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+    }
+  },
+  "runner_sha256": "136aaf30e162e0dd5bba7c7d03ec69d23ea0e7471e796fcf2a3489e697d3c440",
+  "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+  "baseline": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+  "rounds": [
+    {
+      "round": 1,
+      "arguments": {
+        "repo_path": "/tmp/paranoia-issue138-integrated/repo",
+        "base_ref": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+        "head_ref": "HEAD",
+        "lineage": "issue138-live-branch",
+        "round": 1,
+        "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+        "web_search": false,
+        "review_model_policy": "strongest",
+        "propose_patch": true
+      },
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] Reversed operands break quotient correctness and the zero-denominator contract. (repository/divide.py:1-2, repository/README.md:1)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.\n\n---\n_paranoia-local \u00b7 engine=codex \u00b7 session_ref=`01a0f733-5345-7440-bdce-49abfdbad3fb` \u2014 to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\n=== PATCH PROPOSAL (SUPPLEMENTAL; REVIEW VERDICT UNCHANGED) ===\nPATCH-PROPOSAL: PROPOSED\nBOUND-REVIEWED-SNAPSHOT-JSON: \"b934f67d2acc2df0743f27a20ba66900f580f9e4\"\nBOUND-STRUCTURAL-SNAPSHOT-JSON: \"7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de\"\nBOUND-CONTRACT-DIGEST-JSON: null\nTARGET-IDS: [\"structural:D1\"]\nPROPOSAL-CALLS: 1\nPROPOSAL-DURATION-MS: 13617\nPROPOSAL-AUTHOR-SESSION-JSON: \"01a0f732-9c10-7021-b92e-eeb0d5ac7cd6\"\nPROPOSAL-SESSION-JSON: \"01a0f732-9c10-7021-b92e-eeb0d5ac7cd6\"\nAUTHOR-SUMMARY-JSON: \"Restore the documented division order and zero-denominator behavior. README.md already states the correct contract and requires no change.\"\nAUTHOR-COVERED: [\"structural:D1\"]\nAUTHOR-UNADDRESSED: []\nSUGGESTED-TESTS-JSON: [\"Verify divide(6, 3) returns 2.\", \"Verify divide(0, 3) returns 0.\", \"Verify divide(3, 0) raises ZeroDivisionError.\"]\nLIMITATIONS-JSON: [\"Candidate based on the supplied pinned source; no files modified or tests executed.\"]\nPATCH-SHA256: 45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559\nVALIDATION: original source spans matched; patch not applied; tests not executed\nPROPOSAL-AUDIT-JSON: \"20261001T122241-critique_branch_patch_proposal-9f0686d4.json\"\nAPPLICATION-SUITABILITY: CURRENT\n```diff\ndiff --git a/divide.py b/divide.py\n--- a/divide.py\n+++ b/divide.py\n@@ -1,2 +1,2 @@\n def divide(numerator, denominator):\n-    return denominator / numerator\n+    return numerator / denominator\n```\nCALLER: inspect the candidate, confirm the bound preimage is current, apply deliberately, run appropriate tests, and submit the changed artifact in the same lineage with the next lawful round label. A stale proposal requires a new review.\nCALLER: The executing agent SHOULD use the proposed diff as the repair starting point after inspecting and validating it. Before the next round in the same lineage, submit prior_proposal_disposition with its PROPOSAL-AUDIT-JSON basename, status and a reason for each departed target. The API is optional; an omitted disposition of a pending proposal reports none-recorded. Disposition is caller accounting, not proof of repair or clearance.\n\nREVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=census tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED \u2014 staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "audits": {
+        "20261001T122227-critique_branch-d68a8cdc.json": {
+          "timestamp": "20261001T122227",
+          "tool": "critique_branch",
+          "engine": "codex",
+          "session_ref": "01a0f733-5345-7440-bdce-49abfdbad3fb",
+          "returncode": 0,
+          "error": false,
+          "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\n- [MAJOR] Reversed operands break quotient correctness and the zero-denominator contract. (repository/divide.py:1-2, repository/README.md:1)\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\n- [MAJOR] Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.",
+          "target": "committed diff 93fae4f95fc7d9f72e1ce290374bc9c27349715c...HEAD in repo",
+          "model": "gpt-6-astra",
+          "mode": "converge-packet",
+          "round": 1,
+          "already_raised": [],
+          "usage": {
+            "input_tokens": 17196,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 369,
+            "reasoning_output_tokens": 72
+          },
+          "duration_ms": 16542,
+          "base_id": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+          "head_id": "b934f67d2acc2df0743f27a20ba66900f580f9e4",
+          "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "plan_digest": null,
+          "plan_digest_assertion": null,
+          "plan_path": null,
+          "plan_text": null,
+          "plan_contract_reused": false,
+          "lineage": "issue138-live-branch",
+          "retry_register": null,
+          "attempt_ledger": [
+            {
+              "role": "census-behaviour",
+              "engine": "codex",
+              "session_ref": "01a0f732-9c10-7021-b92e-eeb0d5ac7cd6",
+              "outcome": "completed",
+              "duration_ms": 46916,
+              "usage": {
+                "input_tokens": 54123,
+                "cached_input_tokens": 35328,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1230,
+                "reasoning_output_tokens": 0
+              },
+              "response_sha256": "fbeb12f693aaa5ef6d6964f7a1c11a2db0c209a58c1411ae6273126a3d6a9646",
+              "response_excerpt": "{\n  \"class_assessments\": [],\n  \"coverage\": [\n    {\n      \"evidence\": [{\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"Reviewed the complete supplied file and inspected the repository's only other tracked file, README.md.\"}],\n      \"finding_ids\": [],\n      \"id\": \"artifact-complete\",\n      \"status\": \"covered\",\n      \"summary\": \"The entire change and repository were inspected.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/README.md:1\", \"rationale\": \"The explicit contract requires numerator divided by denominator; inspected history confirms the baseline implemented it.\"}],\n      \"finding_ids\": [],\n      \"id\": \"repository-premises\",\n      \"status\": \"covered\",\n      \"summary\": \"The documented contract and baseline agree; no project agent instructions were found.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/divide.py:2\", \"rationale\": \"The operands are reversed, changing the mathematical result.\"}],\n      \"finding_ids\": [\"B1\"],\n      \"id\": \"transformations\",\n      \"status\": \"finding\",\n      \"summary\": \"The transformation computes the inverse quotient.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/divide.py:1\", \"rationale\": \"The public signature retains numerator and denominator; repository inspection found no callers.\"}],\n      \"finding_ids\": [],\n      \"id\": \"consumers\",\n      \"status\": \"covered\",\n      \"summary\": \"The callable interface is preserved, but there are no in-repository consumers to inspect.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/divide.py:2\", \"rationale\": \"A zero numerator now raises, while a zero denominator with a nonzero numerator returns zero.\"}],\n      \"finding_ids\": [\"B1\"],\n      \"id\": \"failure-recovery\",\n      \"status\": \"finding\",\n      \"summary\": \"Operand reversal also moves the division-by-zero failure to the wrong argument.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/README.md:1\", \"rationale\": \"The quotient and zero-denominator requirements provide concrete acceptance criteria.\"}],\n      \"finding_ids\": [],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"covered\",\n      \"summary\": \"No tests exist in the repository. Examples were evaluated by inspection; nothing was executed.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/README.md:1\", \"rationale\": \"The documentation clearly specifies both normal output and exceptional behavior.\"}],\n      \"finding_ids\": [],\n      \"id\": \"docs-operations\",\n      \"status\": \"covered\",\n      \"summary\": \"The existing documentation provides a clear and sufficient contract.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Requires numerator divided by denominator.\"},\n        {\"anchor\": \"repository/divide.py:2\", \"rationale\": \"Implements denominator divided by numerator.\"}\n      ],\n      \"finding_ids\": [\"B1\"],\n      \"id\": \"consistency\",\n      \"status\": \"finding\",\n      \"summary\": \"Implementation contradicts the documented contract.\"\n    },\n    {\n      \"evidence\": [{\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"The defect is confined to a single expression and needs no additional abstraction or hardening.\"}],\n      \"finding_ids\": [],\n      \"id\": \"proportionality\",\n      \"status\": \"covered\",\n      \"summary\": \"A one-line correction and focused regression cases are proportionate.\"\n    }\n  ],\n  \"findings\": [\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"Reversing operands makes divide(6, 3) return 0.5 instead of 2, divide(0, 3) raise instead of returning zero, and divide(3, 0) return zero instead of raising.\"},\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Explicitly requires numerator divided by denominator and ZeroDivisionError for a zero denominator.\"}\n      ],\n      \"id\": \"B1\",\n      \"remedy\": \"Restore return numerator / denominator, preserving the README contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.\",\n      \"severity\": \"MAJOR\",\n      \"summary\": \"Operand r",
+              "sequence": 1,
+              "returncode": 0,
+              "raw_sha256": "a58b84f0d5ce89235b21e4c753e7440cd017a0a2e3d656cc18f98467282a804c",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f732-9c10-7021-b92e-eeb0d5ac7cd6\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I\u2019ll check the repository\u2019s instructions, callers, and history to assess the operand reversal.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g '*.py' -g '*.md' -g '*toml' -g '*cfg' -g '*json'; git log -p --follow -5 -- divide.py; rg -n 'divide|numerator|denominator' --glob '\\\"'!divide.py'\\\"' .\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g '*.py' -g '*.md' -g '*toml' -g '*cfg' -g '*json'; git log -p --follow -5 -- divide.py; rg -n 'divide|numerator|denominator' --glob '\\\"'!divide.py'\\\"' .\\\"\",\"aggregated_output\":\"/tmp/paranoia-wt-iggk1nn3/tree\\ndivide.py\\nREADME.md\\ncommit b934f67d2acc2df0743f27a20ba66900f580f9e4\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    inverted operands\\n\\ndiff --git a/divide.py b/divide.py\\nindex c50d4f0..82a6239 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return numerator / denominator\\n+    return denominator / numerator\\n\\ncommit 93fae4f95fc7d9f72e1ce290374bc9c27349715c\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    baseline\\n\\ndiff --git a/divide.py b/divide.py\\nnew file mode 100644\\nindex 0000000..c50d4f0\\n--- /dev/null\\n+++ b/divide.py\\n@@ -0,0 +1,2 @@\\n+def divide(numerator, denominator):\\n+    return numerator / denominator\\n./README.md:1:Contract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'ls -la; cat README.md; find .. -name AGENTS.md -o -name CLAUDE.md; git ls-files; for p in /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\"$p\\\" ]; then cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'ls -la; cat README.md; find .. -name AGENTS.md -o -name CLAUDE.md; git ls-files; for p in /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\"$p\\\" ]; then cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"total 20\\ndrwxr-xr-x 2 andy andy 4096 Oct  1 12:21 .\\ndrwx------ 3 andy andy 4096 Oct  1 12:21 ..\\n-rw-r--r-- 1 andy andy   67 Oct  1 12:21 .git\\n-rw-r--r-- 1 andy andy  126 Oct  1 12:21 README.md\\n-rw-r--r-- 1 andy andy   71 Oct  1 12:21 divide.py\\nContract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\nREADME.md\\ndivide.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"class_assessments\\\": [],\\n  \\\"coverage\\\": [\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\": \\\"repository/divide.py:1-2\\\", \\\"rationale\\\": \\\"Reviewed the complete supplied file and inspected the repository's only other tracked file, README.md.\\\"}],\\n      \\\"finding_ids\\\": [],\\n      \\\"id\\\": \\\"artifact-complete\\\",\\n      \\\"status\\\": \\\"covered\\\",\\n      \\\"summary\\\": \\\"The entire change and repository were inspected.\\\"\\n    },\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\": \\\"repository/README.md:1\\\", \\\"rationale\\\": \\\"The explicit contract requires numerator divided by denominator; inspected history confirms the baseline implemented it.\\\"}],\\n      \\\"finding_ids\\\": [],\\n      \\\"id\\\": \\\"repository-premises\\\",\\n   ",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 1800,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            },
+            {
+              "role": "census-execution",
+              "engine": "codex",
+              "session_ref": "01a0f732-9c10-7512-9eee-9606a806398d",
+              "outcome": "completed",
+              "duration_ms": 44529,
+              "usage": {
+                "input_tokens": 53950,
+                "cached_input_tokens": 35328,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1158,
+                "reasoning_output_tokens": 0
+              },
+              "response_sha256": "e0a77871dbcec36acfb596248d30ac9c113f20e97c15e645148ddc6e977a04aa",
+              "response_excerpt": "{\n  \"class_assessments\": [],\n  \"coverage\": [\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The complete touched file and supplied diff were reviewed.\"}],\n      \"finding_ids\": [],\n      \"id\": \"artifact-complete\",\n      \"status\": \"covered\",\n      \"summary\": \"Reviewed the entire change and both repository files.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The explicit contract establishes operand order and zero-denominator behavior; inspected history confirms the previous implementation followed it.\"}],\n      \"finding_ids\": [],\n      \"id\": \"repository-premises\",\n      \"status\": \"covered\",\n      \"summary\": \"Verified the contract and inspected function history; no project agent instructions were found.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The return expression reverses the named operands.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"transformations\",\n      \"status\": \"finding\",\n      \"summary\": \"The arithmetic transformation violates the function contract.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1\",\"rationale\":\"The public signature retains its numerator and denominator argument roles.\"}],\n      \"finding_ids\": [],\n      \"id\": \"consumers\",\n      \"status\": \"covered\",\n      \"summary\": \"Repository inspection found no callers or separate production counterpart.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"Zero denominator must raise ZeroDivisionError.\"},{\"anchor\":\"repository/divide.py:2\",\"rationale\":\"Division now uses numerator as divisor, changing which zero argument raises.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"failure-recovery\",\n      \"status\": \"finding\",\n      \"summary\": \"The same reversal breaks documented failure behavior.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The documented contract supplies acceptance criteria for arithmetic and zero handling.\"}],\n      \"finding_ids\": [],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"covered\",\n      \"summary\": \"No tests exist in the inspected repository. Acceptance was assessed by inspection; nothing was executed.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The sole documentation explicitly describes the required division behavior.\"}],\n      \"finding_ids\": [],\n      \"id\": \"docs-operations\",\n      \"status\": \"covered\",\n      \"summary\": \"Documentation provides a clear contract; no operational configuration is involved.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"Documentation requires numerator divided by denominator.\"},{\"anchor\":\"repository/divide.py:2\",\"rationale\":\"Implementation computes the opposite quotient.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"consistency\",\n      \"status\": \"finding\",\n      \"summary\": \"Implementation contradicts the documented contract.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The defect and repair are confined to a single arithmetic expression.\"}],\n      \"finding_ids\": [],\n      \"id\": \"proportionality\",\n      \"status\": \"covered\",\n      \"summary\": \"A direct correctness fix is sufficient; no additional abstraction or hardening is warranted.\"\n    }\n  ],\n  \"findings\": [\n    {\n      \"evidence\": [\n        {\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"Reversing operands makes divide(6, 3) return 0.5 instead of 2, makes divide(0, 3) raise, and makes divide(3, 0) return 0 instead of raising.\"},\n        {\"anchor\":\"repository/README.md:1\",\"rationale\":\"The contract explicitly requires numerator divided by denominator and ZeroDivisionError for zero denominator.\"}\n      ],\n      \"id\": \"F1\",\n      \"remedy\": \"Restore `return numerator / denominator`, preserving the documented contract. Add regression coverage for an asymmetric quotient, zero numerator, and zero denominator.\",\n      \"severity\": \"MAJOR\",\n      \"summary\": \"Operand reversal breaks",
+              "sequence": 2,
+              "returncode": 0,
+              "raw_sha256": "6150c07a6ce33b034aabf593a83a70b0fc330c7e6d46f605aa484e68927f0fca",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f732-9c10-7512-9eee-9606a806398d\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I\u2019ll check the repository\u2019s contracts, callers, and history to assess the operand reversal.\\n\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files --hidden -g '\\\"'!.git'\\\"'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files --hidden -g '\\\"'!.git'\\\"'\\\"\",\"aggregated_output\":\"/tmp/paranoia-wt-iggk1nn3/tree\\nREADME.md\\ndivide.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- divide.py'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- divide.py'\",\"aggregated_output\":\"commit b934f67d2acc2df0743f27a20ba66900f580f9e4\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    inverted operands\\n\\ndiff --git a/divide.py b/divide.py\\nindex c50d4f0..82a6239 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return numerator / denominator\\n+    return denominator / numerator\\n\\ncommit 93fae4f95fc7d9f72e1ce290374bc9c27349715c\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    baseline\\n\\ndiff --git a/divide.py b/divide.py\\nnew file mode 100644\\nindex 0000000..c50d4f0\\n--- /dev/null\\n+++ b/divide.py\\n@@ -0,0 +1,2 @@\\n+def divide(numerator, denominator):\\n+    return numerator / denominator\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; rg -n --hidden -g '\\\"'!.git'\\\"' -g '\\\"'!divide.py'\\\"' 'divide|numerator|denominator' .; for p in /AGENTS.md /CLAUDE.md /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\\\\\"\\\"'$p\\\" ]; then cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; rg -n --hidden -g '\\\"'!.git'\\\"' -g '\\\"'!divide.py'\\\"' 'divide|numerator|denominator' .; for p in /AGENTS.md /CLAUDE.md /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\\\\\"\\\"'$p\\\" ]; then cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"     1\\tContract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n./README.md:1:Contract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_4\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"class_assessments\\\": [],\\n  \\\"coverage\\\": [\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\":\\\"repository/divide.py:1-2\\\",\\\"rationale\\\":\\\"The complete touched file and supplied diff were reviewed.\\\"}],\\n      \\\"finding_ids\\\": [],\\n      \\\"id\\\": \\\"artifact-complete\\\",\\n      \\\"status\\\": \\\"covered\\\",\\n      \\\"summary\\\": \\\"Reviewed the entire change and both repository files.\\\"\\n    },\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\":\\\"repository/README.md:1\\\",\\\"rationale\\\":\\\"The explicit contract establishes operand order and zero-denominator behavior; inspected history confirms the previous implementation followed it.\\\"}],\\n      \\\"finding_ids\\\": [],\\n      \\\"id\\\": \\\"repository-premises\\\",\\n      \\\"status\\\": \\\"covered\\\",\\n      \\\"summary\\\": \\\"Verified the contract and inspected function history; no project agent instructions were ",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 1800,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            },
+            {
+              "role": "census-integrity",
+              "engine": "codex",
+              "session_ref": "01a0f732-9c1b-7680-9517-4a1daaf68f88",
+              "outcome": "completed",
+              "duration_ms": 45265,
+              "usage": {
+                "input_tokens": 54231,
+                "cached_input_tokens": 35456,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1201,
+                "reasoning_output_tokens": 0
+              },
+              "response_sha256": "6ce2e487e324a21913bbfae5e55b5f503be3cbf9e307a4675b06705b66cf306a",
+              "response_excerpt": "{\n  \"class_assessments\": [],\n  \"coverage\": [\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The complete supplied file and its one-line change were reviewed.\"}],\n      \"finding_ids\": [],\n      \"id\": \"artifact-complete\",\n      \"status\": \"covered\",\n      \"summary\": \"The supplied artifact covers the entire change.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The explicit contract requires numerator divided by denominator and an exception for a zero denominator.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"repository-premises\",\n      \"status\": \"finding\",\n      \"summary\": \"The operand swap violates the repository's explicit contract; history confirms the original ordering.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:2\",\"rationale\":\"The return expression reverses the dividend and divisor.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"transformations\",\n      \"status\": \"finding\",\n      \"summary\": \"Ordinary unequal inputs produce the reciprocal of the required result.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The public function retains parameter names that specify the original operand roles.\"}],\n      \"finding_ids\": [],\n      \"id\": \"consumers\",\n      \"status\": \"covered\",\n      \"summary\": \"Repository inspection found no call sites or separate production counterpart.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"Zero denominator must raise ZeroDivisionError.\"},{\"anchor\":\"repository/divide.py:2\",\"rationale\":\"Division now raises for a zero numerator instead; a nonzero numerator with zero denominator returns zero.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"failure-recovery\",\n      \"status\": \"finding\",\n      \"summary\": \"The same operand reversal changes which zero input raises.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The documented contract provides the acceptance oracle for ordinary division and zero-denominator behavior.\"}],\n      \"finding_ids\": [],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"covered\",\n      \"summary\": \"No repository tests were found. Behavior was assessed by inspection; no tests or scripts were executed.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The documentation clearly states the intended arithmetic and exception behavior.\"}],\n      \"finding_ids\": [],\n      \"id\": \"docs-operations\",\n      \"status\": \"covered\",\n      \"summary\": \"The existing documentation supplies a clear, sufficient contract.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/README.md:1\",\"rationale\":\"Documentation specifies numerator divided by denominator.\"},{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The implementation contradicts both the documented ordering and its parameter names.\"}],\n      \"finding_ids\": [\"F1\"],\n      \"id\": \"consistency\",\n      \"status\": \"finding\",\n      \"summary\": \"Implementation and contract disagree.\"\n    },\n    {\n      \"evidence\": [{\"anchor\":\"repository/divide.py:2\",\"rationale\":\"Restoring operand order repairs the defect without introducing abstractions or defensive machinery.\"}],\n      \"finding_ids\": [],\n      \"id\": \"proportionality\",\n      \"status\": \"covered\",\n      \"summary\": \"The finding concerns the core arithmetic contract and requires a one-line repair.\"\n    }\n  ],\n  \"findings\": [\n    {\n      \"evidence\": [\n        {\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"The function computes denominator / numerator. By inspection, divide(6, 3) returns 0.5 instead of 2; divide(0, 3) raises instead of returning zero; divide(3, 0) returns zero instead of raising.\"},\n        {\"anchor\":\"repository/README.md:1\",\"rationale\":\"The repository explicitly requires numerator / denominator and ZeroDivisionError for a zero denominator.\"}\n      ],\n      \"id\": \"F1\",\n      \"remedy\": \"Restore return numerator / denominator, preserving the documented contract. Add focused regression cases fo",
+              "sequence": 3,
+              "returncode": 0,
+              "raw_sha256": "df05cc5398c283383675b9ed8b2cf6196fb6c6a772b0ecb7019b795bf2baadc4",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f732-9c1b-7680-9517-4a1daaf68f88\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I\u2019ll check the repository\u2019s contracts and history to assess the operand swap and its effect on callers.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files --hidden -g '\\\"'!.git'\\\"'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd && rg --files --hidden -g '\\\"'!.git'\\\"'\\\"\",\"aggregated_output\":\"/tmp/paranoia-wt-iggk1nn3/tree\\nREADME.md\\ndivide.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- divide.py'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git log -p --follow -- divide.py'\",\"aggregated_output\":\"commit b934f67d2acc2df0743f27a20ba66900f580f9e4\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    inverted operands\\n\\ndiff --git a/divide.py b/divide.py\\nindex c50d4f0..82a6239 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return numerator / denominator\\n+    return denominator / numerator\\n\\ncommit 93fae4f95fc7d9f72e1ce290374bc9c27349715c\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    baseline\\n\\ndiff --git a/divide.py b/divide.py\\nnew file mode 100644\\nindex 0000000..c50d4f0\\n--- /dev/null\\n+++ b/divide.py\\n@@ -0,0 +1,2 @@\\n+def divide(numerator, denominator):\\n+    return numerator / denominator\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md && rg -n --hidden -g '\\\"'!.git'\\\"' 'divide|numerator|denominator' . && for p in /AGENTS.md /CLAUDE.md /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\\\\\"\\\"'$p\\\" ]; then printf '\\\"'\\\\\\\\n%s\\\\\\\\n' \\\\\\\"\\\"'$p\\\"; cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md && rg -n --hidden -g '\\\"'!.git'\\\"' 'divide|numerator|denominator' . && for p in /AGENTS.md /CLAUDE.md /tmp/AGENTS.md /tmp/CLAUDE.md /tmp/paranoia-wt-iggk1nn3/AGENTS.md /tmp/paranoia-wt-iggk1nn3/CLAUDE.md; do if [ -f \\\\\\\"\\\"'$p\\\" ]; then printf '\\\"'\\\\\\\\n%s\\\\\\\\n' \\\\\\\"\\\"'$p\\\"; cat \\\"$p\\\"; fi; done'\",\"aggregated_output\":\"     1\\tContract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n./README.md:1:Contract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n./divide.py:1:def divide(numerator, denominator):\\n./divide.py:2:    return denominator / numerator\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_4\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"class_assessments\\\": [],\\n  \\\"coverage\\\": [\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\":\\\"repository/divide.py:1-2\\\",\\\"rationale\\\":\\\"The complete supplied file and its one-line change were reviewed.\\\"}],\\n      \\\"finding_ids\\\": [],\\n      \\\"id\\\": \\\"artifact-complete\\\",\\n      \\\"status\\\": \\\"covered\\\",\\n      \\\"summary\\\": \\\"The supplied artifact covers the entire change.\\\"\\n    },\\n    {\\n      \\\"evidence\\\": [{\\\"anchor\\\":\\\"repository/README.md:1\\\",\\\"rationale\\\":\\\"The explicit contract requires numerator divided by denominator and an exception for a zero denominator.\\\"}],\\n      \\\"finding_ids\\\": [\\\"F1\\\"],\\n      \\\"id\\\": \\\"repository-premises\\\",\\n      \\\"status\\\": \\\"fi",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 1800,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            },
+            {
+              "role": "consolidation",
+              "engine": "codex",
+              "session_ref": "01a0f733-5345-7440-bdce-49abfdbad3fb",
+              "outcome": "completed",
+              "duration_ms": 16542,
+              "usage": {
+                "input_tokens": 17196,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 369,
+                "reasoning_output_tokens": 72
+              },
+              "response_sha256": "d7029e7fec9fd8ad7986729c732bb4cbf81364b5054c0fcc5671655074df4dbe",
+              "response_excerpt": "{\n  \"class_actions\": {},\n  \"concession_challenges\": {},\n  \"debt_outcomes\": [],\n  \"governing_findings\": [\n    {\n      \"classification\": {\n        \"kind\": \"one_off\",\n        \"reason\": \"The validated findings concern one operand-order defect in the repository's single arithmetic function, with no broader recurring mechanism established.\"\n      },\n      \"evidence\": [\n        {\n          \"anchor\": \"repository/divide.py:1-2\",\n          \"rationale\": \"The function reverses the operands, producing the inverse quotient for unequal nonzero inputs and moving division-by-zero failure to the numerator.\"\n        },\n        {\n          \"anchor\": \"repository/README.md:1\",\n          \"rationale\": \"The documented contract requires numerator divided by denominator and supplies the expected zero-denominator behavior.\"\n        }\n      ],\n      \"id\": \"census:F1\",\n      \"remedy\": \"Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.\",\n      \"severity\": \"MAJOR\",\n      \"source_ids\": [\n        \"behaviour:B1\",\n        \"execution:F1\",\n        \"integrity:F1\"\n      ],\n      \"summary\": \"Reversed operands break quotient correctness and the zero-denominator contract.\"\n    }\n  ],\n  \"role\": \"census\"\n}",
+              "sequence": 4,
+              "returncode": 0,
+              "raw_sha256": "b76f77eeead89a694506ef63fd42f20a00812c4b8b94107cd948aa9ae9ca3469",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f733-5345-7440-bdce-49abfdbad3fb\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"class_actions\\\": {},\\n  \\\"concession_challenges\\\": {},\\n  \\\"debt_outcomes\\\": [],\\n  \\\"governing_findings\\\": [\\n    {\\n      \\\"classification\\\": {\\n        \\\"kind\\\": \\\"one_off\\\",\\n        \\\"reason\\\": \\\"The validated findings concern one operand-order defect in the repository's single arithmetic function, with no broader recurring mechanism established.\\\"\\n      },\\n      \\\"evidence\\\": [\\n        {\\n          \\\"anchor\\\": \\\"repository/divide.py:1-2\\\",\\n          \\\"rationale\\\": \\\"The function reverses the operands, producing the inverse quotient for unequal nonzero inputs and moving division-by-zero failure to the numerator.\\\"\\n        },\\n        {\\n          \\\"anchor\\\": \\\"repository/README.md:1\\\",\\n          \\\"rationale\\\": \\\"The documented contract requires numerator divided by denominator and supplies the expected zero-denominator behavior.\\\"\\n        }\\n      ],\\n      \\\"id\\\": \\\"census:F1\\\",\\n      \\\"remedy\\\": \\\"Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.\\\",\\n      \\\"severity\\\": \\\"MAJOR\\\",\\n      \\\"source_ids\\\": [\\n        \\\"behaviour:B1\\\",\\n        \\\"execution:F1\\\",\\n        \\\"integrity:F1\\\"\\n      ],\\n      \\\"summary\\\": \\\"Reversed operands break quotient correctness and the zero-denominator contract.\\\"\\n    }\\n  ],\\n  \\\"role\\\": \\\"census\\\"\\n}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":17196,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":369,\"reasoning_output_tokens\":72}}\n",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 1200,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            }
+          ],
+          "rendered_trailer": "REVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=census tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 1)\nCLASS-REGISTER: staged census parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: correction\nSTRUCTURAL-DEBT: 1 blocking open\nCONVERGENCE: BLOCKED \u2014 staged structural debt remains open.\nSTAGED-ATTEMPTS: total=4 validation-retries=0 validation-invalid=0 execution-failed=0",
+          "correction_gates": [],
+          "rejected_payloads": [],
+          "staged_manifests": [
+            {
+              "class_assessments": [],
+              "coverage": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "artifact-complete",
+                  "status": "covered",
+                  "summary": "The entire change and repository were inspected."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "repository-premises",
+                  "status": "covered",
+                  "summary": "The documented contract and baseline agree; no project agent instructions were found."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "behaviour:B1"
+                  ],
+                  "id": "transformations",
+                  "status": "finding",
+                  "summary": "The transformation computes the inverse quotient."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "consumers",
+                  "status": "covered",
+                  "summary": "The callable interface is preserved, but there are no in-repository consumers to inspect."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "behaviour:B1"
+                  ],
+                  "id": "failure-recovery",
+                  "status": "finding",
+                  "summary": "Operand reversal also moves the division-by-zero failure to the wrong argument."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "tests-acceptance",
+                  "status": "covered",
+                  "summary": "No tests exist in the repository. Examples were evaluated by inspection; nothing was executed."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "docs-operations",
+                  "status": "covered",
+                  "summary": "The existing documentation provides a clear and sufficient contract."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1",
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "behaviour:B1"
+                  ],
+                  "id": "consistency",
+                  "status": "finding",
+                  "summary": "Implementation contradicts the documented contract."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "proportionality",
+                  "status": "covered",
+                  "summary": "A one-line correction and focused regression cases are proportionate."
+                }
+              ],
+              "findings": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2",
+                    "repository/README.md:1"
+                  ],
+                  "id": "behaviour:B1",
+                  "remedy": "Restore return numerator / denominator, preserving the README contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.",
+                  "severity": "MAJOR",
+                  "summary": "Operand reversal breaks both the quotient and zero-denominator contract."
+                }
+              ],
+              "lane": "behaviour"
+            },
+            {
+              "class_assessments": [],
+              "coverage": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "artifact-complete",
+                  "status": "covered",
+                  "summary": "Reviewed the entire change and both repository files."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "repository-premises",
+                  "status": "covered",
+                  "summary": "Verified the contract and inspected function history; no project agent instructions were found."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [
+                    "execution:F1"
+                  ],
+                  "id": "transformations",
+                  "status": "finding",
+                  "summary": "The arithmetic transformation violates the function contract."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "consumers",
+                  "status": "covered",
+                  "summary": "Repository inspection found no callers or separate production counterpart."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1",
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "execution:F1"
+                  ],
+                  "id": "failure-recovery",
+                  "status": "finding",
+                  "summary": "The same reversal breaks documented failure behavior."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "tests-acceptance",
+                  "status": "covered",
+                  "summary": "No tests exist in the inspected repository. Acceptance was assessed by inspection; nothing was executed."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "docs-operations",
+                  "status": "covered",
+                  "summary": "Documentation provides a clear contract; no operational configuration is involved."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1",
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "execution:F1"
+                  ],
+                  "id": "consistency",
+                  "status": "finding",
+                  "summary": "Implementation contradicts the documented contract."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "proportionality",
+                  "status": "covered",
+                  "summary": "A direct correctness fix is sufficient; no additional abstraction or hardening is warranted."
+                }
+              ],
+              "findings": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2",
+                    "repository/README.md:1"
+                  ],
+                  "id": "execution:F1",
+                  "remedy": "Restore `return numerator / denominator`, preserving the documented contract. Add regression coverage for an asymmetric quotient, zero numerator, and zero denominator.",
+                  "severity": "MAJOR",
+                  "summary": "Operand reversal breaks both quotient correctness and zero-denominator behavior."
+                }
+              ],
+              "lane": "execution"
+            },
+            {
+              "class_assessments": [],
+              "coverage": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "artifact-complete",
+                  "status": "covered",
+                  "summary": "The supplied artifact covers the entire change."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [
+                    "integrity:F1"
+                  ],
+                  "id": "repository-premises",
+                  "status": "finding",
+                  "summary": "The operand swap violates the repository's explicit contract; history confirms the original ordering."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "integrity:F1"
+                  ],
+                  "id": "transformations",
+                  "status": "finding",
+                  "summary": "Ordinary unequal inputs produce the reciprocal of the required result."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [],
+                  "id": "consumers",
+                  "status": "covered",
+                  "summary": "Repository inspection found no call sites or separate production counterpart."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1",
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [
+                    "integrity:F1"
+                  ],
+                  "id": "failure-recovery",
+                  "status": "finding",
+                  "summary": "The same operand reversal changes which zero input raises."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "tests-acceptance",
+                  "status": "covered",
+                  "summary": "No repository tests were found. Behavior was assessed by inspection; no tests or scripts were executed."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1"
+                  ],
+                  "finding_ids": [],
+                  "id": "docs-operations",
+                  "status": "covered",
+                  "summary": "The existing documentation supplies a clear, sufficient contract."
+                },
+                {
+                  "evidence": [
+                    "repository/README.md:1",
+                    "repository/divide.py:1-2"
+                  ],
+                  "finding_ids": [
+                    "integrity:F1"
+                  ],
+                  "id": "consistency",
+                  "status": "finding",
+                  "summary": "Implementation and contract disagree."
+                },
+                {
+                  "evidence": [
+                    "repository/divide.py:2"
+                  ],
+                  "finding_ids": [],
+                  "id": "proportionality",
+                  "status": "covered",
+                  "summary": "The finding concerns the core arithmetic contract and requires a one-line repair."
+                }
+              ],
+              "findings": [
+                {
+                  "evidence": [
+                    "repository/divide.py:1-2",
+                    "repository/README.md:1"
+                  ],
+                  "id": "integrity:F1",
+                  "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, a zero numerator, and a zero denominator.",
+                  "severity": "MAJOR",
+                  "summary": "Reversed operands break the division result and zero-denominator contract."
+                }
+              ],
+              "lane": "integrity"
+            }
+          ],
+          "staged_settlement": {
+            "role": "census",
+            "source_dispositions": [
+              {
+                "source_id": "behaviour:B1",
+                "governing_id": "census:F1"
+              },
+              {
+                "source_id": "execution:F1",
+                "governing_id": "census:F1"
+              },
+              {
+                "source_id": "integrity:F1",
+                "governing_id": "census:F1"
+              }
+            ],
+            "assessment_dispositions": [],
+            "findings": [
+              {
+                "id": "census:F1",
+                "severity": "MAJOR",
+                "summary": "Reversed operands break quotient correctness and the zero-denominator contract.",
+                "evidence": [
+                  "repository/divide.py:1-2",
+                  "repository/README.md:1"
+                ],
+                "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator."
+              }
+            ],
+            "debt": [
+              {
+                "id": "D1",
+                "finding_id": "census:F1",
+                "status": "open",
+                "severity": "MAJOR",
+                "summary": "Reversed operands break quotient correctness and the zero-denominator contract.",
+                "evidence": [
+                  "repository/divide.py:1-2",
+                  "repository/README.md:1"
+                ],
+                "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator."
+              }
+            ],
+            "debt_updates": [],
+            "class_dispositions": [
+              {
+                "finding_id": "census:F1",
+                "kind": "one_off",
+                "reason": "The validated findings concern one operand-order defect in the repository's single arithmetic function, with no broader recurring mechanism established."
+              }
+            ],
+            "class_records": [],
+            "class_assessments": [],
+            "_finding_class_refs": {
+              "census:F1": null
+            },
+            "_class_record_pointers": [],
+            "concession_challenges": []
+          },
+          "review_routing": {
+            "release": "tiered-review-beta-1",
+            "policy": "strongest",
+            "policy_source": "argument",
+            "custom_override": false,
+            "phase": "census",
+            "tier": "strongest",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "model_source": "policy/strongest",
+            "effort_source": "release-default"
+          },
+          "proposal_disposition": null
+        },
+        "20261001T122241-critique_branch_patch_proposal-9f0686d4.json": {
+          "timestamp": "20261001T122241",
+          "tool": "critique_branch_patch_proposal",
+          "engine": "codex",
+          "session_ref": "01a0f732-9c10-7021-b92e-eeb0d5ac7cd6",
+          "returncode": 0,
+          "error": false,
+          "text": "Restore the documented division order and zero-denominator behavior. README.md already states the correct contract and requires no change.",
+          "review_audit": "/tmp/paranoia-issue138-integrated/logs-1/20261001T122227-critique_branch-d68a8cdc.json",
+          "reviewed_snapshot": "b934f67d2acc2df0743f27a20ba66900f580f9e4",
+          "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "contract_digest": null,
+          "target_ids": [
+            "structural:D1"
+          ],
+          "author_session_ref": "01a0f732-9c10-7021-b92e-eeb0d5ac7cd6",
+          "proposal_session_ref": "01a0f732-9c10-7021-b92e-eeb0d5ac7cd6",
+          "proposal_attempt_ledger": [
+            {
+              "role": "patch-proposal",
+              "engine": "codex",
+              "session_ref": "01a0f732-9c10-7021-b92e-eeb0d5ac7cd6",
+              "outcome": "completed",
+              "duration_ms": 13615,
+              "usage": {
+                "input_tokens": 70621,
+                "cached_input_tokens": 35328,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1496,
+                "reasoning_output_tokens": 33
+              },
+              "response_sha256": "dab4aed4559790d73e6478e3678a014aee34c009a6d6164557b1de0cac144b95",
+              "response_excerpt": "{\n  \"addressed_finding_ids\": [\"structural:D1\"],\n  \"edits\": [\n    {\n      \"new_text\": \"def divide(numerator, denominator):\\n    return numerator / denominator\\n\",\n      \"old_text\": \"def divide(numerator, denominator):\\n    return denominator / numerator\\n\",\n      \"operation\": \"replace\",\n      \"path\": \"divide.py\",\n      \"target\": \"repository\"\n    }\n  ],\n  \"limitations\": [\n    \"Candidate based on the supplied pinned source; no files modified or tests executed.\"\n  ],\n  \"schema_version\": 1,\n  \"status\": \"proposed\",\n  \"suggested_tests\": [\n    \"Verify divide(6, 3) returns 2.\",\n    \"Verify divide(0, 3) returns 0.\",\n    \"Verify divide(3, 0) raises ZeroDivisionError.\"\n  ],\n  \"summary\": \"Restore the documented division order and zero-denominator behavior. README.md already states the correct contract and requires no change.\",\n  \"unaddressed\": []\n}",
+              "sequence": 1,
+              "returncode": 0,
+              "raw_sha256": "10b9d7d53fc0b45314124fa16ee721b3ca187027d7c49386c1a0505abd77942e",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f732-9c10-7021-b92e-eeb0d5ac7cd6\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"{\\n  \\\"addressed_finding_ids\\\": [\\\"structural:D1\\\"],\\n  \\\"edits\\\": [\\n    {\\n      \\\"new_text\\\": \\\"def divide(numerator, denominator):\\\\n    return numerator / denominator\\\\n\\\",\\n      \\\"old_text\\\": \\\"def divide(numerator, denominator):\\\\n    return denominator / numerator\\\\n\\\",\\n      \\\"operation\\\": \\\"replace\\\",\\n      \\\"path\\\": \\\"divide.py\\\",\\n      \\\"target\\\": \\\"repository\\\"\\n    }\\n  ],\\n  \\\"limitations\\\": [\\n    \\\"Candidate based on the supplied pinned source; no files modified or tests executed.\\\"\\n  ],\\n  \\\"schema_version\\\": 1,\\n  \\\"status\\\": \\\"proposed\\\",\\n  \\\"suggested_tests\\\": [\\n    \\\"Verify divide(6, 3) returns 2.\\\",\\n    \\\"Verify divide(0, 3) returns 0.\\\",\\n    \\\"Verify divide(3, 0) raises ZeroDivisionError.\\\"\\n  ],\\n  \\\"summary\\\": \\\"Restore the documented division order and zero-denominator behavior. README.md already states the correct contract and requires no change.\\\",\\n  \\\"unaddressed\\\": []\\n}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":70621,\"cached_input_tokens\":35328,\"cache_write_input_tokens\":0,\"output_tokens\":1496,\"reasoning_output_tokens\":33}}\n",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 900,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            }
+          ],
+          "rejected_payloads": [],
+          "proposal_duration_ms": 13617,
+          "patch": "diff --git a/divide.py b/divide.py\n--- a/divide.py\n+++ b/divide.py\n@@ -1,2 +1,2 @@\n def divide(numerator, denominator):\n-    return denominator / numerator\n+    return numerator / denominator\n",
+          "patch_sha256": "45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559",
+          "patch_bytes": 192,
+          "application_suitability": "CURRENT",
+          "patch_applied": false,
+          "tests_executed": false
+        }
+      },
+      "durable_lineage": {
+        "mode": "branch",
+        "rounds": 1,
+        "next_seq": 1,
+        "classes": [],
+        "exemptions": [],
+        "debt": null,
+        "claim_state": {},
+        "claim_reverify_required": false,
+        "review_state": {
+          "version": 1,
+          "stakes_digest": "7e03c44bf4d44194f274d97413f5048670b7ac14a1b013f0084dddaa1f498a20",
+          "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+          "phase": "correction",
+          "snapshot_digest": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "debt": [
+            {
+              "id": "D1",
+              "finding_id": "census:F1",
+              "status": "open",
+              "severity": "MAJOR",
+              "summary": "Reversed operands break quotient correctness and the zero-denominator contract.",
+              "evidence": [
+                "repository/divide.py:1-2",
+                "repository/README.md:1"
+              ],
+              "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.",
+              "source_ids": [
+                "behaviour:B1",
+                "execution:F1",
+                "integrity:F1"
+              ],
+              "class_ids": [],
+              "first_round": 1,
+              "last_round": 1
+            }
+          ],
+          "correction_control": {
+            "version": 1,
+            "classes": {}
+          },
+          "last_round": 1
+        },
+        "proposal_receipt": {
+          "version": 1,
+          "round": 1,
+          "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "patch_sha256": "45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559",
+          "audit": "20261001T122241-critique_branch_patch_proposal-9f0686d4.json",
+          "target_ids": [
+            "structural:D1"
+          ]
+        }
+      }
+    },
+    {
+      "round": 2,
+      "arguments": {
+        "repo_path": "/tmp/paranoia-issue138-integrated/repo",
+        "base_ref": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+        "head_ref": "HEAD",
+        "lineage": "issue138-live-branch",
+        "round": 2,
+        "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+        "web_search": false,
+        "review_model_policy": "strongest",
+        "propose_patch": false,
+        "prior_proposal_disposition": {
+          "proposal_audit": "20261001T122241-critique_branch_patch_proposal-9f0686d4.json",
+          "status": "applied",
+          "departed_targets": {}
+        }
+      },
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local \u00b7 engine=codex \u00b7 session_ref=`01a0f733-c95b-7242-8662-4198383f7aff` \u2014 to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nREVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=correction tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED \u2014 cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0\nPROPOSAL-DISPOSITION: applied {\"departed_targets\":{},\"receipt\":{\"audit\":\"20261001T122241-critique_branch_patch_proposal-9f0686d4.json\",\"patch_sha256\":\"45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559\",\"round\":1,\"structural_snapshot\":\"7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de\",\"target_ids\":[\"structural:D1\"],\"version\":1},\"status\":\"applied\"}",
+      "audits": {
+        "20261001T122308-critique_branch-f9b8e512.json": {
+          "timestamp": "20261001T122308",
+          "tool": "critique_branch",
+          "engine": "codex",
+          "session_ref": "01a0f733-c95b-7242-8662-4198383f7aff",
+          "returncode": 0,
+          "error": false,
+          "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+          "target": "committed diff 93fae4f95fc7d9f72e1ce290374bc9c27349715c...HEAD in repo",
+          "model": "gpt-6-astra",
+          "mode": "converge-packet",
+          "round": 2,
+          "already_raised": [],
+          "usage": {
+            "input_tokens": 75909,
+            "cached_input_tokens": 55808,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 468,
+            "reasoning_output_tokens": 41
+          },
+          "duration_ms": 27836,
+          "base_id": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+          "head_id": "420ceb1d60df602d683f64fd052d3d0ac4102d16",
+          "structural_snapshot": "2970b93abb1eb00d2dd9445f8f4280174e7abd569b96f770a5e15786d228ffa0",
+          "plan_digest": null,
+          "plan_digest_assertion": null,
+          "plan_path": null,
+          "plan_text": null,
+          "plan_contract_reused": false,
+          "lineage": "issue138-live-branch",
+          "retry_register": null,
+          "attempt_ledger": [
+            {
+              "role": "correction",
+              "engine": "codex",
+              "session_ref": "01a0f733-c95b-7242-8662-4198383f7aff",
+              "outcome": "completed",
+              "duration_ms": 27836,
+              "usage": {
+                "input_tokens": 75909,
+                "cached_input_tokens": 55808,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 468,
+                "reasoning_output_tokens": 41
+              },
+              "response_sha256": "b9290f3f90c71a6ca20023c013fdaf7a3f6e918e18a0425db9cd8ff8e3485106",
+              "response_excerpt": "{\"class_actions\":{},\"class_outcomes\":{},\"concession_challenges\":{},\"debt_outcomes\":[{\"debt_id\":\"D1\",\"evidence\":[{\"anchor\":\"repository/divide.py:1-2\",\"rationale\":\"Operand order is restored: unequal nonzero operands produce numerator divided by denominator, a zero numerator with nonzero denominator produces zero, and a zero denominator raises ZeroDivisionError. Verified by code inspection; no tests were added or executed.\"},{\"anchor\":\"repository/README.md:1\",\"rationale\":\"The documented quotient and zero-denominator contracts agree with the restored implementation. Repository inspection found no other callers or implementations requiring repair.\"}],\"status\":\"closed\"}],\"governing_findings\":[],\"role\":\"correction\"}",
+              "sequence": 1,
+              "returncode": 0,
+              "raw_sha256": "3e0e639cfe8fb06aa3c96766e8d79c92174915b7ef77892e93ec1338a038d816",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f733-c95b-7242-8662-4198383f7aff\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I\u2019ll inspect the current division implementation, its documented contract, and regression coverage to assess whether D1 is resolved.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g '*.py' -g 'README*'; git status --short; git log -5 --oneline\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g '\\\"'! .git'\\\"' -g 'AGENTS.md' -g 'CLAUDE.md' -g '*.py' -g 'README*'; git status --short; git log -5 --oneline\\\"\",\"aggregated_output\":\"/tmp/paranoia-wt-5f2asi86/tree\\nREADME.md\\ndivide.py\\n420ceb1 apply inspected diff\\nb934f67 inverted operands\\n93fae4f baseline\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"ls -la; cat -n divide.py README.md; git log -p --follow -- divide.py; rg -n 'divide|numerator|denominator|quotient|ZeroDivision' .; find .. -name AGENTS.md -o -name CLAUDE.md\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"ls -la; cat -n divide.py README.md; git log -p --follow -- divide.py; rg -n 'divide|numerator|denominator|quotient|ZeroDivision' .; find .. -name AGENTS.md -o -name CLAUDE.md\\\"\",\"aggregated_output\":\"total 20\\ndrwxr-xr-x 2 andy andy 4096 Oct  1 12:22 .\\ndrwx------ 3 andy andy 4096 Oct  1 12:22 ..\\n-rw-r--r-- 1 andy andy   67 Oct  1 12:22 .git\\n-rw-r--r-- 1 andy andy  126 Oct  1 12:22 README.md\\n-rw-r--r-- 1 andy andy   71 Oct  1 12:22 divide.py\\n     1\\tdef divide(numerator, denominator):\\n     2\\t    return numerator / denominator\\n     3\\tContract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\ncommit 420ceb1d60df602d683f64fd052d3d0ac4102d16\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:22:41 2026 +0100\\n\\n    apply inspected diff\\n\\ndiff --git a/divide.py b/divide.py\\nindex 82a6239..c50d4f0 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return denominator / numerator\\n+    return numerator / denominator\\n\\ncommit b934f67d2acc2df0743f27a20ba66900f580f9e4\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    inverted operands\\n\\ndiff --git a/divide.py b/divide.py\\nindex c50d4f0..82a6239 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return numerator / denominator\\n+    return denominator / numerator\\n\\ncommit 93fae4f95fc7d9f72e1ce290374bc9c27349715c\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    baseline\\n\\ndiff --git a/divide.py b/divide.py\\nnew file mode 100644\\nindex 0000000..c50d4f0\\n--- /dev/null\\n+++ b/divide.py\\n@@ -0,0 +1,2 @@\\n+def divide(numerator, denominator):\\n+    return numerator / denominator\\n./README.md:1:Contract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n./divide.py:1:def divide(numerator, denominator):\\n./divide.py:2:    return numerator / denominator\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'for p in /AGENTS.md /CLAUDE.md /tmp/AGENTS.md /tmp/CLAUDE.md; do if [ -f \\\"$p\\\" ]; then cat \\\"$p\\\"; fi; done; git ls-files'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'for p in /AGENTS.",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 2400,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            }
+          ],
+          "rendered_trailer": "REVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=correction tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 2)\nCLASS-REGISTER: staged correction parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: final\nSTRUCTURAL-DEBT: 0 blocking open\nFINAL-REGRESSION: required engine=codex\nCONVERGENCE: BLOCKED \u2014 cold final regression is required.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0\nPROPOSAL-DISPOSITION: applied {\"departed_targets\":{},\"receipt\":{\"audit\":\"20261001T122241-critique_branch_patch_proposal-9f0686d4.json\",\"patch_sha256\":\"45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559\",\"round\":1,\"structural_snapshot\":\"7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de\",\"target_ids\":[\"structural:D1\"],\"version\":1},\"status\":\"applied\"}",
+          "correction_gates": [],
+          "rejected_payloads": [],
+          "staged_manifests": null,
+          "staged_settlement": {
+            "role": "correction",
+            "source_dispositions": [],
+            "assessment_dispositions": [],
+            "findings": [],
+            "debt": [],
+            "debt_updates": [
+              {
+                "id": "D1",
+                "evidence": [
+                  "repository/divide.py:1-2",
+                  "repository/README.md:1"
+                ],
+                "status": "closed"
+              }
+            ],
+            "class_dispositions": [],
+            "class_records": [],
+            "class_assessments": [],
+            "_finding_class_refs": {},
+            "_class_record_pointers": [],
+            "concession_challenges": []
+          },
+          "review_routing": {
+            "release": "tiered-review-beta-1",
+            "policy": "strongest",
+            "policy_source": "argument",
+            "custom_override": false,
+            "phase": "correction",
+            "tier": "strongest",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "model_source": "policy/strongest",
+            "effort_source": "release-default"
+          },
+          "proposal_disposition": {
+            "receipt": {
+              "version": 1,
+              "round": 1,
+              "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+              "patch_sha256": "45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559",
+              "audit": "20261001T122241-critique_branch_patch_proposal-9f0686d4.json",
+              "target_ids": [
+                "structural:D1"
+              ]
+            },
+            "status": "applied",
+            "departed_targets": {}
+          }
+        }
+      },
+      "durable_lineage": {
+        "mode": "branch",
+        "rounds": 2,
+        "next_seq": 1,
+        "classes": [],
+        "exemptions": [],
+        "debt": null,
+        "claim_state": {},
+        "claim_reverify_required": false,
+        "review_state": {
+          "version": 1,
+          "stakes_digest": "7e03c44bf4d44194f274d97413f5048670b7ac14a1b013f0084dddaa1f498a20",
+          "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+          "phase": "final",
+          "snapshot_digest": "2970b93abb1eb00d2dd9445f8f4280174e7abd569b96f770a5e15786d228ffa0",
+          "debt": [
+            {
+              "id": "D1",
+              "finding_id": "census:F1",
+              "status": "closed",
+              "severity": "MAJOR",
+              "summary": "Reversed operands break quotient correctness and the zero-denominator contract.",
+              "evidence": [
+                "repository/divide.py:1-2",
+                "repository/README.md:1"
+              ],
+              "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.",
+              "source_ids": [
+                "behaviour:B1",
+                "execution:F1",
+                "integrity:F1"
+              ],
+              "class_ids": [],
+              "first_round": 1,
+              "last_round": 2
+            }
+          ],
+          "correction_control": {
+            "version": 1,
+            "classes": {}
+          },
+          "last_round": 2,
+          "final_engine": "codex"
+        },
+        "proposal_receipt": {
+          "version": 1,
+          "round": 1,
+          "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "patch_sha256": "45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559",
+          "audit": "20261001T122241-critique_branch_patch_proposal-9f0686d4.json",
+          "target_ids": [
+            "structural:D1"
+          ]
+        }
+      }
+    },
+    {
+      "round": 3,
+      "arguments": {
+        "repo_path": "/tmp/paranoia-issue138-integrated/repo",
+        "base_ref": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+        "head_ref": "HEAD",
+        "lineage": "issue138-live-branch",
+        "round": 3,
+        "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+        "web_search": false,
+        "review_model_policy": "strongest",
+        "propose_patch": false
+      },
+      "result": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.\n\n---\n_paranoia-local \u00b7 engine=codex \u00b7 session_ref=`01a0f734-3633-7b72-b98d-979e3c6c1787` \u2014 to dispute a finding, call `rebut` with this session_ref and your counter-evidence._\n\nREVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=final tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 3)\nCLASS-REGISTER: staged final parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: clear\nSTRUCTURAL-DEBT: 0 blocking open\nBETA-ACCEPTANCE: qualified engine=codex model=gpt-6-astra effort=medium policy=strongest\nCONVERGENCE: NOT-BLOCKED \u2014 staged structural debt is clear.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+      "audits": {
+        "20261001T122400-critique_branch-f0cd8493.json": {
+          "timestamp": "20261001T122400",
+          "tool": "critique_branch",
+          "engine": "codex",
+          "session_ref": "01a0f734-3633-7b72-b98d-979e3c6c1787",
+          "returncode": 0,
+          "error": false,
+          "text": "## What works\n\nNothing notable.\n\n## What doesn't work\n\nNothing notable.\n\n## Risks\n\nNothing notable.\n\n## Gaps\n\nNothing notable.\n\n## Improvements\n\nNothing notable.",
+          "target": "committed diff 93fae4f95fc7d9f72e1ce290374bc9c27349715c...HEAD in repo",
+          "model": "gpt-6-astra",
+          "mode": "converge-packet",
+          "round": 3,
+          "already_raised": [],
+          "usage": {
+            "input_tokens": 91883,
+            "cached_input_tokens": 64000,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 1261,
+            "reasoning_output_tokens": 10
+          },
+          "duration_ms": 51298,
+          "base_id": "93fae4f95fc7d9f72e1ce290374bc9c27349715c",
+          "head_id": "420ceb1d60df602d683f64fd052d3d0ac4102d16",
+          "structural_snapshot": "2970b93abb1eb00d2dd9445f8f4280174e7abd569b96f770a5e15786d228ffa0",
+          "plan_digest": null,
+          "plan_digest_assertion": null,
+          "plan_path": null,
+          "plan_text": null,
+          "plan_contract_reused": false,
+          "lineage": "issue138-live-branch",
+          "retry_register": null,
+          "attempt_ledger": [
+            {
+              "role": "final",
+              "engine": "codex",
+              "session_ref": "01a0f734-3633-7b72-b98d-979e3c6c1787",
+              "outcome": "completed",
+              "duration_ms": 51298,
+              "usage": {
+                "input_tokens": 91883,
+                "cached_input_tokens": 64000,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 1261,
+                "reasoning_output_tokens": 10
+              },
+              "response_sha256": "bb99386d95391e8ff575862fb7166f4f3e368be786e5ca78ceb667e1c13e0c97",
+              "response_excerpt": "{\n  \"class_actions\": {},\n  \"class_outcomes\": {},\n  \"concession_challenges\": {},\n  \"coverage\": [\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"Read the complete implementation and its history; the final snapshot restores the baseline operand order.\"},\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Read the complete documented contract. These are the repository's only tracked files.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"artifact-complete\",\n      \"status\": \"covered\",\n      \"summary\": \"Reviewed the complete artifact. The specified endpoint diff is empty and the working tree is clean.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"Implementation directly performs the documented arithmetic without configuration or external dependencies.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"repository-premises\",\n      \"status\": \"covered\",\n      \"summary\": \"No repository agent instructions, hidden runtime configuration, or additional implementation were found.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:2\", \"rationale\": \"Numerator is the dividend and denominator is the divisor; neither is transformed or inverted.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"transformations\",\n      \"status\": \"covered\",\n      \"summary\": \"Operand order matches the contract.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"The public function returns the division result directly. Repository search found no callers or alternate production implementation.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"consumers\",\n      \"status\": \"covered\",\n      \"summary\": \"No downstream consumers require migration.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:2\", \"rationale\": \"Ordinary Python numeric division propagates ZeroDivisionError for a zero denominator without swallowing it or modifying state.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"failure-recovery\",\n      \"status\": \"covered\",\n      \"summary\": \"Documented failure behavior is preserved; no recovery lifecycle exists.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Defines the acceptance criteria: correct quotient and ZeroDivisionError for a zero denominator.\"},\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"Direct inspection supports both criteria for ordinary Python numeric inputs.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"tests-acceptance\",\n      \"status\": \"covered\",\n      \"summary\": \"No tests are present. No tests or repository scripts were executed; acceptance assessment is static.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Documentation accurately states the implemented operation and zero-denominator behavior.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"docs-operations\",\n      \"status\": \"covered\",\n      \"summary\": \"Documentation matches implementation; no deployment or operational machinery is present.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/README.md:1\", \"rationale\": \"Requires numerator divided by denominator.\"},\n        {\"anchor\": \"repository/divide.py:2\", \"rationale\": \"Implements that exact operand order.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"consistency\",\n      \"status\": \"covered\",\n      \"summary\": \"All contract assertions agree.\"\n    },\n    {\n      \"evidence\": [\n        {\"anchor\": \"repository/divide.py:1-2\", \"rationale\": \"A single direct arithmetic expression is proportionate to the stated one-function scope.\"}\n      ],\n      \"finding_ids\": [],\n      \"id\": \"proportionality\",\n      \"status\": \"covered\",\n      \"summary\": \"No unnecessary abstraction or hardening; no supported defects found.\"\n    }\n  ],\n  \"debt_outcomes\": [],\n  \"governing_findings\": [],\n  \"role\": \"final\"\n}",
+              "sequence": 1,
+              "returncode": 0,
+              "raw_sha256": "ed5fad8997609e94aa94f34dcf3e1cb17be7044a316ca0840ae9ea0650795b6b",
+              "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a0f734-3633-7b72-b98d-979e3c6c1787\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"I\u2019ll check the snapshot and repository instructions first; the supplied packet has an empty diff and no file contents.\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g AGENTS.md -g CLAUDE.md -g '*'\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"pwd; rg --files -g AGENTS.md -g CLAUDE.md -g '*'\\\"\",\"aggregated_output\":\"/tmp/paranoia-wt-mtb0nln_/tree\\n.git\\nREADME.md\\ndivide.py\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git status --short; git diff --stat 93fae4f95fc7..420ceb1d60df; git log -5 --oneline'\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_2\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc 'git status --short; git diff --stat 93fae4f95fc7..420ceb1d60df; git log -5 --oneline'\",\"aggregated_output\":\"420ceb1 apply inspected diff\\nb934f67 inverted operands\\n93fae4f baseline\\n\",\"exit_code\":0,\"status\":\"completed\"}}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; cat -n divide.py; git log -p --follow -- divide.py; git ls-tree -r --name-only HEAD; git diff 93fae4f95fc7..420ceb1d60df; rg -n 'divide|division' .; ls -la /tmp/paranoia-wt-mtb0nln_ /tmp\\\"\",\"aggregated_output\":\"\",\"exit_code\":null,\"status\":\"in_progress\"}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_3\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"cat -n README.md; cat -n divide.py; git log -p --follow -- divide.py; git ls-tree -r --name-only HEAD; git diff 93fae4f95fc7..420ceb1d60df; rg -n 'divide|division' .; ls -la /tmp/paranoia-wt-mtb0nln_ /tmp\\\"\",\"aggregated_output\":\"     1\\tContract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n     1\\tdef divide(numerator, denominator):\\n     2\\t    return numerator / denominator\\ncommit 420ceb1d60df602d683f64fd052d3d0ac4102d16\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:22:41 2026 +0100\\n\\n    apply inspected diff\\n\\ndiff --git a/divide.py b/divide.py\\nindex 82a6239..c50d4f0 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return denominator / numerator\\n+    return numerator / denominator\\n\\ncommit b934f67d2acc2df0743f27a20ba66900f580f9e4\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    inverted operands\\n\\ndiff --git a/divide.py b/divide.py\\nindex c50d4f0..82a6239 100644\\n--- a/divide.py\\n+++ b/divide.py\\n@@ -1,2 +1,2 @@\\n def divide(numerator, denominator):\\n-    return numerator / denominator\\n+    return denominator / numerator\\n\\ncommit 93fae4f95fc7d9f72e1ce290374bc9c27349715c\\nAuthor: Paranoia acceptance <acceptance@localhost>\\nDate:   Thu Oct 1 12:21:23 2026 +0100\\n\\n    baseline\\n\\ndiff --git a/divide.py b/divide.py\\nnew file mode 100644\\nindex 0000000..c50d4f0\\n--- /dev/null\\n+++ b/divide.py\\n@@ -0,0 +1,2 @@\\n+def divide(numerator, denominator):\\n+    return numerator / denominator\\nREADME.md\\ndivide.py\\n./README.md:1:Contract: divide(numerator, denominator) returns numerator divided by denominator. Zero denominator raises ZeroDivisionError.\\n./divide.py:1:def divide(numerator, denominator):\\n/tmp:\\ntotal 5619068\\ndrwxrwxrwt 11263 nobody nogroup   1417216 Oct  1 12:23 .\\ndrwxr-xr-x    19 nobody nogroup      4096 Sep 28 18:39 ..\\nlrwxrwxrwx     1 nobody nogroup        19 May  1  2024 .X11-unix -> /mnt/wslg/.X11-unix\\ndrwxr-xr-x     2 andy   andy         4096 Jul 23 13:05 .agents\\n-rw-------     1 andy   andy      1464984",
+              "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "failure_detail_excerpt": "",
+              "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stderr_excerpt": "",
+              "validation_issue": null,
+              "validation_pointer": null,
+              "rejected_reply_sha256": null,
+              "rejected_reply_excerpt": null,
+              "requested_timeout_sec": 2400,
+              "provider_duration_ms": null,
+              "model": "gpt-6-astra",
+              "effort": "medium"
+            }
+          ],
+          "rendered_trailer": "REVIEW-ROUTING: beta=tiered-review-beta-1 policy=strongest policy-source=argument phase=final tier=strongest model=gpt-6-astra effort=medium model-source=policy/strongest effort-source=release-default\nLINEAGE: issue138-live-branch (rounds recorded: 3)\nCLASS-REGISTER: staged final parsed \u2014 NONE\nCLASS-CLOSURE: 0 open, 0 closed, 0 surviving matches, 0 exempt, 0 unmechanized\nSTRUCTURAL-PHASE: clear\nSTRUCTURAL-DEBT: 0 blocking open\nBETA-ACCEPTANCE: qualified engine=codex model=gpt-6-astra effort=medium policy=strongest\nCONVERGENCE: NOT-BLOCKED \u2014 staged structural debt is clear.\nSTAGED-ATTEMPTS: total=1 validation-retries=0 validation-invalid=0 execution-failed=0",
+          "correction_gates": [],
+          "rejected_payloads": [],
+          "staged_manifests": null,
+          "staged_settlement": {
+            "role": "final",
+            "source_dispositions": [],
+            "assessment_dispositions": [],
+            "findings": [],
+            "debt": [],
+            "debt_updates": [],
+            "class_dispositions": [],
+            "class_records": [],
+            "class_assessments": [],
+            "_finding_class_refs": {},
+            "_class_record_pointers": [],
+            "concession_challenges": [],
+            "coverage": [
+              {
+                "evidence": [
+                  "repository/divide.py:1-2",
+                  "repository/README.md:1"
+                ],
+                "finding_ids": [],
+                "id": "artifact-complete",
+                "status": "covered",
+                "summary": "Reviewed the complete artifact. The specified endpoint diff is empty and the working tree is clean."
+              },
+              {
+                "evidence": [
+                  "repository/divide.py:1-2"
+                ],
+                "finding_ids": [],
+                "id": "repository-premises",
+                "status": "covered",
+                "summary": "No repository agent instructions, hidden runtime configuration, or additional implementation were found."
+              },
+              {
+                "evidence": [
+                  "repository/divide.py:2"
+                ],
+                "finding_ids": [],
+                "id": "transformations",
+                "status": "covered",
+                "summary": "Operand order matches the contract."
+              },
+              {
+                "evidence": [
+                  "repository/divide.py:1-2"
+                ],
+                "finding_ids": [],
+                "id": "consumers",
+                "status": "covered",
+                "summary": "No downstream consumers require migration."
+              },
+              {
+                "evidence": [
+                  "repository/divide.py:2"
+                ],
+                "finding_ids": [],
+                "id": "failure-recovery",
+                "status": "covered",
+                "summary": "Documented failure behavior is preserved; no recovery lifecycle exists."
+              },
+              {
+                "evidence": [
+                  "repository/README.md:1",
+                  "repository/divide.py:1-2"
+                ],
+                "finding_ids": [],
+                "id": "tests-acceptance",
+                "status": "covered",
+                "summary": "No tests are present. No tests or repository scripts were executed; acceptance assessment is static."
+              },
+              {
+                "evidence": [
+                  "repository/README.md:1"
+                ],
+                "finding_ids": [],
+                "id": "docs-operations",
+                "status": "covered",
+                "summary": "Documentation matches implementation; no deployment or operational machinery is present."
+              },
+              {
+                "evidence": [
+                  "repository/README.md:1",
+                  "repository/divide.py:2"
+                ],
+                "finding_ids": [],
+                "id": "consistency",
+                "status": "covered",
+                "summary": "All contract assertions agree."
+              },
+              {
+                "evidence": [
+                  "repository/divide.py:1-2"
+                ],
+                "finding_ids": [],
+                "id": "proportionality",
+                "status": "covered",
+                "summary": "No unnecessary abstraction or hardening; no supported defects found."
+              }
+            ]
+          },
+          "review_routing": {
+            "release": "tiered-review-beta-1",
+            "policy": "strongest",
+            "policy_source": "argument",
+            "custom_override": false,
+            "phase": "final",
+            "tier": "strongest",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "model_source": "policy/strongest",
+            "effort_source": "release-default"
+          },
+          "proposal_disposition": null
+        }
+      },
+      "durable_lineage": {
+        "mode": "branch",
+        "rounds": 3,
+        "next_seq": 1,
+        "classes": [],
+        "exemptions": [],
+        "debt": null,
+        "claim_state": {},
+        "claim_reverify_required": false,
+        "review_state": {
+          "version": 1,
+          "stakes_digest": "7e03c44bf4d44194f274d97413f5048670b7ac14a1b013f0084dddaa1f498a20",
+          "stakes": "Trusted single operator and OS; untrusted static repository bytes. No hostile local process or OS compromise. One arithmetic function, a few findings, results within minutes. Wrong clearance is high impact; recoverable blocking acceptable. No network service, concurrency or formal proof.",
+          "phase": "clear",
+          "snapshot_digest": "2970b93abb1eb00d2dd9445f8f4280174e7abd569b96f770a5e15786d228ffa0",
+          "debt": [
+            {
+              "id": "D1",
+              "finding_id": "census:F1",
+              "status": "closed",
+              "severity": "MAJOR",
+              "summary": "Reversed operands break quotient correctness and the zero-denominator contract.",
+              "evidence": [
+                "repository/divide.py:1-2",
+                "repository/README.md:1"
+              ],
+              "remedy": "Restore return numerator / denominator, preserving the documented contract. Add focused regression cases for unequal nonzero operands, zero numerator, and zero denominator.",
+              "source_ids": [
+                "behaviour:B1",
+                "execution:F1",
+                "integrity:F1"
+              ],
+              "class_ids": [],
+              "first_round": 1,
+              "last_round": 2
+            }
+          ],
+          "correction_control": {
+            "version": 1,
+            "classes": {}
+          },
+          "last_round": 3,
+          "acceptance": {
+            "version": 1,
+            "release": "tiered-review-beta-1",
+            "engine": "codex",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "policy": "strongest",
+            "custom_override": false,
+            "snapshot_digest": "2970b93abb1eb00d2dd9445f8f4280174e7abd569b96f770a5e15786d228ffa0"
+          }
+        },
+        "proposal_receipt": {
+          "version": 1,
+          "round": 1,
+          "structural_snapshot": "7018742926ce2bdeef37616275def0476b8f0a94c392197b6cd0e617f04f38de",
+          "patch_sha256": "45ae448085b1f34699d0b449c95b03bdd745ae6a3e112a1013817f71bd565559",
+          "audit": "20261001T122241-critique_branch_patch_proposal-9f0686d4.json",
+          "target_ids": [
+            "structural:D1"
+          ]
+        }
+      }
+    }
+  ],
+  "outcome": "passed"
+}

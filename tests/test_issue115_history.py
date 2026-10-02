@@ -18,7 +18,10 @@ RECORDS = {
         ("allowed_later_source_diffs",), ("validation", "allowed_later_source_diffs")],
     "authoritative_capture_acceptance_2026-08-20.json": [
         ("reviewed_snapshot", "allowed_later_plan_claims_diff"),
-        ("reviewed_snapshot", "allowed_later_handlers_diff")],
+        ("reviewed_snapshot", "allowed_later_handlers_diff"),
+        # Beta tiered review (docs/beta-tiered-review-plan.md) changes review_census.py;
+        # only this existing entry's hash/scope metadata may follow it.
+        ("reviewed_snapshot", "allowed_later_review_census_diff")],
 }
 
 

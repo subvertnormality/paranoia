@@ -164,6 +164,8 @@ def claude_provider_guidance(review: Review, engine_name: str) -> str | None:
 class Engine(ABC):
     name: str
     default_model: str
+    #: Tiered-policy structural correction model; None keeps the strongest default.
+    correction_model: str | None = None
     # argv[0] — needed on its own so a preflight can check the CLI is installed
     # without building a whole command line.
     binary: str
@@ -453,6 +455,8 @@ class Engine(ABC):
 class CodexEngine(Engine):
     name = "codex"
     default_model = "gpt-6-astra"
+    # Release-pinned beta structural-correction model (docs/beta-tiered-review-plan.md).
+    correction_model = "gpt-6.1-sol"
     binary = "codex"
 
     def _evidence_flags(self, *, resumed: bool = False) -> list[str]:
@@ -636,6 +640,7 @@ CLAUDE_DENY_TOOLS = ["Write", "Edit", "NotebookEdit"]
 class ClaudeEngine(Engine):
     name = "claude"
     default_model = "claude-fable-5-1"
+    correction_model = "claude-opus-5-5"
     binary = "claude"
 
     def _evidence_tools(self) -> str:
@@ -773,11 +778,17 @@ ATTESTER_MODEL = "gpt-6-astra"
 MODEL_FAMILY_EFFORT = {"fable": "medium", "astra": "medium", "opus": "high", "sol": "high"}
 
 
-def default_effort(model: str, *, fallback: str) -> str:
+def model_family(model: str) -> str | None:
+    """The MODEL_FAMILY_EFFORT family named by a model ID, if any."""
     for token in re.split(r"[-._]", model.lower()):
         if token in MODEL_FAMILY_EFFORT:
-            return MODEL_FAMILY_EFFORT[token]
-    return fallback
+            return token
+    return None
+
+
+def default_effort(model: str, *, fallback: str) -> str:
+    family = model_family(model)
+    return MODEL_FAMILY_EFFORT[family] if family is not None else fallback
 
 
 def get_engine(name: str, *, text_only: bool = False) -> Engine:

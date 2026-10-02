@@ -1,10 +1,5 @@
 # Paranoia
 
-> Reviewer-authored patch proposals are available as an explicit opt-in under
-> [`docs/reviewer-patch-proposal-plan.md`](docs/reviewer-patch-proposal-plan.md).
-> `PROPOSE_PATCH_DEFAULT` is false: omission and explicit false preserve the
-> ordinary review-only flow; pass `propose_patch: true` to request a candidate.
-
 Get a cold, adversarial review of your code, plans, and technical decisions from
 the other frontier coding agent.
 
@@ -42,6 +37,8 @@ You need:
 - the reviewing agent's stable CLI, installed and signed in:
   [Codex CLI](https://developers.openai.com/codex) 0.144.6 or later, or
   [Claude Code](https://code.claude.com) 2.1.251 or later.
+  Default tiered Codex review also needs a CLI that offers the `gpt-6.1-sol`
+  correction model; see [model routing](#tracked-reviews).
 
 Most tools need only the reviewer CLI. `arbitrate` uses both vendors and needs
 both CLIs.
@@ -145,20 +142,36 @@ You can bind an approved implementation plan to the branch review with
 contract for the lineage; later rounds verify the implementation against the same
 text. Changing the contract requires a new lineage.
 
-Explicit `propose_patch: true` can ask the
-successful fresh census author for a supplemental candidate diff after the
-tracked review has settled. Omission and false remain disabled. The proposal is
+By default (`propose_patch` omitted), the source reviewer is asked for a supplemental
+unapplied candidate diff after a blocked census (the successful census lane author) or a blocked
+cold final (that final's own session) has settled, using that review's model and effort.
+Clean results report `NOT-NEEDED`; correction rounds, dirty, one-shot and
+closure-disabled reviews report an inert `UNAVAILABLE` and make no proposal call.
+`false` makes zero proposal calls; explicit `true` still rejects unsupported modes. The
+proposal is
 read-only, bound to the reviewed snapshot and complete target/class context,
 locally validated against pinned source, separately audited, and never applied
 or tested by Paranoia. The original verdict, durable state, and convergence
 trailer remain authoritative. A dirty caller tree blocks branch proposal spend;
 later ref or preimage movement marks a returned candidate stale.
+Clean expanded Git LFS files are recognized by verified pointer size and SHA-256
+without running repository filters. Unsupported pointers remain unavailable;
+proposed edits still require exact committed preimages.
 
-For executing agents, opt in on the initial clean, committed, tracked review when
-blocking debt appears concretely repairable in the reviewed code or plan. Inspect
-and amend the candidate deliberately. Keep it off for correction/final rounds,
-dirty or one-shot reviews, architectural or missing-authority findings, and cases
-where the agent already has a complete verified repair.
+For executing agents: inspect and amend the candidate deliberately, run appropriate
+checks, and submit the changed artifact in the next round. A proposal is never proof of
+repair. Pass `propose_patch: false` for architectural or missing-authority findings or
+when you already have a complete verified repair.
+
+On the next tracked round, report what you did with a pending proposal through the
+optional `prior_proposal_disposition` argument: the exact `PROPOSAL-AUDIT-JSON` basename,
+`status` (`applied`, `partially-applied`, or `departed`), and `departed_targets` mapping
+each departed addressed target to a one-line reason. Omission is allowed and reports
+`PROPOSAL-DISPOSITION: none-recorded`. Disposition is caller accounting: it never enters
+reviewer prompts or clearance and does not establish that a repair works. See the
+[caller contract](docs/tool-reference.md#proposal-disposition) and
+[its design record](docs/proposal-disposition-138-plan.md); Git LFS handling is
+specified in [the LFS cleanliness contract](docs/lfs-proposal-cleanliness-139-plan.md).
 
 ### Review a plan
 
@@ -303,6 +316,30 @@ phases:
    model consolidation. See the [census execution architecture](docs/census-execution.md).
 2. **Correction:** later rounds target durable debt and the effects of your fixes.
 3. **Final:** after debt closes, one fresh whole-artifact regression is required.
+   A clean census also advances to a final rather than clearing directly.
+
+Model routing (`review_model_policy`, default `tiered`): census lanes, consolidation
+and the cold final use the engine's strongest model (`gpt-6-astra` / `claude-fable-5-1`,
+medium effort); targeted correction uses `gpt-6.1-sol` / `claude-opus-5-5` at high effort.
+`strongest` uses the strongest model for every structural phase. Tiered Codex routing
+needs a Codex CLI/account that offers `gpt-6.1-sol`: on a ChatGPT account, Codex CLI
+0.156.1 rejected it as unsupported (2026-09-29) and 0.159.3 accepted it (2026-10-02), so
+use 0.159.3 or later. An unsupported model fails visibly rather than substituting a
+model: update the CLI or pass `review_model_policy: "strongest"`. Set effort per model family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
+merged per family); a family entry beats the global `effort`, so
+`{"sol": "high", "opus": "high"}` keeps correction at high. The model is chosen from
+the authoritative durable phase, never from round labels. An explicit `model` (argument or
+`.paranoia.toml`) pins every structural phase as a custom override: it can
+clear, but its `BETA-ACCEPTANCE` trailer is labelled `custom-override`, and a later run without the
+override needs its own strongest cold final. An effort setting counts as a custom
+override only when it changes the cold final's release effort. Claim verification, `query`, `rebut` and
+`arbitrate` keep the call-level model. `NOT-BLOCKED` requires a cold-final acceptance
+record bound to the exact current snapshot; older `clear` state is re-verified by one
+final. Each staged trailer begins with `REVIEW-ROUTING` naming the actual phase, model,
+effort, policy and its source. The routing release identifier `tiered-review-beta-1` and
+the `BETA-ACCEPTANCE` field name are stable wire names retained from the original release;
+they do not mark the behavior as optional. The design record is
+[`docs/beta-tiered-review-plan.md`](docs/beta-tiered-review-plan.md).
 
 The engine that closes correction debt owns the resulting final-regression gate.
 A different engine may still report new debt, but its clean result cannot discharge
@@ -313,8 +350,8 @@ The retained 2026-08-23 persistent-correction acceptance predates final ownershi
 and is historical evidence only; it does not certify the current final-selection or
 clearance route. Current owner behavior is exercised through both public handlers.
 
-A clear census can finish immediately. Otherwise, increase `round` only after
-you have changed the reviewed artifact. Failed or rejected rounds can reuse the
+A clear census proceeds to its cold final on the same snapshot. Increase `round`
+after you change the reviewed artifact to repair debt. After a clean census or clean correction (`FINAL-REGRESSION: required`), increment `round` and review the unchanged snapshot to run the cold final; edit only to repair debt. Failed or rejected rounds can reuse the
 same label; a successfully settled round requires the next label to increase.
 
 Paranoia tracks both concrete findings and reusable defect classes. Blocking
@@ -440,8 +477,8 @@ isolate = true
 ```
 
 Supported keys are `base_ref`, `project_summary`, `stakes`, `isolate`,
-`converge`, `class_closure`, `max_packet_chars`, `model`, `effort`, and
-`web_search`.
+`converge`, `class_closure`, `max_packet_chars`, `model`, `effort`,
+`review_model_policy`, `effort_by_model` (a table), and `web_search`.
 
 For `critique_plan`, `lineage` and `class_closure` are call-only arguments and
 are never read from `.paranoia.toml`.

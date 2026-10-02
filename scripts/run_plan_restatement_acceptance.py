@@ -134,6 +134,23 @@ def _audit_projection(audit: dict) -> dict:
     return projected
 
 
+def _historical_beta_audit_projection(audit: dict, routing_line: str) -> dict:
+    """Remove only the beta routing/proposal audit additions the historical run predates."""
+    projected = json.loads(json.dumps(audit, ensure_ascii=False))
+    if not isinstance(projected.pop("review_routing", None), dict):
+        raise ValueError("public-handler replay audit omitted beta review routing")
+    if "proposal_disposition" not in projected or projected.pop("proposal_disposition") is not None:
+        raise ValueError("public-handler replay audit recorded a proposal disposition")
+    trailer = projected.get("rendered_trailer", "")
+    if trailer.count(routing_line + "\n") != 1:
+        raise ValueError("public-handler replay audit trailer lacks its routing line")
+    projected["rendered_trailer"] = trailer.replace(routing_line + "\n", "", 1)
+    for attempt in projected.get("attempt_ledger") or []:
+        if (attempt.pop("model", None), attempt.pop("effort", None)) != ("gpt-5.6-sol", "high"):
+            raise ValueError("public-handler replay attempt left the accepted Codex route")
+    return projected
+
+
 def _capture_call(
     arguments: dict, *, state_root: Path, log_dir: Path,
 ) -> tuple[str, list[str], dict, dict, list[dict], list[dict]]:
@@ -319,6 +336,13 @@ def _historical_no_concession_prompt(prompt: str) -> str:
         prior = task.pop("prior_concessions", None)
         if prior not in (None, [], {}):
             raise ValueError("historical replay cannot discard a concession")
+        # Beta tiered review adds bounded closed-class context to the final task only;
+        # the historical run predates it (docs/beta-tiered-review-plan.md §5.6).
+        if "closed_class_history" in task:
+            if task.get("role") != "final" or not isinstance(
+                task.pop("closed_class_history"), dict,
+            ):
+                raise ValueError("closed-class history outside a final task")
         for row in task.get("active_classes", []):
             row.pop("members", None)
         artifact = task.get("artifact")
@@ -702,6 +726,9 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     "class_closure":True, "claim_verification":False,
                     "web_search":False, "model":"gpt-5.6-sol",
                     "effort":"high", "stakes":STAKES,
+                    # Pre-beta protocol: proposals were opt-in; keep them off explicitly now
+                    # that the beta default is automatic (docs/beta-tiered-review-plan.md).
+                    "propose_patch":False,
                 }, engine=engines.CodexEngine(), log_dir=log_dir,
                    now=lambda: "20260901T000000")
                 if pending:
@@ -711,13 +738,19 @@ def _replay_public_handler(artifact: dict, source_tree: str) -> None:
                     (cc.lineage_dir(replay_root / "state") / f"{row['lineage']}.json")
                     .read_text(encoding="utf-8")
                 )
-                if result != row["result_text"]:
+                # The beta prefixes one REVIEW-ROUTING trailer line the historical run predates.
+                routing_lines = [
+                    line for line in result.split("\n") if line.startswith("REVIEW-ROUTING: ")
+                ]
+                if len(routing_lines) != 1:
+                    raise ValueError("public-handler replay did not render exactly one beta routing line")
+                if result.replace(routing_lines[0] + "\n", "", 1) != row["result_text"]:
                     raise ValueError("public-handler replay did not reconstruct returned result")
                 if _pre_member_inventory_projection(replay_lineage) != row["durable_lineage"]:
                     raise ValueError("public-handler replay did not reconstruct durable lineage")
-                if _pre_member_inventory_projection(
-                    _audit_projection(replay_audit)
-                ) != row["audit_projection"]:
+                if _pre_member_inventory_projection(_historical_beta_audit_projection(
+                    _audit_projection(replay_audit), routing_lines[0],
+                )) != row["audit_projection"]:
                     raise ValueError("public-handler replay did not reconstruct audit settlement")
         finally:
             engines.CodexEngine.run = original_run
