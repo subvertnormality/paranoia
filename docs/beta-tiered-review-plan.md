@@ -1,5 +1,16 @@
 # Beta: phase-based review models and default repair proposals
 
+> **Status (2026-10-02):** historical design record. The behavior specified here is the
+> default on main, promoted by PR #140; the `tiered-review-beta-1` release name and
+> `BETA-ACCEPTANCE` field remain as stable wire names. Current usage is documented in the
+> [README](../README.md#tracked-reviews), [How Paranoia works](how-it-works.md#the-tracked-lifecycle)
+> and the [tool reference](tool-reference.md). Later fixes: main's #131–133 changes were
+> merged in (#137); caller proposal disposition (#138,
+> [plan](proposal-disposition-138-plan.md)); Git LFS proposal cleanliness (#139,
+> [plan](lfs-proposal-cleanliness-139-plan.md)). On a ChatGPT account Codex CLI 0.159.3
+> accepted `gpt-6.1-sol` on 2026-10-02 (0.156.1 rejected it, as recorded below). The text
+> below is unchanged.
+
 2026-09-29 model-pin amendment: targeted Codex correction uses `gpt-6.1-sol`
 at the existing high effort. Astra census/final routing is unchanged. The retained
 2026-09-23 qualification records describe the previous Sol pin and remain historical.

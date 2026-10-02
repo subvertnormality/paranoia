@@ -1,18 +1,10 @@
 # Paranoia Local: LLM operating reference
 
-> **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
-> `claude-opus-5-5` (high effort), require an independent strongest-model cold final
-> before `NOT-BLOCKED` (including after a clean census), and request an unapplied
-> repair proposal after a blocked census or blocked cold final by default. Opt out with
-> `review_model_policy: "strongest"` and `propose_patch: false`. See
-> [`docs/beta-tiered-review-plan.md`](beta-tiered-review-plan.md).
-
 Purpose: provide enough precise context for an agent to install, select, and call
 Paranoia Local without inferring behavior from introductory prose. Runtime MCP
 schemas are authoritative.
 
-Patch-proposal selection rule (beta, default-on): omit `propose_patch`; the server
+Patch-proposal selection rule (default-on): omit `propose_patch`; the server
 proposes only after a blocked census or blocked cold final and reports `NOT-NEEDED` or
 an inert `UNAVAILABLE` otherwise. Inspect or amend every candidate and run your own
 checks; never apply it blindly or treat it as proof of repair. Set `false` for
@@ -26,14 +18,17 @@ For `departed`, give a concrete one-line reason for every addressed target; for
 the proposal's addressed IDs. The optional API reports `none-recorded` on omission
 with a pending receipt. This accounting never establishes repair or clearance.
 
-Beta routing rule: `review_model_policy` defaults to `tiered` (census/final strongest at
+Routing rule: `review_model_policy` defaults to `tiered` (census/final strongest at
 medium, correction `gpt-6.1-sol` / `claude-opus-5-5` at high); `strongest` keeps every
 structural phase on the strongest model. Do not pass `model` unless you intend a custom
-override that cannot claim beta qualification. Use `effort_by_model` (keys `astra`, `sol`,
+override that cannot claim a qualified acceptance. Use `effort_by_model` (keys `astra`, `sol`,
 `fable`, `opus`) for per-family effort; it beats the global `effort` and is a custom
 override only if it changes the cold final's release effort. A clean census is followed by a
 required cold final on the same snapshot; parse `REVIEW-ROUTING`, `FINAL-REGRESSION`
-and `BETA-ACCEPTANCE` from the trailer.
+and `BETA-ACCEPTANCE` from the trailer (`tiered-review-beta-1` and `BETA-ACCEPTANCE` are
+stable wire names, not an opt-in). Tiered Codex correction needs a CLI offering
+`gpt-6.1-sol`: on a ChatGPT account 0.156.1 rejected it and 0.159.3 accepted it; with an
+older CLI pass `review_model_policy: "strongest"`.
 
 ## Identity
 
@@ -42,6 +37,7 @@ and `BETA-ACCEPTANCE` from the trailer.
 - Requirements: Python 3.11+, Git 2.36+
 - Engines: `codex`, `claude`
 - Minimum evidence-profile CLIs: Codex 0.144.6; Claude Code 2.1.251
+- Tiered correction models: `gpt-6.1-sol` (Codex CLI 0.159.3+ verified); `claude-opus-5-5`
 - Default models: `gpt-6-astra`; `claude-fable-5-1`
 - Arbitration cleaner: `claude-opus-5`
 - Arbitration attester: `gpt-6-astra`
@@ -292,11 +288,11 @@ reports the agreed option only as `PROVISIONAL-SELECTED`.
 
 ```text
 new -> census
-census clear -> final        (beta: independent cold final still required)
+census clear -> final        (independent cold final still required)
 census blocked -> correction
 correction blocked -> correction
 correction debt closed -> final
-final clear -> clear         (writes the snapshot-bound beta acceptance record)
+final clear -> clear         (writes the snapshot-bound acceptance record)
 final blocked -> correction
 clear without acceptance -> final
 clear, snapshot changed -> census

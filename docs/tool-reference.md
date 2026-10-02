@@ -1,13 +1,5 @@
 # Paranoia Local tool reference
 
-> **Beta branch (`tiered-review-beta-1`, experimental).** Tracked reviews route census
-> and cold final to the strongest model and targeted correction to `gpt-6.1-sol` /
-> `claude-opus-5-5` (high effort), require an independent strongest-model cold final
-> before `NOT-BLOCKED` (including after a clean census), and request an unapplied
-> repair proposal after a blocked census or blocked cold final by default. Opt out with
-> `review_model_policy: "strongest"` and `propose_patch: false`. See
-> [`docs/beta-tiered-review-plan.md`](beta-tiered-review-plan.md).
-
 This page documents the public MCP interface. The runtime schemas in
 [`src/paranoia_local/server.py`](../src/paranoia_local/server.py) are authoritative
 if this page and an installed version differ.
@@ -42,10 +34,10 @@ Changing `cleaner_model` to evade a safeguard is unsupported.
 | `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-1` |
 | `effort` | `low`, `medium`, or `high` | By model: Fable/Astra `medium`, Opus/Sol `high`; otherwise `high` (`query` `medium`) |
 | `web_search` | Boolean | `true` |
-| `review_model_policy` (beta; `critique_branch`, `critique_plan`) | `tiered` or `strongest` | `tiered` |
-| `effort_by_model` (beta; `critique_branch`, `critique_plan`) | Object mapping `astra`, `sol`, `fable`, `opus` to `low`/`medium`/`high` | Release family defaults |
+| `review_model_policy` (`critique_branch`, `critique_plan`) | `tiered` or `strongest` | `tiered` |
+| `effort_by_model` (`critique_branch`, `critique_plan`) | Object mapping `astra`, `sol`, `fable`, `opus` to `low`/`medium`/`high` | Release family defaults |
 
-Beta structural routing applies only to tracked staged `critique_branch` and
+Structural model routing applies only to tracked staged `critique_branch` and
 `critique_plan` roles and is resolved after the authoritative durable phase:
 
 | Phase | Codex | Claude | Effort |
@@ -65,7 +57,9 @@ phase and is reported as `custom-override`; an effort setting is `custom-overrid
 when it changes the cold final's release effort, so `{"sol": "high"}` stays qualified. Claim discovery/binding/attestation,
 one-shot review, `query` and `rebut` keep the call-level `model`/`effort`. Model IDs are
 release-pinned and passed verbatim; an unsupported model is a visible staged execution
-failure, never a silent substitution.
+failure, never a silent substitution. On a ChatGPT account, Codex CLI 0.156.1 rejected
+`gpt-6.1-sol` (2026-09-29) and 0.159.3 accepted it (2026-10-02); tiered Codex review
+needs 0.159.3 or later, or `review_model_policy: "strongest"`.
 
 `engine` names the reviewer. `arbitrate` has no single `engine` or `model`
 argument because it always uses both vendors.
@@ -97,7 +91,7 @@ default and returns cited findings plus a computed convergence trailer.
 | `lineage` | string | Derived | Explicit key; required for a detached head or raw commit |
 | `exempt` | object array | `[]` | Exempt exact `{class_id,path,line,line_text}` predicate matches |
 | `unexempt` | object array | `[]` | Revoke exact `{class_id,path,line}` exemptions |
-| `propose_patch` | boolean | omitted = automatic (beta) | Omitted: request a supplemental unapplied candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
+| `propose_patch` | boolean | omitted = automatic | Omitted: request a supplemental unapplied candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
 | `prior_proposal_disposition` | object | omitted | Caller accounting for the pending proposal; see [proposal disposition](#proposal-disposition) |
 
 Rules:
@@ -112,7 +106,7 @@ Rules:
   contract requires a new lineage.
 - A contract is declarative requirements data, not reviewer instructions.
 - Lost or ambiguous substantive lineage state blocks with `STATE-UNAVAILABLE`.
-- Omitted `propose_patch` (beta) proposes only after a blocked census (census lane
+- Omitted `propose_patch` proposes only after a blocked census (census lane
   author) or blocked cold final (that final's session). Clean results are
   `NOT-NEEDED`; correction rounds, cached-census reuse, dirty, one-shot and
   closure-disabled reviews render an inert `UNAVAILABLE` reason with no call.
@@ -154,7 +148,7 @@ runs before structural review by default.
 | `focus` | string | — | Optional review focus |
 | `stakes` | string | Modest internal-tool assumptions | Scope and consequence boundary |
 | `already_raised` | string array | `[]` | Accepted cited findings from earlier rounds |
-| `propose_patch` | boolean | omitted = automatic (beta) | Omitted: request a supplemental unapplied plan-text candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
+| `propose_patch` | boolean | omitted = automatic | Omitted: request a supplemental unapplied plan-text candidate after a blocked census or blocked cold final; `false`: zero proposal calls; `true`: explicit request |
 | `prior_proposal_disposition` | object | omitted | Caller accounting for the pending proposal; see [proposal disposition](#proposal-disposition) |
 
 Rules:
@@ -371,7 +365,7 @@ to one active class.
 
 | Trailer field | Meaning |
 |---|---|
-| `REVIEW-ROUTING` | Beta release, policy and its source, and this round's actual phase, tier, model, effort and model source; `custom-override=yes` when a model/effort override pinned it |
+| `REVIEW-ROUTING` | Routing release (`beta=tiered-review-beta-1`, a stable wire name), policy and its source, and this round's actual phase, tier, model, effort and model source; `custom-override=yes` when a model/effort override pinned it |
 | `CLASS-REGISTER` | Class operations applied in this settlement, plus any earlier validation-rejected payload count, discarded-operation warning, and bounded first diagnostic |
 | `CLASS-CLOSURE` | Durable open/closed class status |
 | `STRUCTURAL-PHASE` | `census`, `correction`, `final`, or `clear` |
@@ -382,7 +376,7 @@ to one active class.
 | `REVIEW-ATTEMPTS` | All claim and structural attempts, including recovered validation retries |
 | `CLAIM-REGISTER` | Active and retired external claims, or retained non-adjudicated history after audit failure |
 | `CLAIM-CLOSURE` | Supported/refuted/unverified claims, or `AUDIT-FAILED` when no current adjudication completed |
-| `FINAL-REGRESSION` | A cold final is required (owning engine named), including after a clean census or for `clear` state without a current beta acceptance record |
+| `FINAL-REGRESSION` | A cold final is required (owning engine named), including after a clean census or for `clear` state without a current acceptance record |
 | `BETA-ACCEPTANCE` | On clear: `qualified` or `custom-override (not beta-qualified)`, with the final's engine, model, effort and policy |
 | `CONVERGENCE` | Governing tracked result |
 | `STATE-UNAVAILABLE` | Lineage state could not be trusted or persisted |
@@ -395,8 +389,8 @@ to one active class.
 is call argument, repository config, then built-in default.
 
 Supported keys: `base_ref`, `project_summary`, `stakes`, `isolate`, `converge`,
-`class_closure`, `max_packet_chars`, `model`, `effort`, `review_model_policy` (beta),
-`effort_by_model` (beta table), and `web_search`.
+`class_closure`, `max_packet_chars`, `model`, `effort`, `review_model_policy`,
+`effort_by_model` (a table), and `web_search`.
 
 ```text
 paranoia-local --engine {codex|claude} [--log-dir DIR]
