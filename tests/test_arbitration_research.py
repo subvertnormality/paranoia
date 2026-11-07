@@ -107,6 +107,31 @@ def test_distinct_large_captures_degrade_per_source_to_fit_binding_budget():
     ]
 
 
+@pytest.mark.parametrize("size,admitted", [(80_000, True), (450_000, False)])
+def test_deep_extracted_evidence_is_complete_or_explicitly_excluded(size, admitted):
+    claims = ar.parse_discovery(discovery())
+    passage = "The API retries twice."
+    raw = (("x" * size) + "\n" + passage).encode()
+    text = es._extract(raw, "text/plain")
+    capture = es.Capture(
+        claims[0].candidate, claims[0].candidate.url, 200, "text/plain",
+        "a" * 64, "b" * 64, text,
+    )
+    rendered, effective = ar.bounded_binding_input(claims, (capture,))
+    assert capture.text == raw.decode()
+    row = json.loads(rendered)["rows"][0]["capture"]
+    assert effective[0].usable is admitted
+    if admitted:
+        assert effective[0].text == text
+        assert row["line_numbered_text"] == es.numbered_text(text)
+        assert row["line_numbered_text"].endswith(passage)
+    else:
+        assert effective[0].error == ar.BINDING_BUDGET_ERROR
+        assert effective[0].text is None
+        assert row["line_numbered_text"] == ""
+        assert row["error"] == ar.BINDING_BUDGET_ERROR
+
+
 def test_packet_union_is_deterministic_and_governing():
     claims = ar.parse_discovery(discovery())
     captures = [captured(claims[0])]

@@ -778,6 +778,8 @@ def test_public_plan_reports_nonactionable_claim_debt_unavailable_when_structura
 def test_disabled_claim_verification_ignores_retained_claim_debt_for_supplement(
     tmp_path, monkeypatch,
 ):
+    # Claim verification is scripted below; this unit test needs no installed CLI.
+    monkeypatch.setattr(engines, "require_evidence_profile", lambda _engine: "test")
     repo = repository(tmp_path)
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state-root"))
     trailer = install_settled_census(monkeypatch, blocking=False)

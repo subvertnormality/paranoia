@@ -1,0 +1,66 @@
+{
+  "audit_basename": "20261105T161405-arbitrate-6756114d",
+  "audit_sha256": "3b1d4aa283e921588f09a5f7f757efd225c19c3c4d35f1f399572145657cbf10",
+  "scope": "Bounded capture-row excerpt from the original unchanged audit; per-claim rows, not unique sources.",
+  "outcome": "CONVERGED",
+  "research_runs": [
+    {
+      "engine": "codex",
+      "claims": 8,
+      "bound_sources": 0,
+      "http_statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "capture_errors": [
+        "capture excluded from binding input because its serialized captured text exceeds the available binding budget",
+        "capture excluded from binding input because its serialized captured text exceeds the available binding budget",
+        "capture excluded from binding input because its serialized captured text exceeds the available binding budget",
+        "response exceeds 5000000 bytes",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text"
+      ]
+    },
+    {
+      "engine": "claude",
+      "claims": 12,
+      "bound_sources": 0,
+      "http_statuses": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ],
+      "capture_errors": [
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "page extraction produced no text",
+        "response exceeds 5000000 bytes"
+      ]
+    }
+  ]
+}
