@@ -1,0 +1,91 @@
+{
+  "qualified": true,
+  "source_revision": "b93621974e2646a461118ba23f90190cd3dcd0f1",
+  "source_sha256": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "5c359d3ec889462c07152e697d56aca4df67774dc1c11eaa99497f94ff15d59e",
+    "src/paranoia_local/arbitration.py": "1abf862841ece8db197ba347d431df9aa89679d74a900b93a922c1a65aeb32df",
+    "src/paranoia_local/arbitration_research.py": "539c577558fea4b43ee5a9e813788649a7d02e500296082feba6f59899867813",
+    "src/paranoia_local/census_execution.py": "b7975f6d223e74e098c2d3010f1d290d5d6c405ebbe8d76475bef722219437e6",
+    "src/paranoia_local/class_closure.py": "6cfbcc72000d84d46b0504f84e66af537ae457bc38b66cdd744f6bab6e98fb59",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+    "src/paranoia_local/engines.py": "fa1e137e03bfe79f6cf870c37193bd369f812992d59b48f00d4da47c33ab99a9",
+    "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+    "src/paranoia_local/external_sources.py": "1e2b07e5ed04e3920378f1d7fc60f7f67c3f18a8d4e75d530ce9f95cec7cf840",
+    "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+    "src/paranoia_local/handlers.py": "6abd1c902591448fc92e23c9ce2a4898819557f174f964b198c7f19377d25593",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+    "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/patch_experiments.py": "d0a50131f91d3a2fa9770cd83445a284eb6d7f386f7cf8dc49e720d4d57f87e7",
+    "src/paranoia_local/patch_proposals.py": "891e0d4a984ebf7bd548816951440e45502181d6212b5ecc2e32e9d6e1327dd8",
+    "src/paranoia_local/plan_claims.py": "7cf4b345824bb8c83c0d11f8cd99c6530c26002fd53b7c26af8bfd12cd878027",
+    "src/paranoia_local/prompts.py": "e9a2f04a93f79eabc97a906a411473074b6e3494a99b91cf89422f153250c793",
+    "src/paranoia_local/proposal_checkout.py": "7fac1f318095a2f4f6eaf9bdb4683187fe4140b5e995e99d551980cf13151930",
+    "src/paranoia_local/proposal_disposition.py": "e5bb87aee073e8613b570f11e69915c1c3fa2ebf182125b8f96c41edce38f5c1",
+    "src/paranoia_local/review_census.py": "48097d3bb7e27890dc7c8d0462ed3707a2095a2927a4e2080bfc311b00827d0f",
+    "src/paranoia_local/review_policy.py": "3fca61e52e1d4ad1ebac158b4c82ef26934aa712217e30a2b5447dbeea557928",
+    "src/paranoia_local/review_transitions.py": "b657111ed0db8ea6fd1afdaa4c297ffbcec6915d658e16300829300231d0cac7",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "7ae8ea916d06e0927f437f9c1272085750f86e473a22c0ed6ec3d96a4e897266",
+    "src/paranoia_local/session_routing.py": "349014898c1f2aa9292f1f7e5c0b6e8860e6bb1db9dabf791141a60ab7d9a30e",
+    "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "models": {
+    "codex": "gpt-6.1-sol",
+    "claude": "claude-opus-5-5"
+  },
+  "clean": false,
+  "research": true,
+  "audit_path": "/tmp/paranoia-142/native-2/logs/20261107T045255-arbitrate-986258ad.json",
+  "audit_sha256": "c7b2ece388026a558b7c0a0ed5899d7ba84b55b9c44b9c6ae5adad01f41c5d26",
+  "report_sha256": "c81f2a9c5531c3c6d91c4a5096409a90214429d82dff9a9f61355412c1ddf474",
+  "calls": 6,
+  "elapsed_seconds": 81.44836595095694,
+  "summary": {
+    "claims": 17,
+    "usable_captures": 17,
+    "capture_failures": 0,
+    "binding_budget_exclusions": 0,
+    "bound_sources": 15,
+    "unbound_captures": 2,
+    "packets": 15,
+    "governing_packets": 6
+  },
+  "checks": {
+    "converged": true,
+    "expected_selection": true,
+    "research_enabled": true,
+    "both_completed_research": true,
+    "capture_completed": true,
+    "binding_completed": true,
+    "governing_packets": true,
+    "report_counts": true,
+    "packet_digest": true,
+    "unchanged_source": true
+  },
+  "evidence_archive": {
+    "path": "arbitration-diagnostics-142-native-recheck-evidence.tar.gz",
+    "sha256": "4c4b70a57c8501163b766a78dba64ff8994caa70ab7f6cee442161568f27cbde",
+    "bytes": 86653
+  },
+  "scope": "Native public research-enabled arbitration after Astra's advisory correction. Both researchers and deciders used weaker models; cleaning was skipped to avoid its pinned Astra attester. The first native run remains an unchanged historical observation.",
+  "implementation_metrics": {
+    "baseline": "7dfb5a90ae8a2c8592f5fa548a4b619bacbc98dc",
+    "production_diff_added": 64,
+    "production_diff_removed": 14,
+    "production_files_changed": 1,
+    "largest_modules_lines": {
+      "src/paranoia_local/handlers.py": 6725,
+      "src/paranoia_local/arbitrate_handler.py": 3133,
+      "src/paranoia_local/plan_claims.py": 1922
+    }
+  }
+}
