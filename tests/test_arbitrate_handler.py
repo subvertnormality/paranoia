@@ -1100,18 +1100,28 @@ def test_terminal_research_failure_is_written_to_gate_audit(
         )
 
     args = {key: value for key, value in BASE.items() if key != "research"}
+    agent = Agent(lambda engine, rnd: "opt-decimal")
     report = ah.arbitrate(
         {**args, "repo_path": str(repo), "clean": False},
-        log_dir=tmp_path / "logs", engines=ENGINES,
-        run_agent=Agent(lambda engine, rnd: "opt-decimal"),
+        log_dir=tmp_path / "logs", engines=ENGINES, run_agent=agent,
         run_research=researcher, now=lambda: "20260727T120000",
     )
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
     assert trailer_field(report, "SNAPSHOT") != "none"
     assert trailer_field(report, "CLEANING") == "skipped"
-    assert trailer_field(report, "RESEARCH") == "failed"
+    assert not agent.calls
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    expected = {
+        "claims": 1, "usable_captures": 1, "capture_failures": 0,
+        "binding_budget_exclusions": 0, "bound_sources": 1, "unbound_captures": 0,
+        "packets": 0, "governing_packets": 0,
+    }
+    assert record["research"]["summary"] == expected
+    assert record["research"]["status"] == "failed"
+    assert trailer_field(report, "RESEARCH") == "failed; " + "; ".join(
+        f"{key}={value}" for key, value in expected.items()
+    )
     assert record["snapshot"] == trailer_field(report, "SNAPSHOT")
     assert record["cleaning"] == "skipped"
     assert record["research"]["failures"][0]["phase"] == "binding-validation-retry"
@@ -1226,6 +1236,16 @@ def test_research_packet_rejects_caller_id_in_captured_passage_before_voting(
     assert trailer_field(report, "CLEANING") == "attested"
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     assert record["research"]["failures"][0]["phase"] == "packet-validation"
+    expected = {
+        "claims": 2, "usable_captures": 2, "capture_failures": 0,
+        "binding_budget_exclusions": 0, "bound_sources": 2, "unbound_captures": 0,
+        "packets": 1, "governing_packets": 1,
+    }
+    assert record["research"]["summary"] == expected
+    assert record["research"]["status"] == "failed"
+    assert trailer_field(report, "RESEARCH") == "failed; " + "; ".join(
+        f"{key}={value}" for key, value in expected.items()
+    )
     assert record["research"]["packets"]
     assert trailer_field(report, "RESEARCH-DIGEST") == record["research"]["digest"]
     assert len(record["research"]["digest"]) == 64
@@ -3398,7 +3418,9 @@ def test_duplicate_attestation_verdicts_are_rejected(repo: Path, tmp_path: Path)
 # --- field-report fixes (issue #8) -------------------------------------------
 
 
-@pytest.mark.parametrize("terminal", ["success", "decider-failure", "established-failure"])
+@pytest.mark.parametrize("terminal", [
+    "success", "decider-failure", "established-failure", "normalization-failure",
+])
 @pytest.mark.parametrize("kinds,counts,prefix", [
     ([], (0, 0, 0, 0, 0, 0, 0, 0), "no-claims 0 packets"),
     (["unbound"], (2, 2, 0, 0, 0, 2, 0, 0), "unbound 2 captures; 0 packets"),
@@ -3456,6 +3478,10 @@ def test_research_summary_across_terminal_paths(
         def broken_substantiation(*args, **kwargs):
             raise RuntimeError("resolution failed after research")
         monkeypatch.setattr(ah.arb, "substantiation", broken_substantiation)
+    elif terminal == "normalization-failure":
+        def broken_packets(*args, **kwargs):
+            raise ar.ResearchError("packet normalization failed after research")
+        monkeypatch.setattr(ah.research_core, "packets", broken_packets)
 
     report = ah.arbitrate(
         {**BASE, "repo_path": str(repo), "clean": False, "research": True},
@@ -3467,17 +3493,20 @@ def test_research_summary_across_terminal_paths(
         "claims", "usable_captures", "capture_failures", "binding_budget_exclusions",
         "bound_sources", "unbound_captures", "packets", "governing_packets",
     ), counts, strict=True))
+    if terminal == "normalization-failure":
+        expected.update(packets=0, governing_packets=0)
+        prefix = "failed"
     assert audit["research"]["summary"] == expected
     assert trailer_field(report, "RESEARCH") == prefix + "; " + "; ".join(
         f"{key}={value}" for key, value in expected.items()
     )
-    assert trailer_field(report, "RESEARCH-DIGEST") == audit["research"]["digest"]
+    assert trailer_field(report, "RESEARCH-DIGEST") == (audit["research"]["digest"] or "none")
     assert trailer_field(report, "ARBITRATION") == (
         "CONVERGED" if terminal == "success" else "FAILED"
     )
     assert sorted(researcher_calls) == ["claude", "codex"]
     assert sum(run["calls"] for run in audit["research"]["runs"]) == 4
-    assert len(scripted.calls) == 2
+    assert len(scripted.calls) == (0 if terminal == "normalization-failure" else 2)
     assert len(audit["research"]["runs"]) == 2
 
 

@@ -327,8 +327,9 @@ packet counts are after normalization and deduplication. `unbound_captures`
 counts usable captures without a binding. `capture_failures` includes retrieval,
 response-size and extraction failures, and excludes binding-budget exclusions.
 These counts also appear after a subsequent decision failure. Research execution
-failure keeps its failure status and retained attempt/capture diagnostics;
-summary rows cover only completed research runs.
+failure keeps its failure status prefix and retained attempt/capture diagnostics,
+and appends these counters whenever a completed research run is available, even
+before shared-packet establishment. Summary rows cover only completed research runs.
 
 HTTP 200 alone does not establish usable evidence. Sources exceeding the binding
 budget are explicitly excluded as whole captures; admitted source text is not

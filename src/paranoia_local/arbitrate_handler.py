@@ -1658,11 +1658,15 @@ def _research_summary(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, 
     }
 
 
-def _research_result(packet: Packet, runs: Sequence[ResearchRun]) -> str:
-    if not packet.research_enabled:
+def _research_result(
+    packet: Packet, runs: Sequence[ResearchRun], *, status: str | None = None,
+) -> str:
+    if status is None and not packet.research_enabled:
         return "repository-only"
     summary = _research_summary(packet, runs)
-    if summary["packets"]:
+    if status is not None:
+        result = status
+    elif summary["packets"]:
         result = f"complete {summary['packets']} packets"
     elif not summary["claims"]:
         result = "no-claims 0 packets"
@@ -1755,11 +1759,14 @@ def _failed_established_report(
         research_core.digest(packet.research_packets)
         if packet.research_enabled else None
     )
-    rendered_research_status = (
-        _research_result(packet, completed)
-        if research_status == "complete" and packet.research_enabled
-        else research_status
-    )
+    if research_status == "complete" and packet.research_enabled:
+        rendered_research_status = _research_result(packet, completed)
+    elif completed:
+        rendered_research_status = _research_result(
+            packet, completed, status=research_status,
+        )
+    else:
+        rendered_research_status = research_status
     research = {
         "enabled": research_status in {"running", "complete", "failed"},
         "status": research_status,
