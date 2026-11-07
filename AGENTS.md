@@ -1,5 +1,12 @@
 # Repository agent instructions
 
+Issue #142 follows docs/arbitration-diagnostics-142-plan.md. Preserve the intentional
+gained-carried-evidence gate for changed arbitration selections and the two-round
+ceiling. Report unanimous unsubstantiated agreement explicitly. Derive research
+diagnostics consistently across reports and audits from actual completed rows;
+distinguish empty discovery, unbound captures, binding-budget exclusions and capture
+failures without changing evidence authority or the independent verdict.
+
 Issue #139 follows docs/lfs-proposal-cleanliness-139-plan.md. Proposal cleanliness
 may recognize canonical extension-free v1 Git LFS pointers through exact size and
 SHA-256 of streamed checkout bytes plus the cached lfs attribute. Never execute

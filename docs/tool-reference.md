@@ -314,6 +314,27 @@ distinct from an unresolved repository citation: movers must ground their decisi
 reason in the carried evidence, while already-substantiated holders need only a
 resolving citation. Supporting citations do not discharge that requirement.
 
+Research completion is separate from evidence availability. `RESEARCH` reports
+`no-claims 0 packets` for empty discovery, `unbound N captures; 0 packets` for
+usable captures with no accepted binding, and `unavailable 0 packets` when all
+captures failed or were excluded. A nonempty normalized union reports
+`complete N packets`. Every research result includes the same numeric summary
+stored under `research.summary` in the audit: `claims`, `usable_captures`,
+`capture_failures`, `binding_budget_exclusions`, `bound_sources`,
+`unbound_captures`, `packets`, and `governing_packets`. Capture and binding
+counts are per-claim rows from completed research runs, including repeated URLs;
+packet counts are after normalization and deduplication. `unbound_captures`
+counts usable captures without a binding. `capture_failures` includes retrieval,
+response-size and extraction failures, and excludes binding-budget exclusions.
+These counts also appear after a subsequent decision failure. Research execution
+failure keeps its failure status and retained attempt/capture diagnostics;
+summary rows cover only completed research runs.
+
+HTTP 200 alone does not establish usable evidence. Sources exceeding the binding
+budget are explicitly excluded as whole captures; admitted source text is not
+silently shortened. Research counts never replace decisive-evidence
+substantiation or make a context-only packet governing.
+
 `ADVISORY: human-owner` is informational. `SNAPSHOT` is provenance, not a durable
 replay handle, unless `retain_snapshot: true` was used. That option is the only
 ordinary Paranoia mode that writes a Git ref.

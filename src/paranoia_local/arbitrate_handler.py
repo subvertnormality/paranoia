@@ -1608,6 +1608,7 @@ def _arbitrate(
         per_round=per_round, advisory=advisory, snapshot=snapshot, seed=seed,
         refs_moved=refs_moved, audit=str(audit) if audit else "FAILED could not write log",
         rounds=rounds, record=record, carried_note=carried_note,
+        research_runs=research_runs,
     )
     return _attach_audit_fallback(report, fallback)
 
@@ -1637,9 +1638,47 @@ def _research_run_records(runs: Sequence[ResearchRun]) -> list[dict[str, Any]]:
     ]
 
 
+def _research_summary(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, int]:
+    """Count completed per-claim rows, separately from normalized packet identities."""
+    captures = [capture for run in runs for capture in run.captures]
+    usable = sum(capture.usable for capture in captures)
+    excluded = sum(
+        capture.error == research_core.BINDING_BUDGET_ERROR for capture in captures
+    )
+    bound = sum(source is not None for run in runs for source in run.bound)
+    return {
+        "claims": sum(len(run.claims) for run in runs),
+        "usable_captures": usable,
+        "capture_failures": len(captures) - usable - excluded,
+        "binding_budget_exclusions": excluded,
+        "bound_sources": bound,
+        "unbound_captures": usable - bound,
+        "packets": len(packet.research_packets),
+        "governing_packets": sum(item.governing for item in packet.research_packets),
+    }
+
+
+def _research_result(packet: Packet, runs: Sequence[ResearchRun]) -> str:
+    if not packet.research_enabled:
+        return "repository-only"
+    summary = _research_summary(packet, runs)
+    if summary["packets"]:
+        result = f"complete {summary['packets']} packets"
+    elif not summary["claims"]:
+        result = "no-claims 0 packets"
+    elif summary["unbound_captures"]:
+        result = f"unbound {summary['unbound_captures']} captures; 0 packets"
+    else:
+        result = "unavailable 0 packets"
+    return result + "; " + "; ".join(
+        f"{key}={value}" for key, value in summary.items()
+    )
+
+
 def _research_record(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, Any]:
     return {
         "enabled": packet.research_enabled,
+        "summary": _research_summary(packet, runs),
         "digest": (
             research_core.digest(packet.research_packets)
             if packet.research_enabled else None
@@ -1717,13 +1756,14 @@ def _failed_established_report(
         if packet.research_enabled else None
     )
     rendered_research_status = (
-        f"complete {len(packet.research_packets)} packets"
+        _research_result(packet, completed)
         if research_status == "complete" and packet.research_enabled
         else research_status
     )
     research = {
         "enabled": research_status in {"running", "complete", "failed"},
         "status": research_status,
+        "summary": _research_summary(packet, completed),
         "digest": completed_digest,
         "packets": packet.research_text if packet.research_enabled else None,
         "runs": _research_run_records(completed),
@@ -1835,10 +1875,7 @@ def _failed_decision_report(
     audit, fallback = _write_bounded_audit(
         log_dir, record=audit_record, timestamp=now(),
     )
-    research = (
-        f"complete {len(packet.research_packets)} packets"
-        if packet.research_enabled else "repository-only"
-    )
+    research = _research_result(packet, research_runs)
     digest = (
         research_core.digest(packet.research_packets)
         if packet.research_enabled else "none"
@@ -3007,8 +3044,17 @@ def _render_report(
     rounds: int,
     record: str,
     carried_note: str,
+    research_runs: Sequence[ResearchRun],
 ) -> str:
     out: list[str] = [f"# Arbitration: {outcome.outcome}", "", outcome.reason, ""]
+    if outcome.provisional_selected is not None:
+        out.extend([
+            f"The votes agree on `{outcome.provisional_selected}`, but the agreement "
+            "is non-binding because a decisive evidence check failed. In reconciliation, "
+            "a changed selection must ground its decisive citation in gained carried "
+            "evidence; another resolving snapshot citation does not establish that grounding.",
+            "",
+        ])
 
     out.append("## Options (caller ids)")
     for oid, original in originals.items():
@@ -3028,7 +3074,7 @@ def _render_report(
     out.append("## Shared research")
     if packet.research_enabled:
         out.append(
-            f"{len(packet.research_packets)} server-captured packet(s), digest "
+            f"{_research_result(packet, research_runs)}. Packet digest "
             f"`{research_core.digest(packet.research_packets)}`."
         )
         out.append("```json")
@@ -3070,10 +3116,7 @@ def _render_report(
         render_trailer(
             outcome, advisory=advisory, cleaning=packet.cleaning, snapshot=snapshot,
             seed=seed, refs_moved=refs_moved, audit=audit, rounds=rounds,
-            research=(
-                f"complete {len(packet.research_packets)} packets"
-                if packet.research_enabled else "repository-only"
-            ),
+            research=_research_result(packet, research_runs),
             research_digest=(
                 research_core.digest(packet.research_packets)
                 if packet.research_enabled else "none"

@@ -358,7 +358,7 @@ def test_terminal_decider_failure_preserves_default_research_provenance(
     )
 
     assert trailer_field(report, "ARBITRATION") == "FAILED"
-    assert trailer_field(report, "RESEARCH") == "complete 0 packets"
+    assert trailer_field(report, "RESEARCH").startswith("no-claims 0 packets; ")
     assert trailer_field(report, "SNAPSHOT") != "none"
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     assert record["research"]["enabled"] is True
@@ -532,7 +532,7 @@ def test_post_fanout_failure_preserves_completed_research_packet_and_digest(
     )
 
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
-    assert trailer_field(report, "RESEARCH") == "complete 1 packets"
+    assert trailer_field(report, "RESEARCH").startswith("complete 1 packets; ")
     assert trailer_field(report, "RESEARCH-DIGEST") == record["research"]["digest"]
     assert record["research"]["packets"]
     assert record["research"]["packets"] == ar.render(
@@ -694,7 +694,7 @@ def test_default_research_injects_one_shared_captured_packet_before_voting(
     )
     assert sorted(research_calls) == ["claude", "codex"]
     assert trailer_field(report, "ARBITRATION") == "CONVERGED"
-    assert trailer_field(report, "RESEARCH") == "complete 1 packets"
+    assert trailer_field(report, "RESEARCH").startswith("complete 1 packets; ")
     decider_calls = [call for call in agent.calls if call["cwd"] is not None]
     assert len(decider_calls) == 2
     assert all(call["web_search"] is False for call in decider_calls)
@@ -3398,6 +3398,133 @@ def test_duplicate_attestation_verdicts_are_rejected(repo: Path, tmp_path: Path)
 # --- field-report fixes (issue #8) -------------------------------------------
 
 
+@pytest.mark.parametrize("terminal", ["success", "decider-failure", "established-failure"])
+@pytest.mark.parametrize("kinds,counts,prefix", [
+    ([], (0, 0, 0, 0, 0, 0, 0, 0), "no-claims 0 packets"),
+    (["unbound"], (2, 2, 0, 0, 0, 2, 0, 0), "unbound 2 captures; 0 packets"),
+    (["failed"], (2, 0, 2, 0, 0, 0, 0, 0), "unavailable 0 packets"),
+    (["excluded"], (2, 0, 0, 2, 0, 0, 0, 0), "unavailable 0 packets"),
+    (["unbound", "failed", "excluded"],
+     (6, 2, 2, 2, 0, 2, 0, 0), "unbound 2 captures; 0 packets"),
+    (["bound", "unbound", "failed", "excluded", "context"],
+     (10, 6, 2, 2, 4, 2, 2, 1), "complete 2 packets"),
+    (["context"], (2, 2, 0, 0, 2, 0, 1, 0), "complete 1 packets"),
+])
+def test_research_summary_across_terminal_paths(
+    repo, tmp_path, monkeypatch, terminal, kinds, counts, prefix,
+):
+    researcher_calls = []
+
+    def researcher(**kwargs):
+        researcher_calls.append(kwargs["engine"].name)
+        claims, captures, bindings = [], [], []
+        for kind in kinds:
+            candidate = es.CandidateSource(
+                f"https://docs.example.com/{kind}", "API", "Example", "primary",
+                "Example defines the API", "context" if kind == "context" else "supports_claim",
+            )
+            text = f"The API {kind} behavior is documented."
+            error = (
+                ar.BINDING_BUDGET_ERROR if kind == "excluded"
+                else "page extraction produced no text" if kind == "failed" else None
+            )
+            capture = es.Capture(
+                candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
+                None if error else text, error,
+            )
+            claims.append(ar.DiscoveryClaim("behavior", text, candidate))
+            captures.append(capture)
+            bindings.append(
+                es.BoundSource(candidate, capture, "API", text)
+                if kind in {"bound", "context"} else None
+            )
+        return ah.ResearchRun(
+            kwargs["engine"].name, kwargs["model"], tuple(claims),
+            tuple(bindings), tuple(captures), "discovery", "binding",
+            2, ({}, {}), (1, 1),
+        )
+
+    scripted = Agent(lambda engine, rnd: "opt-decimal")
+
+    def agent(**kwargs):
+        reply = scripted(**kwargs)
+        if terminal == "decider-failure" and kwargs["engine_name"] == "claude":
+            raise RuntimeError("decision execution failed after research")
+        return reply
+
+    if terminal == "established-failure":
+        def broken_substantiation(*args, **kwargs):
+            raise RuntimeError("resolution failed after research")
+        monkeypatch.setattr(ah.arb, "substantiation", broken_substantiation)
+
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False, "research": True},
+        log_dir=tmp_path / "logs", engines=ENGINES, run_agent=agent,
+        run_research=researcher, now=lambda: "20260727T120000",
+    )
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    expected = dict(zip((
+        "claims", "usable_captures", "capture_failures", "binding_budget_exclusions",
+        "bound_sources", "unbound_captures", "packets", "governing_packets",
+    ), counts, strict=True))
+    assert audit["research"]["summary"] == expected
+    assert trailer_field(report, "RESEARCH") == prefix + "; " + "; ".join(
+        f"{key}={value}" for key, value in expected.items()
+    )
+    assert trailer_field(report, "RESEARCH-DIGEST") == audit["research"]["digest"]
+    assert trailer_field(report, "ARBITRATION") == (
+        "CONVERGED" if terminal == "success" else "FAILED"
+    )
+    assert sorted(researcher_calls) == ["claude", "codex"]
+    assert sum(run["calls"] for run in audit["research"]["runs"]) == 4
+    assert len(scripted.calls) == 2
+    assert len(audit["research"]["runs"]) == 2
+
+
+def test_issue142_incident_reports_all_http200_capture_failures(repo, tmp_path):
+    incident = json.loads((
+        Path(__file__).parents[1] / "docs/arbitration-diagnostics-142-incident.json"
+    ).read_text())
+
+    def researcher(**kwargs):
+        row = next(r for r in incident["research_runs"] if r["engine"] == kwargs["engine"].name)
+        candidate = es.CandidateSource(
+            "https://example.com/filing", "Filing", "Issuer", "primary",
+            "Issuer filing", "supports_claim",
+        )
+        assert all(status == 200 for status in row["http_statuses"])
+        captures = tuple(
+            es.Capture(candidate, candidate.url, 200, "text/html", None, None, None, error)
+            for error in row["capture_errors"]
+        )
+        claims = tuple(
+            ar.DiscoveryClaim("fact", f"Filing claim {index}.", candidate)
+            for index in range(row["claims"])
+        )
+        return ah.ResearchRun(
+            row["engine"], kwargs["model"], claims, (None,) * len(claims), captures,
+            "discovery", "binding", 2, ({}, {}), (1, 1),
+        )
+
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False, "research": True},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        run_agent=Agent(lambda engine, rnd: "opt-decimal"), run_research=researcher,
+        now=lambda: "20260727T120000",
+    )
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    assert audit["research"]["summary"] == {
+        "claims": 20, "usable_captures": 0, "capture_failures": 17,
+        "binding_budget_exclusions": 3, "bound_sources": 0, "unbound_captures": 0,
+        "packets": 0, "governing_packets": 0,
+    }
+    result = trailer_field(report, "RESEARCH")
+    assert result.startswith("unavailable 0 packets; ")
+    assert "capture_failures=17; binding_budget_exclusions=3" in result
+    assert "complete 0 packets" not in result
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+
+
 def test_the_field_scenario_now_converges(repo: Path, tmp_path: Path):
     """Issue #8's actual run: round 1 diverges, codex flips onto claude's carried
     region, claude holds and cites the producer code instead of the artifact. That
@@ -3446,6 +3573,8 @@ def test_a_flip_onto_uncarried_evidence_is_still_unsubstantiated(repo: Path, tmp
     reason = trailer_field(report, "REASON")
     assert "elsewhere.py:20" in reason
     assert "resolved decisive citation is outside gained carried evidence" in reason
+    assert "The votes agree on `opt-decimal`" in report
+    assert "agreement is non-binding" in report
     record = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
     assert record["reason"] == reason
 
