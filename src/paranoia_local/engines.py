@@ -639,7 +639,7 @@ CLAUDE_DENY_TOOLS = ["Write", "Edit", "NotebookEdit"]
 
 class ClaudeEngine(Engine):
     name = "claude"
-    default_model = "claude-fable-5-1"
+    default_model = "claude-fable-5-2"
     correction_model = "claude-opus-5-5"
     binary = "claude"
 

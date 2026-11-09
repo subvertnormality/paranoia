@@ -1,5 +1,9 @@
 # Repository agent instructions
 
+The default Claude model is `ClaudeEngine.default_model` (`claude-fable-5-2`).
+Current tool descriptions and documentation follow that default. Keep historical
+provider evidence and frozen benchmark model pins bound to their original models.
+
 Issue #142 follows docs/arbitration-diagnostics-142-plan.md. Preserve the intentional
 gained-carried-evidence gate for changed arbitration selections and the two-round
 ceiling. Report unanimous unsubstantiated agreement explicitly. Derive research

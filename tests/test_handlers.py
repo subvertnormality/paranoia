@@ -53,9 +53,9 @@ class TestModelKeyedEffort:
     """Fable/Astra default to medium effort; Opus/Sol default to high."""
 
     @pytest.mark.parametrize("default_model, override, expected", [
-        ("claude-fable-5-1", None, "medium"),
+        ("claude-fable-5-2", None, "medium"),
         ("gpt-6-astra", None, "medium"),
-        ("claude-fable-5-1", "claude-opus-5", "high"),
+        ("claude-fable-5-2", "claude-opus-5", "high"),
         ("gpt-6-astra", "gpt-5.6-sol", "high"),
     ])
     def test_critique_branch(
@@ -74,7 +74,7 @@ class TestModelKeyedEffort:
     def test_critique_branch_explicit_effort_wins(
         self, repo_with_branch: Path, tmp_path: Path,
     ) -> None:
-        eng = ModelEngine("claude-fable-5-1")
+        eng = ModelEngine("claude-fable-5-2")
         handlers.critique_branch(
             {"repo_path": str(repo_with_branch), "base_ref": "main", "head_ref": "feature",
              "round": 1, "effort": "high"},
@@ -83,7 +83,7 @@ class TestModelKeyedEffort:
         assert [c for c in eng.calls if c["kind"] == "run"][0]["effort"] == "high"
 
     @pytest.mark.parametrize("model, expected", [
-        ("claude-fable-5-1", "medium"), ("gpt-5.6-sol", "high"),
+        ("claude-fable-5-2", "medium"), ("gpt-5.6-sol", "high"),
     ])
     def test_critique_plan(self, repo: Path, tmp_path: Path, model, expected) -> None:
         eng = ModelEngine(model)
@@ -114,7 +114,7 @@ class TestModelKeyedEffort:
         assert eng.calls[0]["effort"] == "low"
 
     @pytest.mark.parametrize("model, expected", [
-        ("claude-fable-5-1", "medium"), ("claude-opus-5", "high"),
+        ("claude-fable-5-2", "medium"), ("claude-opus-5", "high"),
     ])
     def test_rebut(self, repo: Path, tmp_path: Path, model, expected) -> None:
         eng = ModelEngine(model)
