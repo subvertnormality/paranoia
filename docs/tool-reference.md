@@ -31,7 +31,7 @@ Changing `cleaner_model` to evade a safeguard is unsupported.
 | Argument | Values | Default |
 |---|---|---|
 | `engine` | `codex` or `claude` | Server configuration |
-| `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-1` |
+| `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-2` |
 | `effort` | `low`, `medium`, or `high` | By model: Fable/Astra `medium`, Opus/Sol `high`; otherwise `high` (`query` `medium`) |
 | `web_search` | Boolean | `true` |
 | `review_model_policy` (`critique_branch`, `critique_plan`) | `tiered` or `strongest` | `tiered` |
@@ -42,10 +42,10 @@ Structural model routing applies only to tracked staged `critique_branch` and
 
 | Phase | Codex | Claude | Effort |
 |---|---|---|---|
-| Census lanes and consolidation | `gpt-6-astra` | `claude-fable-5-1` | medium |
+| Census lanes and consolidation | `gpt-6-astra` | `claude-fable-5-2` | medium |
 | Correction (`tiered`) | `gpt-6.1-sol` | `claude-opus-5-5` | high |
-| Correction (`strongest`) | `gpt-6-astra` | `claude-fable-5-1` | medium |
-| Cold final | `gpt-6-astra` | `claude-fable-5-1` | medium |
+| Correction (`strongest`) | `gpt-6-astra` | `claude-fable-5-2` | medium |
+| Cold final | `gpt-6-astra` | `claude-fable-5-2` | medium |
 | Proposal and its validation retry | source review's model | source review's model | source review's effort |
 
 Effort for a routed phase resolves as: that model family's `effort_by_model` entry, then

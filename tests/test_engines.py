@@ -43,7 +43,7 @@ class TestFactory:
 
     def test_default_models(self) -> None:
         assert engines.get_engine("codex").default_model == "gpt-6-astra"
-        assert engines.get_engine("claude").default_model == "claude-fable-5-1"
+        assert engines.get_engine("claude").default_model == "claude-fable-5-2"
 
     def test_arbitration_attester_uses_codex_default_generation(self) -> None:
         assert engines.ATTESTER_ENGINE == "codex"
@@ -191,6 +191,7 @@ def test_codex_terminal_error_remains_a_failure() -> None:
     assert review.failure_detail == "terminal"
 
 @pytest.mark.parametrize("model, expected", [
+    ("claude-fable-5-2", "medium"),
     ("claude-fable-5-1", "medium"),
     ("gpt-6-astra", "medium"),
     ("claude-opus-5", "high"),

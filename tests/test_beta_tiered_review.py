@@ -26,7 +26,7 @@ GOOD_PLAN = "The value is two.\n"
 BAD_PLAN = "The value is broken.\n"
 ENGINES = {
     "codex": (engines.CodexEngine, "gpt-6-astra", "gpt-6.1-sol"),
-    "claude": (engines.ClaudeEngine, "claude-fable-5-1", "claude-opus-5-5"),
+    "claude": (engines.ClaudeEngine, "claude-fable-5-2", "claude-opus-5-5"),
 }
 
 
@@ -639,7 +639,7 @@ def test_effort_by_model_merges_config_and_argument_per_family(tmp_path, monkeyp
     corrected = h.review(propose_patch=False, effort_by_model={"fable": "high"})
     final = h.review(propose_patch=False, effort_by_model={"fable": "high"})
     assert h.provider.roles()[-2:] == [
-        ("correction", "claude-opus-5-5", "medium"), ("final", "claude-fable-5-1", "high"),
+        ("correction", "claude-opus-5-5", "medium"), ("final", "claude-fable-5-2", "high"),
     ]
     assert "effort-by-model=fable/high(argument),opus/medium(repository-config)" in corrected
     # A final at a non-release effort cannot claim beta qualification.
