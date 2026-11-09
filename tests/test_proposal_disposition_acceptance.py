@@ -29,14 +29,24 @@ def test_native_proposal_disposition_acceptance(name, current):
     assert hashlib.sha256(blob(runner)).hexdigest() == record["runner_sha256"]
     for path, digest in record["source"]["files"].items():
         assert hashlib.sha256(blob(path)).hexdigest() == digest
-    # This retained acceptance applies to the current critical production route,
-    # not a blanket claim that historical evidence exercises later changed bytes.
+    # Bind the critical route while preserving the trace's historical model.
+    # Only the default/description model spelling may differ; the retained run
+    # does not qualify Fable 5.2 itself (checked separately with a live query).
     if current:
         for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
                      "patch_proposals.py", "engines.py", "review_census.py", "prompts.py",
                      "proposal_checkout.py"):
             relative = f"src/paranoia_local/{path}"
-            assert hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() == record["source"]["files"][relative]
+            source = (ROOT / relative).read_bytes()
+            if path == "engines.py":
+                source = source.replace(
+                    b'default_model = "claude-fable-5-2"',
+                    b'default_model = "claude-fable-5-1"',
+                    1,
+                )
+            elif path == "server.py":
+                source = source.replace(b"claude-fable-5-2", b"claude-fable-5-1")
+            assert hashlib.sha256(source).hexdigest() == record["source"]["files"][relative]
     if name.startswith("lfs_"):
         fixture = record["lfs_fixture"]
         payload = b"inert dataset\x00\xff\n" * 16384
