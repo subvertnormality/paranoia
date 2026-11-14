@@ -279,6 +279,58 @@ def test_filing_windows_and_rejection_diagnostics_through_public_handler(
         assert all(row["status"] == "binding-not-completed" for row in failure["diagnostics"])
 
 
+@pytest.mark.parametrize("invalid", [False, True])
+def test_sec_identity_capture_and_rejection_through_public_arbitration(repo, tmp_path, monkeypatch, invalid):
+    from .test_external_sources import Response
+
+    identity = "Private invalid contact" if invalid else "ResearchTool alice@example.com"
+    monkeypatch.setenv(es.SEC_USER_AGENT_ENV, identity)
+    monkeypatch.setattr(es, "_validate_public_url", lambda url: None)
+    urls = ["https://www.sec.gov/source", "https://docs.example.com/source"]
+    quotes, requests = ["The SEC API retries twice.", "The public API retries twice."], []
+    original_capture_all = es.capture_all
+    def open_call(request, timeout):
+        requests.append(request.full_url)
+        sec = request.full_url == urls[0]
+        assert request.get_header("User-agent") == (identity if sec else es.BASE_REQUEST_HEADERS["User-Agent"])
+        return Response(quotes[urls.index(request.full_url)].encode(), "text/plain", url=request.full_url)
+    def captured(candidates, **kwargs):
+        assert kwargs["research"] is True
+        return original_capture_all(candidates, capture_one=lambda candidate:
+                                    es.capture(candidate, research=True, opener=open_call))
+    monkeypatch.setattr(es, "capture_all", captured)
+    def researcher(**kwargs):
+        discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({"claims": [{
+            "kind": "behavior", "proposition": quotes[index],
+            "candidate": {"url": url, "title": "Official docs", "publisher": "Example",
+                          "source_kind": "primary", "authority_basis": "Issuer defines API",
+                          "relation": "supports_claim"},
+        } for index, url in enumerate(urls)]})
+        binding = ar.BINDING_MARKER + "\n" + json.dumps({"bindings": [{
+            "claim_index": index, "usable": not (invalid and index == 0),
+            "location": None if invalid and index == 0 else "API",
+            "passage": None if invalid and index == 0 else quotes[index],
+        } for index in range(2)]})
+        scripted = ScriptedResearchEngine(kwargs["engine"].name, [
+            eng.Review(discovery, "session", discovery), eng.Review(binding, "session", binding)])
+        return ah._research_one(**{**kwargs, "engine": scripted})
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False, "research": True},
+        log_dir=tmp_path / "logs", engines=ENGINES,
+        run_agent=Agent(lambda engine, rnd: "opt-decimal"), run_research=researcher,
+    )
+    audit_path = Path(trailer_field(report, "AUDIT"))
+    audit_text = audit_path.read_text(encoding="utf-8")
+    audit = json.loads(audit_text)
+    assert trailer_field(report, "ARBITRATION") == "CONVERGED"
+    assert len(requests) == (2 if invalid else 4)
+    for run in audit["research"]["runs"]:
+        assert bool(run["bindings"][0]) is (not invalid) and run["bindings"][1]
+        if invalid:
+            assert run["original_captures"][0]["error"] == es.SEC_USER_AGENT_ERROR
+    assert identity not in report and identity not in audit_text
+
+
 def _options_by_engine(agent) -> dict:
     """Deciders run in parallel, so call order is nondeterministic — key by engine."""
     out = {}

@@ -338,6 +338,34 @@ substantiation or make a context-only packet governing.
 
 ### Captured filing evidence
 
+#### SEC request identity policy
+
+This section is the authoritative SEC request policy; other documentation and
+agent guidance summarize it.
+
+`PARANOIA_SEC_USER_AGENT` optionally supplies the full declared application/operator
+identity and contact email for `sec.gov` and dot-delimited subdomains. The value is
+frozen once per capture and must be nonempty printable ASCII of at most 512
+characters containing an email. Invalid values fail only captures that request
+SEC, using a constant diagnostic that omits the value. Header selection repeats
+after every public-address-validated redirect: entering SEC applies the identity;
+leaving SEC removes it and restores that attempt's generic or browser header.
+The existing one-time 403 retry retains the configured identity for SEC requests,
+the original deadline and a fresh redirect counter. Unset configuration preserves
+the previous generic/browser behavior. No contact is stored in capture metadata,
+and successful HTTP capture still requires independent authority and entailment.
+
+The practical email token has a boundary at the start/end of the value, a space,
+or an angle/round bracket. Its local part consists of alphanumeric, `_`, `%`, `+`
+or `-` segments separated by single dots. Its domain has at least two DNS labels
+of 1–63 ASCII alphanumeric/hyphen characters without edge hyphens; the final label
+has 2–63 ASCII letters. `Tool alice+research@example.com` and
+`Tool <a.b@example.org>` qualify. Missing contacts, `a@localhost`,
+`a@-example.com`, `a..b@example.com` and joined email tokens do not. There is no
+mailbox-existence check.
+
+#### Extraction and binding limits
+
 The shared capturer accepts HTML, XHTML, plain text and `application/pdf`.
 Text-bearing PDF extraction uses pypdf; encrypted, empty/scanned, malformed and
 over-limit documents remain retrieval failures. HTML first uses Trafilatura
