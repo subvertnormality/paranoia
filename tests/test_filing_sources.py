@@ -252,3 +252,26 @@ def test_binding_rejection_reason_is_bounded_and_legacy_is_explicit():
     row["reason"] = "x" * 601
     with pytest.raises(ar.ResearchError, match="reason exceeds"):
         ar.parse_binding_result(reply(), [claim], [capture])
+
+
+def test_filing_research_native_receipt_retains_its_source_and_execution():
+    root = Path(__file__).resolve().parents[1]
+    receipt = json.loads((root / "docs/filing-research-146-acceptance.json").read_text(encoding="utf-8"))
+    assert receipt["kind"] == "issue146-captured-filing-research" and receipt["qualified"]
+    revision = receipt["source_revision"]
+    inventory = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", revision, "--", "src/paranoia_local"], cwd=root, text=True)
+    assert set(receipt["source_sha256"]) == {p for p in inventory.splitlines() if p.endswith(".py")}
+    for name, digest in receipt["source_sha256"].items():
+        assert hashlib.sha256(subprocess.check_output(["git", "show", f"{revision}:{name}"], cwd=root)).hexdigest() == digest
+    sources = receipt["direct_capture"]["sources"]
+    assert {source["extraction_metadata"]["kind"] for source in sources} == {"pdf", "edgar-single-document"}
+    assert all(source["status"] == 200 and source["extracted_characters"] > 0 for source in sources)
+    native = receipt["native_research"]
+    assert native["engine"] == "codex" and native["model_calls"] == 2
+    assert native["claims"] == native["bound_sources"] == 1
+    assert [row["phase"] for row in native["attempts"]] == ["discovery", "binding"]
+    for row in native["attempts"]:
+        assert row["returncode"] == 0 and not row["execution_error"] and row["session_ref"]
+        assert len(row["raw_sha256"]) == len(row["extracted_sha256"]) == 64
+    assert "shares outstanding" in native["packet_text"]
+    assert "latest practicable date" in native["packet_text"]

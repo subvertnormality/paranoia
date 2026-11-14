@@ -10,6 +10,9 @@ captures and explicitly labelled quote-located binding windows; plan verificatio
 keeps its existing complete-source limits and authority/attestation requirements.
 Research window locators are untrusted hints, never evidence. Preserve original
 capture digests and validate passages against the exact supplied window.
+Structural-only historical class fixtures still check original capture/research
+blobs, but do not qualify later behavior in those unrelated modules. Keep existing
+allowance entries exact, add none, and retain current capture evidence separately.
 
 Issue #142 follows docs/arbitration-diagnostics-142-plan.md. Preserve the intentional
 gained-carried-evidence gate for changed arbitration selections and the two-round

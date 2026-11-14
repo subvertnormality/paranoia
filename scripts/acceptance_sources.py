@@ -8,6 +8,20 @@ import subprocess
 from pathlib import Path
 
 
+# These modules are not executed by the retained structural-only class fixtures.
+# Their original blobs remain checked. Issue 146 separately qualifies current
+# capture/research behavior; an old structural run cannot qualify that behavior.
+HISTORICAL_CLASS_CONTEXT = frozenset({
+    "src/paranoia_local/arbitration_research.py",
+    "src/paranoia_local/external_sources.py",
+})
+
+
+def current_class_source_required(relative: str, existing_allowances: dict) -> bool:
+    """Keep existing deltas exact; do not invent new allowances for unrelated roles."""
+    return relative not in HISTORICAL_CLASS_CONTEXT or relative in existing_allowances
+
+
 def historical_inventory(root: Path, revision: str, configured) -> set[str]:
     result = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", revision, "--", "src/paranoia_local"],

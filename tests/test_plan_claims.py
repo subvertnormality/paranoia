@@ -278,6 +278,10 @@ def test_authoritative_capture_acceptance_record() -> None:
         if relative not in {
             "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
             "src/paranoia_local/plan_claims.py",
+            # Issue 146 deliberately changes extraction; this provider run still
+            # binds only its immutable source blob checked above. Current PDF/SGML
+            # evidence is separately retained in filing-research-146-acceptance.json.
+            "src/paranoia_local/external_sources.py",
         }:
             assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     allowed = snapshot["allowed_later_handlers_diff"]
