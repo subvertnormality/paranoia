@@ -1652,6 +1652,9 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
             stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(recorded).hexdigest() == expected
+        from scripts.acceptance_sources import current_class_source_required
+        if not current_class_source_required(relative, allowed_later):
+            continue
         if (root / relative).read_bytes() == recorded:
             continue
         changed.add(relative)
@@ -2081,6 +2084,9 @@ def test_keyed_handler_acceptance_replays_production_lifecycle(tmp_path):
         assert artifact["module_metrics"][relative] == {
             "bytes":len(historical), "lines":len(historical.splitlines()),
         }
+        from scripts.acceptance_sources import current_class_source_required
+        if not current_class_source_required(relative, artifact["allowed_later_source_diffs"]):
+            continue
         if (root / relative).read_bytes() == historical:
             continue
         changed.add(relative)

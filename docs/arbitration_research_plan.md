@@ -4,6 +4,12 @@
 
 Implemented and covered by the current arbitration acceptance record.
 
+This historical design's capture limits, whole-source arbitration binding and
+unusable-binding diagnostics are superseded by
+[issue 146](filing-research-146-plan.md) and the current
+[capture policy](tool-reference.md#captured-filing-evidence). Its original acceptance
+remains historical evidence, not qualification of those later changes.
+
 ## Frozen stakes
 
 `paranoia-local` is a trusted-single-user local MCP on a trusted OS. The caller, repository,

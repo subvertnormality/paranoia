@@ -251,7 +251,8 @@ project-authored choices stay in structural review and tests.
 Verification has four stages:
 
 1. The reviewer uses built-in search only to inventory claims and discover URLs.
-2. Paranoia downloads public HTTP(S) pages and extracts main text with Trafilatura.
+2. Paranoia downloads public HTTP(S) sources and extracts HTML text with Trafilatura
+   or PDF text with pypdf under the [contained capture policy](tool-reference.md#captured-filing-evidence).
 3. The same session, now without browsing, binds exact captured passages to claims.
 4. A separate cold, tool-free attester judges authority and entailment.
 

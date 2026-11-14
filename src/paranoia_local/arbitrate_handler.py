@@ -160,6 +160,9 @@ class ResearchRun:
     usage: tuple[dict | None, ...]
     durations_ms: tuple[int | None, ...]
     attempts: tuple[dict[str, Any], ...] = ()
+    original_captures: tuple[external_sources.Capture, ...] = ()
+    binding_scopes: tuple[tuple[int, int] | None, ...] = ()
+    binding_reasons: tuple[str | None, ...] = ()
 
 
 class ResearchFailure(ArbitrationError):
@@ -1630,12 +1633,43 @@ def _research_run_records(runs: Sequence[ResearchRun]) -> list[dict[str, Any]]:
             "usage": run.usage,
             "durations_ms": run.durations_ms,
             "captures": [asdict(capture) for capture in run.captures],
+            "original_captures": [asdict(capture) for capture in (run.original_captures or run.captures)],
+            "binding_views": [
+                research_core.window_metadata(capture, run.binding_scopes[index] if run.binding_scopes else None)
+                for index, capture in enumerate(run.original_captures or run.captures)
+            ],
+            "diagnostics": list(research_core.binding_diagnostics(
+                run.claims, run.captures, run.bound, run.binding_reasons,
+            )),
             "claims": [asdict(claim) for claim in run.claims],
             "bindings": [asdict(item) if item is not None else None for item in run.bound],
             "attempts": [dict(item) for item in run.attempts],
         }
         for run in runs
     ]
+
+
+def _research_diagnostics(
+    runs: Sequence[ResearchRun], failures: Sequence[Mapping[str, Any]] = (),
+) -> list[dict[str, Any]]:
+    rows = [
+        {"engine": run.engine, **row}
+        for run in runs for row in research_core.binding_diagnostics(
+            run.claims, run.captures, run.bound, run.binding_reasons,
+        )
+    ]
+    rows.extend({"engine": failure["engine"], **row}
+                for failure in failures for row in failure.get("diagnostics", ()))
+    return rows
+
+
+def _research_diagnostic_lines(
+    runs: Sequence[ResearchRun], failures: Sequence[Mapping[str, Any]] = (),
+) -> list[str]:
+    rows = _research_diagnostics(runs, failures)
+    if not rows:
+        return []
+    return ["Research binding diagnostics:", "```json", json.dumps(rows, ensure_ascii=True), "```", ""]
 
 
 def _research_summary(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, int]:
@@ -1683,6 +1717,7 @@ def _research_record(packet: Packet, runs: Sequence[ResearchRun]) -> dict[str, A
     return {
         "enabled": packet.research_enabled,
         "summary": _research_summary(packet, runs),
+        "diagnostics": _research_diagnostics(runs),
         "digest": (
             research_core.digest(packet.research_packets)
             if packet.research_enabled else None
@@ -1771,6 +1806,7 @@ def _failed_established_report(
         "enabled": research_status in {"running", "complete", "failed"},
         "status": research_status,
         "summary": _research_summary(packet, completed),
+        "diagnostics": _research_diagnostics(completed, failures),
         "digest": completed_digest,
         "packets": packet.research_text if packet.research_enabled else None,
         "runs": _research_run_records(completed),
@@ -1811,6 +1847,7 @@ def _failed_established_report(
         reason,
         "",
     ]
+    parts.extend(_research_diagnostic_lines(completed, failures))
     if fallback is not None:
         parts.extend(["## Audit fallback", "", "```json", fallback, "```", ""])
     parts.append(render_trailer(
@@ -1893,6 +1930,7 @@ def _failed_decision_report(
         failure_reason,
         "",
     ]
+    parts.extend(_research_diagnostic_lines(research_runs))
     if fallback is not None:
         parts.extend(["## Audit fallback", "", "```json", fallback, "```", ""])
     parts.append(render_trailer(
@@ -2014,6 +2052,10 @@ def _research_one(
     rejected: list[dict[str, Any]] = []
     claims: tuple[research_core.DiscoveryClaim, ...] = ()
     captures: tuple[external_sources.Capture, ...] = ()
+    original_captures: tuple[external_sources.Capture, ...] = ()
+    prepared: research_core.BindingInput | None = None
+    binding_reasons: tuple[str | None, ...] = ()
+    capture_outcomes: tuple[external_sources.Capture | None, ...] | None = None
 
     def admit(phase: str, cap: int, attempt: dict[str, Any]) -> None:
         if deadline is not None and time.monotonic() + cap > deadline:
@@ -2143,11 +2185,17 @@ def _research_one(
 
         try:
             captures = tuple(external_sources.capture_all(
-                [claim.candidate for claim in claims], deadline=deadline,
+                [claim.candidate for claim in claims], deadline=deadline, research=True,
             ))
         except Exception as exc:
             completed_captures = tuple(
                 getattr(exc, "completed", ())
+            )
+            captures = completed_captures
+            indices = getattr(exc, "completed_indices", None)
+            capture_outcomes = (
+                tuple(dict(zip(indices, captures, strict=True)).get(index) for index in range(len(claims)))
+                if indices is not None else None
             )
             raise _research_failure(
                 engine=engine, model=model, phase="capture", kind="execution",
@@ -2155,7 +2203,9 @@ def _research_one(
                 rejected=rejected, claims=claims, captures=completed_captures,
             ) from exc
         try:
-            rendered, captures = research_core.bounded_binding_input(claims, captures)
+            original_captures = captures
+            prepared = research_core.prepare_binding_input(claims, captures)
+            rendered, captures = prepared.rendered, prepared.captures
         except Exception as exc:
             raise _research_failure(
                 engine=engine, model=model, phase="binding-input", kind="validation",
@@ -2204,7 +2254,9 @@ def _research_one(
                 review=binding, rejected=rejected, claims=claims, captures=captures,
             )
         try:
-            bound = research_core.parse_binding(binding.text, claims, captures)
+            bound, binding_reasons = research_core.parse_binding_result(
+                binding.text, claims, captures, prepared.scopes,
+            )
         except research_core.ResearchError as first:
             attempts[-1] = _research_reply_record(
                 "binding", binding, first, prompt=binding_prompt,
@@ -2256,7 +2308,9 @@ def _research_one(
                     captures=captures,
                 )
             try:
-                bound = research_core.parse_binding(correction.text, claims, captures)
+                bound, binding_reasons = research_core.parse_binding_result(
+                    correction.text, claims, captures, prepared.scopes,
+                )
             except research_core.ResearchError as second:
                 attempts[-1] = _research_reply_record(
                     "binding-validation-retry", correction, second,
@@ -2280,7 +2334,26 @@ def _research_one(
             usage=tuple(item.usage for item in reviews),
             durations_ms=tuple(item.duration_ms for item in reviews),
             attempts=tuple(dict(attempt) for attempt in attempts),
+            original_captures=original_captures,
+            binding_scopes=prepared.scopes,
+            binding_reasons=binding_reasons,
         )
+    except ResearchFailure as failure:
+        originals = original_captures or captures
+        failure.record["original_captures"] = [asdict(item) for item in originals]
+        failure.record["binding_views"] = [
+            research_core.window_metadata(item, prepared.scopes[index] if prepared else None)
+            for index, item in enumerate(originals)
+        ]
+        aligned = capture_outcomes if capture_outcomes is not None else (
+            captures if len(captures) == len(claims) else tuple(
+                next((item for item in captures if item.candidate == claim.candidate), None)
+                if sum(other.candidate == claim.candidate for other in claims) == 1 else None
+                for claim in claims
+            )
+        )
+        failure.record["diagnostics"] = list(research_core.binding_diagnostics(claims, aligned))
+        raise
     finally:
         if launch is not None:
             shutil.rmtree(launch, ignore_errors=True)
@@ -3090,6 +3163,8 @@ def _render_report(
     else:
         out.append("Repository-only; no web research was performed.")
     out.append("")
+
+    out.extend(_research_diagnostic_lines(research_runs))
 
     for i, votes in enumerate(per_round, 1):
         out.append(f"## Round {i}")

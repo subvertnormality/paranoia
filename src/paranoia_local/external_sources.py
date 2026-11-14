@@ -8,17 +8,20 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 import re
 import socket
+import subprocess
+import sys
+import tempfile
 import time
 import unicodedata
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Callable, Iterable
 from urllib.parse import urljoin, urlparse
-
-import trafilatura
 
 
 SOURCE_KINDS = frozenset({"primary", "authoritative", "secondary", "ugc"})
@@ -32,6 +35,8 @@ UGC_HOSTS = (
 
 MAX_RESPONSE_BYTES = 5_000_000
 MAX_EXTRACTED_CHARS = 1_000_000
+RESEARCH_MAX_RESPONSE_BYTES = 25_000_000
+RESEARCH_MAX_EXTRACTED_CHARS = 5_000_000
 CONNECT_TIMEOUT_SEC = 20
 READ_TIMEOUT_SEC = 40
 MAX_REDIRECTS = 5
@@ -73,9 +78,11 @@ class RedirectRejected(SourceError):
 class CaptureGroupError(RuntimeError):
     """A capture task failed unexpectedly after zero or more siblings completed."""
 
-    def __init__(self, message: str, completed: tuple["Capture", ...]):
+    def __init__(self, message: str, completed: tuple["Capture", ...], *,
+                 completed_indices: tuple[int, ...] | None = None):
         super().__init__(message)
         self.completed = completed
+        self.completed_indices = completed_indices
 
 
 @dataclass(frozen=True)
@@ -99,6 +106,7 @@ class Capture:
     text: str | None
     error: str | None = None
     fallback_attempted: bool = False
+    extraction_metadata: dict | None = None
 
     @property
     def usable(self) -> bool:
@@ -207,39 +215,90 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def _extract(body: bytes, content_type: str) -> str:
-    if content_type.startswith("text/plain"):
-        text = body.decode("utf-8", errors="replace")
-    else:
-        text = trafilatura.extract(
-            body, output_format="txt", include_comments=False, include_tables=True,
-            favor_precision=True,
-        ) or ""
-    text = text.strip()
-    if not text:
-        raise SourceError("page extraction produced no text")
-    if len(text) > MAX_EXTRACTED_CHARS:
-        raise SourceError(
-            f"extracted page has {len(text)} characters; limit is {MAX_EXTRACTED_CHARS}"
-        )
-    return text
+    """Pure extraction helper for deterministic callers; capture uses containment."""
+    from .source_extraction import extract
+
+    try:
+        return extract(body, content_type, MAX_EXTRACTED_CHARS)[0]
+    except ValueError as exc:
+        raise SourceError(str(exc)) from exc
 
 
-def _read_body(response: object, *, deadline: float, clock: Callable[[], float]) -> bytes:
+def _extract_bounded(
+    body: bytes, content_type: str, *, deadline: float,
+    clock: Callable[[], float], max_chars: int,
+) -> tuple[str, dict | None]:
+    output_limit = 12 * max_chars + 5000
+    argv = [sys.executable, "-I", str(Path(__file__).with_name("source_extraction.py")),
+            content_type, str(max_chars)]
+    # Files avoid unbounded communicate() pipe buffers. The parent polls file
+    # sizes and reads only the admitted protocol size, even on worker failure.
+    with tempfile.TemporaryFile() as source, tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+        source.write(body)
+        source.seek(0)
+        if clock() >= deadline:
+            raise SourceError("source capture deadline expired before extraction")
+        with subprocess.Popen(
+            argv, stdin=source, stdout=output, stderr=errors,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        ) as proc:
+            try:
+                while proc.poll() is None:
+                    remaining = deadline - clock()
+                    if remaining <= 0:
+                        raise SourceError("source capture deadline expired during extraction")
+                    if output.tell() > output_limit or errors.tell() > 4800:
+                        raise SourceError("source extraction worker output exceeds limit")
+                    try:
+                        proc.wait(timeout=min(0.05, remaining))
+                    except subprocess.TimeoutExpired:
+                        pass
+            finally:
+                if proc.poll() is None:
+                    proc.kill()
+                proc.wait()
+            if clock() >= deadline:
+                raise SourceError("source capture deadline expired during extraction")
+            output.seek(0)
+            raw = output.read(output_limit + 1)
+            errors.seek(0)
+            error = errors.read(4801)
+            if len(raw) > output_limit or len(error) > 4800:
+                raise SourceError("source extraction worker output exceeds limit")
+            if proc.returncode:
+                detail = error.decode("utf-8", "replace") or f"exit {proc.returncode}"
+                raise SourceError(f"source extraction failed: {detail}")
+    try:
+        value = json.loads(raw)
+        if (not isinstance(value, dict) or set(value) != {"text", "metadata"}
+                or not isinstance(value["text"], str) or not value["text"].strip()
+                or len(value["text"]) > max_chars
+                or value["metadata"] is not None and not isinstance(value["metadata"], dict)):
+            raise ValueError("invalid extraction fields")
+        if clock() >= deadline:
+            raise SourceError("source capture deadline expired after extraction")
+        return value["text"], value["metadata"]
+    except (UnicodeError, ValueError) as exc:
+        raise SourceError(f"invalid source extraction reply: {exc}") from exc
+
+
+def _read_body(response: object, *, deadline: float, clock: Callable[[], float],
+               max_bytes: int = MAX_RESPONSE_BYTES) -> bytes:
     """Read a real urllib response in bounded chunks under one wall-clock deadline."""
     read1 = getattr(response, "read1", None)
     if not callable(read1):
-        body = response.read(MAX_RESPONSE_BYTES + 1)  # type: ignore[attr-defined]
+        body = response.read(max_bytes + 1)  # type: ignore[attr-defined]
         if clock() > deadline:
             raise SourceError("source capture deadline expired while reading response")
         return body
     body = bytearray()
-    while len(body) <= MAX_RESPONSE_BYTES:
+    while len(body) <= max_bytes:
         remaining = deadline - clock()
         if remaining <= 0:
             raise SourceError("source capture deadline expired while reading response")
         # HTTPResponse.read1 performs at most one buffered/raw read, so the deadline is
         # checked between chunks rather than being reset indefinitely by a trickle stream.
-        chunk = read1(min(READ_CHUNK_BYTES, MAX_RESPONSE_BYTES + 1 - len(body)))
+        chunk = read1(min(READ_CHUNK_BYTES, max_bytes + 1 - len(body)))
         if clock() > deadline:
             raise SourceError("source capture deadline expired while reading response")
         if not chunk:
@@ -287,6 +346,7 @@ def capture(
     opener: Callable[[urllib.request.Request, float], object] | None = None,
     deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
+    research: bool = False,
 ) -> Capture:
     candidate = normalize_candidate(candidate)
     fallback_attempted = False
@@ -295,6 +355,8 @@ def capture(
     content_type: str | None = None
     content_sha256: str | None = None
     text_sha256: str | None = None
+    max_bytes = RESEARCH_MAX_RESPONSE_BYTES if research else MAX_RESPONSE_BYTES
+    max_chars = RESEARCH_MAX_EXTRACTED_CHARS if research else MAX_EXTRACTED_CHARS
     try:
         started = clock()
         capture_deadline = started + CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC
@@ -351,13 +413,15 @@ def capture(
             status = int(getattr(response, "status", 200))
             content_type = response.headers.get_content_type().lower()
             _validate_public_url(final_url)
-            if content_type not in {"text/html", "application/xhtml+xml", "text/plain"}:
+            if content_type not in {"text/html", "application/xhtml+xml", "text/plain", "application/pdf"}:
                 raise SourceError(f"unsupported content type {content_type!r}")
-            body = _read_body(response, deadline=capture_deadline, clock=clock)
+            body = _read_body(response, deadline=capture_deadline, clock=clock, max_bytes=max_bytes)
             content_sha256 = hashlib.sha256(body).hexdigest()
-            if len(body) > MAX_RESPONSE_BYTES:
-                raise SourceError(f"response exceeds {MAX_RESPONSE_BYTES} bytes")
-        text = _extract(body, content_type)
+            if len(body) > max_bytes:
+                raise SourceError(f"response exceeds {max_bytes} bytes")
+        text, metadata = _extract_bounded(
+            body, content_type, deadline=capture_deadline, clock=clock, max_chars=max_chars,
+        )
         text_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
         return Capture(
             candidate=candidate,
@@ -368,6 +432,7 @@ def capture(
             text_sha256=text_sha256,
             text=text,
             fallback_attempted=fallback_attempted,
+            extraction_metadata=metadata,
         )
     except RedirectRejected as exc:
         return Capture(
@@ -402,17 +467,18 @@ def capture_all(
     workers: int = 4,
     deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
+    research: bool = False,
 ) -> list[Capture]:
     from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 
     rows = list(candidates)
     invoke = (
-        (lambda candidate: capture(candidate, deadline=deadline, clock=clock))
+        (lambda candidate: capture(candidate, deadline=deadline, clock=clock, research=research))
         if capture_one is capture else capture_one
     )
     completed: dict[int, Capture] = {}
     failure: Exception | None = None
-    with ThreadPoolExecutor(max_workers=min(workers, max(1, len(rows)))) as pool:
+    with ThreadPoolExecutor(max_workers=min(4, workers, max(1, len(rows)))) as pool:
         futures = {pool.submit(invoke, row): index for index, row in enumerate(rows)}
         for future in as_completed(futures):
             index = futures[future]
@@ -427,7 +493,10 @@ def capture_all(
                         pending.cancel()
     ordered = tuple(completed[index] for index in sorted(completed))
     if failure is not None:
-        raise CaptureGroupError(f"{type(failure).__name__}: {failure}", ordered) from failure
+        raise CaptureGroupError(
+            f"{type(failure).__name__}: {failure}", ordered,
+            completed_indices=tuple(sorted(completed)),
+        ) from failure
     return list(ordered)
 
 

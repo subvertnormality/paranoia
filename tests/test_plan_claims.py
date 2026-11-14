@@ -278,6 +278,10 @@ def test_authoritative_capture_acceptance_record() -> None:
         if relative not in {
             "src/paranoia_local/handlers.py", "src/paranoia_local/review_census.py",
             "src/paranoia_local/plan_claims.py",
+            # Issue 146 deliberately changes extraction; this provider run still
+            # binds only its immutable source blob checked above. Current PDF/SGML
+            # evidence is separately retained in filing-research-146-acceptance.json.
+            "src/paranoia_local/external_sources.py",
         }:
             assert hashlib.sha256((root / relative).read_bytes()).hexdigest() == expected
     allowed = snapshot["allowed_later_handlers_diff"]
@@ -1708,6 +1712,44 @@ class _RoleScript:
     def resume(self, *args, **kwargs):
         self.calls.append((self.role, args[1]))
         return self._next()
+
+
+def test_pdf_capture_binding_and_cold_attestation_through_public_plan(repo, tmp_path, monkeypatch):
+    from .test_filing_sources import pdf_bytes
+    from .test_external_sources import Response
+
+    source = _source(url="https://www.python.org/release.pdf")
+    body = pdf_bytes(source["quote"])
+    discovery = _audit(_claim(evidence=[source]))
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [{
+        "claim_index": 0, "evidence_index": 0, "usable": True,
+        "location": "PDF page 1", "passage": source["quote"],
+    }]})
+    attestation = '=== EVIDENCE ATTESTATION JSON ===\n' + json.dumps({"attestations": [{
+        "claim_index": 0, "evidence_index": 0, "publisher_authority": True,
+        "authority_reason": "official publisher", "passage_entailment": True,
+        "entailment_reason": "exact release date in the captured PDF",
+    }]})
+    engine = _RoleScript({"evidence-discovery": [discovery], "evidence-binding": [binding],
+                          "evidence-text": [attestation], "evidence-repository": [STRUCTURAL_CLEAR]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: "test")
+    monkeypatch.setattr(external_sources, "_validate_public_url", lambda url: None)
+    capture_all = external_sources.capture_all
+    def captured(candidates, **kwargs):
+        assert not kwargs.get("research", False)
+        return capture_all(candidates, capture_one=lambda candidate: external_sources.capture(
+            candidate, opener=lambda request, timeout: Response(body, "application/pdf", url=candidate.url),
+        ))
+    monkeypatch.setattr(external_sources, "capture_all", captured)
+    report = handlers.critique_plan(
+        {"repo_path": str(repo), "plan_text": PLAN, "class_closure": False,
+         "claim_verification": True}, engine=engine, log_dir=tmp_path / "logs",
+    )
+    assert "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" in report
+    assert [role for role, _ in engine.calls] == ["evidence-discovery", "evidence-binding", "evidence-text", "evidence-repository"]
+    assert "application/pdf" in engine.calls[1][1]
+    assert source["quote"] in engine.calls[2][1]
 
 
 @pytest.mark.parametrize(

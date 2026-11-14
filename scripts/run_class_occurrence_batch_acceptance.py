@@ -270,6 +270,9 @@ def validate_artifact(
         ).stdout
         if _sha_bytes(historical) != expected_sha:
             raise ValueError(f"historical source mismatch for {relative}")
+        from scripts.acceptance_sources import current_class_source_required
+        if not current_class_source_required(relative, allowed):
+            continue
         if (root / relative).read_bytes() != historical:
             changed.add(relative)
             row = allowed.get(relative)

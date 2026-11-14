@@ -31,6 +31,7 @@ def test_parallel_capture_failure_retains_completed_sibling():
     with pytest.raises(es.CaptureGroupError) as caught:
         es.capture_all([first, second], capture_one=capture_one, workers=2)
     assert [item.candidate.url for item in caught.value.completed] == [first.url]
+    assert caught.value.completed_indices == (0,)
 
 
 def test_parallel_capture_failure_waits_for_running_sibling_record():
@@ -54,6 +55,7 @@ def test_parallel_capture_failure_waits_for_running_sibling_record():
     with pytest.raises(es.CaptureGroupError) as caught:
         es.capture_all([first, second], capture_one=capture_one, workers=2)
     assert [item.candidate.url for item in caught.value.completed] == [second.url]
+    assert caught.value.completed_indices == (1,)
 
 
 def test_known_ugc_is_mechanically_demoted():

@@ -612,6 +612,9 @@ def validate_artifact(
         ).stdout
         if hashlib.sha256(historical).hexdigest() != expected:
             raise ValueError(f"historical source digest mismatch for {relative}")
+        from scripts.acceptance_sources import current_class_source_required
+        if not current_class_source_required(relative, allowed_later):
+            continue
         if (root / relative).read_bytes() != historical:
             changed.add(relative)
             allowance = allowed_later.get(relative)

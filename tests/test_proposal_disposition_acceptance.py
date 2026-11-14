@@ -1,5 +1,6 @@
 """Replay retained live evidence; historical provider exchanges remain immutable."""
 import hashlib
+import ast
 import json
 from pathlib import Path
 import subprocess
@@ -30,8 +31,9 @@ def test_native_proposal_disposition_acceptance(name, current):
     for path, digest in record["source"]["files"].items():
         assert hashlib.sha256(blob(path)).hexdigest() == digest
     # Bind the critical route while preserving the trace's historical model.
-    # Only the default/description model spelling may differ; the retained run
-    # does not qualify Fable 5.2 itself (checked separately with a live query).
+    # Default/description model spelling may differ. Arbitration-only instruction
+    # constants are outside this proposal route; all other prompt AST stays exact.
+    # The retained run does not qualify either later change as new native evidence.
     if current:
         for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
                      "patch_proposals.py", "engines.py", "review_census.py", "prompts.py",
@@ -46,6 +48,22 @@ def test_native_proposal_disposition_acceptance(name, current):
                 )
             elif path == "server.py":
                 source = source.replace(b"claude-fable-5-2", b"claude-fable-5-1")
+            elif path == "prompts.py":
+                def proposal_route_ast(raw):
+                    tree = ast.parse(raw)
+                    excluded = {"ARBITRATION_DISCOVERY_INSTRUCTIONS", "ARBITRATION_BINDING_INSTRUCTIONS"}
+                    seen = set()
+                    for node in tree.body:
+                        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                            target = node.targets[0]
+                            if isinstance(target, ast.Name) and target.id in excluded:
+                                assert isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+                                seen.add(target.id)
+                                node.value = ast.Constant("arbitration-only instruction outside proposal route")
+                    assert seen == excluded
+                    return ast.dump(tree, include_attributes=False)
+                assert proposal_route_ast(source) == proposal_route_ast(blob(relative))
+                continue
             assert hashlib.sha256(source).hexdigest() == record["source"]["files"][relative]
     if name.startswith("lfs_"):
         fixture = record["lfs_fixture"]

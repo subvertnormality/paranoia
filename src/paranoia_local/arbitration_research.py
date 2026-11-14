@@ -34,6 +34,8 @@ MAX_PROPOSITION_CHARS = 1200
 MAX_BINDING_INPUT_CHARS = 400_000
 MAX_UNION_PACKETS = 24
 MAX_UNION_CHARS = 200_000
+WINDOW_CONTEXT_CHARS = 8_000
+MAX_BINDING_REASON_CHARS = 600
 
 
 class ResearchError(ValueError):
@@ -45,6 +47,14 @@ class DiscoveryClaim:
     kind: str
     proposition: str
     candidate: sources.CandidateSource
+    quote: str | None = None
+
+
+@dataclass(frozen=True)
+class BindingInput:
+    rendered: str
+    captures: tuple[sources.Capture, ...]
+    scopes: tuple[tuple[int, int] | None, ...]
 
 
 @dataclass(frozen=True)
@@ -110,7 +120,8 @@ def parse_discovery(text: str, *, forbidden: Iterable[str] = ()) -> tuple[Discov
     claims: list[DiscoveryClaim] = []
     seen: set[str] = set()
     for index, item in enumerate(raw_claims):
-        if not isinstance(item, dict) or set(item) != {"kind", "proposition", "candidate"}:
+        required = {"kind", "proposition", "candidate"}
+        if not isinstance(item, dict) or set(item) not in (required, required | {"quote"}):
             raise ResearchError(f"claim {index} has invalid fields")
         kind = item["kind"]
         if kind not in CLAIM_KINDS:
@@ -134,27 +145,36 @@ def parse_discovery(text: str, *, forbidden: Iterable[str] = ()) -> tuple[Discov
             authority_basis=_one_line(raw_source["authority_basis"], "authority_basis", 600),
             relation=_one_line(raw_source["relation"], "relation", 40),
         ))
-        claims.append(DiscoveryClaim(kind, proposition, candidate))
+        quote = item.get("quote")
+        if "quote" in item and (not isinstance(quote, str) or not quote.strip() or len(quote) > 1200):
+            raise ResearchError(f"claim {index} quote must be nonempty text through 1200 characters")
+        claims.append(DiscoveryClaim(kind, proposition, candidate, quote))
     return tuple(claims)
 
 
 CAPTURE_REF_SEMANTICS = (
     "A non-null capture_ref names an earlier claim_index in rows with identical final URL "
-    "and content/text digests; use that row's line-numbered text."
+    "and content/text digests and identical window offsets; use that row's line-numbered text. "
+    "Window offsets are zero-based, end-exclusive Unicode character offsets in the complete "
+    "captured text; coordinate prefixes number only the displayed window. A quote locator "
+    "is untrusted discovery data, never evidence."
 )
 BINDING_BUDGET_ERROR = sources.BINDING_BUDGET_ERROR
 
 
 def _render_binding_input(
     claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
+    scopes: Sequence[tuple[int, int] | None] | None = None,
 ) -> str:
     if len(claims) != len(captures):
         raise ResearchError("capture count does not match discovery count")
     rows: list[dict[str, object]] = []
-    seen_captures: dict[tuple[str | None, str | None, str | None], int] = {}
+    seen_captures: dict[tuple[object, ...], int] = {}
     for index, (claim, capture) in enumerate(zip(claims, captures, strict=True)):
-        identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
-        referenceable = capture.usable and all(identity)
+        scope = scopes[index] if scopes is not None else None
+        supplied = scoped_text(capture, scope)
+        identity = (capture.final_url, capture.content_sha256, capture.text_sha256, scope)
+        referenceable = capture.usable and all(identity[:3])
         capture_ref = seen_captures.get(identity) if referenceable else None
         if referenceable and capture_ref is None:
             seen_captures[identity] = index
@@ -179,9 +199,10 @@ def _render_binding_input(
                 "error": capture.error,
                 "fallback_attempted": capture.fallback_attempted,
                 "capture_ref": capture_ref,
+                "window": window_metadata(capture, scope),
                 "line_numbered_text": (
                     "" if capture_ref is not None
-                    else sources.numbered_text(capture.text or "")
+                    else sources.numbered_text(supplied)
                 ),
             },
         })
@@ -191,21 +212,49 @@ def _render_binding_input(
     )
 
 
-def bounded_binding_input(
+def scoped_text(capture: sources.Capture, scope: tuple[int, int] | None) -> str:
+    text = capture.text or ""
+    return text if scope is None else text[scope[0]:scope[1]]
+
+
+def window_metadata(capture: sources.Capture, scope: tuple[int, int] | None) -> dict | None:
+    if not capture.usable:
+        return None
+    text = capture.text or ""
+    start, end = scope if scope is not None else (0, len(text))
+    return {
+        "mode": "quote-window" if scope is not None else "full-source",
+        "start": start, "end": end, "full_text_chars": len(text),
+        "text_sha256": hashlib.sha256(text[start:end].encode("utf-8", "surrogatepass")).hexdigest(),
+    }
+
+
+def prepare_binding_input(
     claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
-) -> tuple[str, tuple[sources.Capture, ...]]:
-    """Fit arbitration binding input by failing only the largest distinct captures closed."""
+) -> BindingInput:
+    """Try exact quote windows before excluding the largest remaining capture groups."""
     effective = list(captures)
+    scopes: list[tuple[int, int] | None] = [None] * len(captures)
+    if len(_render_binding_input(claims, effective)) > MAX_BINDING_INPUT_CHARS:
+        for index, (claim, capture) in enumerate(zip(claims, captures, strict=True)):
+            if capture.usable and claim.quote is not None:
+                text = capture.text or ""
+                position = text.find(claim.quote)
+                if position >= 0:
+                    start = max(0, position - WINDOW_CONTEXT_CHARS)
+                    end = min(len(text), position + len(claim.quote) + WINDOW_CONTEXT_CHARS)
+                    if start != 0 or end != len(text):
+                        scopes[index] = (start, end)
     while True:
-        rendered = _render_binding_input(claims, effective)
+        rendered = _render_binding_input(claims, effective, scopes)
         if len(rendered) <= MAX_BINDING_INPUT_CHARS:
-            return rendered, tuple(effective)
+            return BindingInput(rendered, tuple(effective), tuple(scopes))
         groups: dict[
-            tuple[str | None, str | None, str | None], list[int]
+            tuple[object, ...], list[int]
         ] = {}
         for index, capture in enumerate(effective):
-            identity = (capture.final_url, capture.content_sha256, capture.text_sha256)
-            if capture.usable and all(identity):
+            identity = (capture.final_url, capture.content_sha256, capture.text_sha256, scopes[index])
+            if capture.usable and all(identity[:3]):
                 groups.setdefault(identity, []).append(index)
         if not groups:
             raise ResearchError(
@@ -215,7 +264,7 @@ def bounded_binding_input(
         _identity, indices = max(
             groups.items(),
             key=lambda item: (
-                len(sources.numbered_text(effective[item[1][0]].text or "")),
+                len(sources.numbered_text(scoped_text(effective[item[1][0]], scopes[item[1][0]]))),
                 tuple(-index for index in item[1]),
             ),
         )
@@ -225,16 +274,24 @@ def bounded_binding_input(
             )
 
 
+def bounded_binding_input(
+    claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
+) -> tuple[str, tuple[sources.Capture, ...]]:
+    prepared = prepare_binding_input(claims, captures)
+    return prepared.rendered, prepared.captures
+
+
 def binding_input(claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture]) -> str:
     rendered, _ = bounded_binding_input(claims, captures)
     return rendered
 
 
-def parse_binding(
+def parse_binding_result(
     text: str,
     claims: Sequence[DiscoveryClaim],
     captures: Sequence[sources.Capture],
-) -> tuple[sources.BoundSource | None, ...]:
+    scopes: Sequence[tuple[int, int] | None] | None = None,
+) -> tuple[tuple[sources.BoundSource | None, ...], tuple[str | None, ...]]:
     value = _json_after(text, BINDING_MARKER)
     if not isinstance(value, dict) or set(value) != {"bindings"}:
         raise ResearchError("binding must contain exactly a bindings array")
@@ -242,9 +299,11 @@ def parse_binding(
     if not isinstance(raw_bindings, list) or len(raw_bindings) != len(claims):
         raise ResearchError("binding must return exactly one item per discovery claim")
     bound: list[sources.BoundSource | None] = [None] * len(claims)
+    reasons: list[str | None] = [None] * len(claims)
     seen: set[int] = set()
     for item in raw_bindings:
-        if not isinstance(item, dict) or set(item) != {"claim_index", "usable", "location", "passage"}:
+        fields = {"claim_index", "usable", "location", "passage"}
+        if not isinstance(item, dict) or set(item) not in (fields, fields | {"reason"}):
             raise ResearchError("binding item fields are invalid")
         index = item["claim_index"]
         if not isinstance(index, int) or not 0 <= index < len(claims) or index in seen:
@@ -253,21 +312,61 @@ def parse_binding(
         usable = item["usable"]
         if not isinstance(usable, bool):
             raise ResearchError("binding usable must be boolean")
+        reason = item.get("reason")
+        if reason is not None:
+            reason = _one_line(reason, "reason", MAX_BINDING_REASON_CHARS)
+        if usable and reason is not None:
+            raise ResearchError("usable binding must have null or omitted reason")
         if not usable:
             if item["location"] is not None or item["passage"] is not None:
                 raise ResearchError("unusable binding must have null location and passage")
+            reasons[index] = reason or "model rejected capture; no reason supplied"
             continue
         capture = captures[index]
         if not capture.usable or not capture.text:
             raise ResearchError("binding marked an unavailable capture usable")
         location = _one_line(item["location"], "location", 400)
         passage = _one_line(item["passage"], "passage", 1200)
-        if not sources.passage_matches(passage, capture.text):
+        scope = scopes[index] if scopes is not None else None
+        if not sources.passage_matches(passage, scoped_text(capture, scope)):
             raise ResearchError(f"binding passage for claim {index} is not in captured text")
         bound[index] = sources.BoundSource(claims[index].candidate, capture, location, passage)
     if seen != set(range(len(claims))):
         raise ResearchError("binding omitted a discovery claim")
-    return tuple(bound)
+    return tuple(bound), tuple(reasons)
+
+
+def parse_binding(
+    text: str, claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture],
+) -> tuple[sources.BoundSource | None, ...]:
+    return parse_binding_result(text, claims, captures)[0]
+
+
+def binding_diagnostics(
+    claims: Sequence[DiscoveryClaim], captures: Sequence[sources.Capture | None],
+    bound: Sequence[sources.BoundSource | None] = (),
+    reasons: Sequence[str | None] = (),
+) -> tuple[dict, ...]:
+    rows = []
+    for index, claim in enumerate(claims):
+        capture = captures[index] if index < len(captures) else None
+        if capture is None:
+            status, reason = "capture-not-completed", "capture completion was not recorded for this index"
+        elif capture.error == BINDING_BUDGET_ERROR:
+            status, reason = "binding-budget-excluded", capture.error
+        elif not capture.usable:
+            status, reason = "capture-failed", capture.error or "capture has no extracted text"
+        elif index >= len(bound):
+            status, reason = "binding-not-completed", "binding did not complete"
+        elif bound[index] is not None:
+            status, reason = "bound", "passage matched supplied captured text"
+        else:
+            status = "model-rejected"
+            reason = reasons[index] if index < len(reasons) else None
+            reason = reason or "model rejected capture; no reason supplied"
+        rows.append({"claim_index": index, "url": claim.candidate.url,
+                     "status": status, "reason": reason[:1200]})
+    return tuple(rows)
 
 
 def packets(

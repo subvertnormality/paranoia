@@ -86,7 +86,10 @@ prompt-size measurements describe their recorded source, not this later wording.
    bounded correction therefore repairs omissions while discovery search is still available;
    only the corrected complete inventory proceeds to capture.
 3. The server downloads each candidate directly under bounded HTTP(S), redirect, response-size,
-   and extracted-text limits, then extracts main text with Trafilatura. Responses remain capped at
+   and extracted-text limits, then extracts HTML text with Trafilatura or PDF text
+   with pypdf in a contained worker. Single-document EDGAR wrappers are validated
+   before HTML extraction. See the current [capture policy](tool-reference.md#captured-filing-evidence).
+   Plan responses remain capped at
    5,000,000 bytes; complete extracted text through 1,000,000 characters is admitted. Plan
    binding preserves complete-source context: a structurally governing primary or authoritative
    capture may use one dedicated expanded packet when its exact rendered prompt fits 685,000
@@ -94,10 +97,9 @@ prompt-size measurements describe their recorded source, not this later wording.
    the selected passage into a separately size-checked cold attestation prompt. Admission reserves
    the worst-case bounded binding correction and attestation output envelopes. Repeated
    captures with the same final URL and content/text digests appear once per serialized binding
-   prompt or batch and later rows reference that exact capture. If distinct arbitration captures
-   exceed its single 400,000-character binding prompt, the largest capture groups are
-   deterministically made unusable with a server-owned binding-budget reason until the prompt
-   fits; other research continues. The same reviewer session
+   prompt or batch and later rows reference that exact capture. Arbitration's
+   larger capture profile and explicit quote windows follow the linked capture
+   policy; they do not apply to plan verification. The same reviewer session
    is resumed with web and repository access disabled and may bind exact passages only from those
    captures. Search snippets, provider summaries, and provider-fetched page bodies never count.
    The initial attributable request carries explicit accept/language/identity-encoding headers.
