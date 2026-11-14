@@ -363,6 +363,9 @@ end-of-stream and rejects recovery, truncation and trailing data before pypdf ca
 admit decoded text, font maps or object streams. Additional encodings are a
 maintainer-owned follow-up requiring complete-decoding and omission regressions;
 the current extractor does not fall back to partial evidence.
+Forms must carry their own nonempty Resources dictionary, including nested Forms.
+PDFs requiring page-resource fallback for a Form fail as unsupported before any
+text is admitted; readable sibling pages do not make such a capture usable.
 
 Plan capture keeps 5,000,000 response bytes and 1,000,000 extracted characters,
 with complete-source binding and the existing cold attestation. Arbitration alone

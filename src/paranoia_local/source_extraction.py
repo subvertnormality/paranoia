@@ -108,7 +108,7 @@ class _ParserNotices(logging.Handler):
 
 def _pdf_streams(page: object) -> None:
     """Bound decoded page and Form resource streams together before text parsing."""
-    from pypdf.generic import ContentStream
+    from pypdf.generic import ContentStream, DictionaryObject
 
     total = 0
     seen: dict[int, object] = {}
@@ -135,8 +135,13 @@ def _pdf_streams(page: object) -> None:
         for reference in xobjects.values():
             form = reference.get_object()
             if form.get("/Subtype") == "/Form" and id(form) not in seen:
+                own_resources = form.get("/Resources")
+                if own_resources is not None:
+                    own_resources = own_resources.get_object()
+                if not isinstance(own_resources, DictionaryObject) or not own_resources:
+                    raise ValueError("PDF Form requires explicit nonempty Resources; inherited resources are unsupported")
                 admit(form)
-                forms(form.get("/Resources"))
+                forms(own_resources)
 
     admit(page.get_contents())
     forms(page.get("/Resources"))

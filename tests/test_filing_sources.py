@@ -145,7 +145,7 @@ def test_pdf_decoded_stream_limit_is_enforced_before_text_extraction(monkeypatch
     assert got.content_sha256
 
 
-def form_pdf(data, filter_name=None, decode_params=None):
+def form_pdf(data, filter_name=None, decode_params=None, *, resource_mode="explicit", nested=False):
     from pypdf import PdfReader
     from pypdf.generic import ArrayObject, EncodedStreamObject, NumberObject
 
@@ -158,13 +158,28 @@ def form_pdf(data, filter_name=None, decode_params=None):
     form[NameObject("/Subtype")] = NameObject("/Form")
     form[NameObject("/BBox")] = ArrayObject([NumberObject(n) for n in (0, 0, 600, 800)])
     form[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): page["/Resources"]["/Font"]})
+    if resource_mode == "absent":
+        del form[NameObject("/Resources")]
+    elif resource_mode == "empty":
+        form[NameObject("/Resources")] = DictionaryObject()
     if filter_name:
         form[NameObject("/Filter")] = NameObject(filter_name)
     if decode_params is not None:
         form[NameObject("/DecodeParms")] = DictionaryObject({
             NameObject(key): NumberObject(value) for key, value in decode_params.items()
         })
-    page["/Resources"][NameObject("/XObject")] = DictionaryObject({NameObject("/Fm"): writer._add_object(form)})
+    target = writer._add_object(form)
+    if nested:
+        wrapper = DecodedStreamObject()
+        wrapper.set_data(b"/Inner Do")
+        wrapper[NameObject("/Type")] = NameObject("/XObject")
+        wrapper[NameObject("/Subtype")] = NameObject("/Form")
+        wrapper[NameObject("/BBox")] = form["/BBox"]
+        wrapper[NameObject("/Resources")] = DictionaryObject({
+            NameObject("/XObject"): DictionaryObject({NameObject("/Inner"): target}),
+        })
+        target = writer._add_object(wrapper)
+    page["/Resources"][NameObject("/XObject")] = DictionaryObject({NameObject("/Fm"): target})
     stream = DecodedStreamObject()
     stream.set_data(page.get_contents().get_data() + b"\n/Fm Do\n")
     page[NameObject("/Contents")] = writer._add_object(stream)
@@ -236,6 +251,21 @@ def test_jbig2_filter_cannot_launch_an_external_decoder(monkeypatch, tmp_path):
     got = serve(monkeypatch, form_pdf(b"inert JBIG2 bytes", "/JBIG2Decode"))
     assert not got.usable and got.error
     assert not marker.exists()
+
+
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("resource_mode", ["explicit", "absent", "empty"])
+def test_direct_and_nested_forms_require_self_contained_resources(monkeypatch, nested, resource_mode):
+    body = form_pdf(b"BT /F1 12 Tf 10 20 Td (Qualification from the Form.) Tj ET",
+                    resource_mode=resource_mode, nested=nested)
+    got = serve(monkeypatch, body)
+    if resource_mode == "explicit":
+        assert got.usable, got.error
+        assert "The API retries twice." in got.text and "Qualification from the Form." in got.text
+    else:
+        assert not got.usable and "Resources" in got.error
+        assert got.status == 200 and got.content_sha256 == hashlib.sha256(body).hexdigest()
+        assert got.text is None and got.text_sha256 is None
 
 
 def test_containment_failure_becomes_a_source_local_capture_error(monkeypatch, tmp_path):
@@ -348,7 +378,7 @@ def test_binding_rejection_reason_is_bounded_and_legacy_is_explicit():
         ar.parse_binding_result(reply(), [claim], [capture])
 
 
-@pytest.mark.parametrize("name", ["filing-research-146-acceptance.json", "filing-research-146-acceptance-configuration.json", "filing-research-146-acceptance-final.json"])
+@pytest.mark.parametrize("name", ["filing-research-146-acceptance.json", "filing-research-146-acceptance-configuration.json", "filing-research-146-acceptance-streams.json"])
 def test_filing_research_native_receipt_retains_its_source_and_execution(name):
     root = Path(__file__).resolve().parents[1]
     receipt = json.loads((root / "docs" / name).read_text(encoding="utf-8"))
