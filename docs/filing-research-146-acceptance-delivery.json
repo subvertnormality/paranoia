@@ -1,0 +1,257 @@
+{
+  "kind": "issue146-captured-filing-research",
+  "date": "2026-11-14",
+  "qualified": true,
+  "source_revision": "b6c9df895fb6b0fa16e215bf3cb9bda83c3e6c98",
+  "source_sha256": {
+    "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+    "src/paranoia_local/arbitrate_handler.py": "f9fe0cf2ed8e95ac07c499eb6e9ed78b1b2856bd27a05bc082d231488aca2f47",
+    "src/paranoia_local/arbitration.py": "1abf862841ece8db197ba347d431df9aa89679d74a900b93a922c1a65aeb32df",
+    "src/paranoia_local/arbitration_research.py": "b26aa60a5f9bf35c18c0e7ad3e779d97cf37fb45a4a1591d46c02e7df76cc049",
+    "src/paranoia_local/census_execution.py": "b7975f6d223e74e098c2d3010f1d290d5d6c405ebbe8d76475bef722219437e6",
+    "src/paranoia_local/class_closure.py": "6cfbcc72000d84d46b0504f84e66af537ae457bc38b66cdd744f6bab6e98fb59",
+    "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+    "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+    "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+    "src/paranoia_local/engines.py": "1861b53201e292187cc1b788a80a9173b28408f0657f43139bd853b2418b876a",
+    "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+    "src/paranoia_local/external_sources.py": "f1bb94677a46789089f09f5ddbe9ee61253e2d7ac3171efc720639b045c4a187",
+    "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+    "src/paranoia_local/handlers.py": "6abd1c902591448fc92e23c9ce2a4898819557f174f964b198c7f19377d25593",
+    "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+    "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+    "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+    "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+    "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+    "src/paranoia_local/patch_experiments.py": "d0a50131f91d3a2fa9770cd83445a284eb6d7f386f7cf8dc49e720d4d57f87e7",
+    "src/paranoia_local/patch_proposals.py": "891e0d4a984ebf7bd548816951440e45502181d6212b5ecc2e32e9d6e1327dd8",
+    "src/paranoia_local/plan_claims.py": "7cf4b345824bb8c83c0d11f8cd99c6530c26002fd53b7c26af8bfd12cd878027",
+    "src/paranoia_local/prompts.py": "d33a7d54d6d51306c77e060e56564ab1108d328d3fe86415944c31d6c3be7610",
+    "src/paranoia_local/proposal_checkout.py": "7fac1f318095a2f4f6eaf9bdb4683187fe4140b5e995e99d551980cf13151930",
+    "src/paranoia_local/proposal_disposition.py": "e5bb87aee073e8613b570f11e69915c1c3fa2ebf182125b8f96c41edce38f5c1",
+    "src/paranoia_local/review_census.py": "48097d3bb7e27890dc7c8d0462ed3707a2095a2927a4e2080bfc311b00827d0f",
+    "src/paranoia_local/review_policy.py": "3fca61e52e1d4ad1ebac158b4c82ef26934aa712217e30a2b5447dbeea557928",
+    "src/paranoia_local/review_transitions.py": "b657111ed0db8ea6fd1afdaa4c297ffbcec6915d658e16300829300231d0cac7",
+    "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+    "src/paranoia_local/server.py": "96fa9350e168dda7718a48daa26d544c67c3b4d9e48a50a873ad104c52d040af",
+    "src/paranoia_local/session_routing.py": "349014898c1f2aa9292f1f7e5c0b6e8860e6bb1db9dabf791141a60ab7d9a30e",
+    "src/paranoia_local/source_extraction.py": "3aeebc58e6898b3c8ea02ed96358e3185e0bd17ea0d4cf73b92ed693571f7420",
+    "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+    "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+    "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+    "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121"
+  },
+  "scope": "Live public PDF/SGML capture and one native Codex discovery/binding research lane. Dual-vendor arbitration is covered deterministically through the public handler; this is not a full native arbitration or renewed historical acceptance.",
+  "direct_capture": {
+    "elapsed_seconds": 4.25,
+    "sources": [
+      {
+        "candidate": {
+          "url": "https://www.sec.gov/files/form10-k.pdf",
+          "title": "SEC filing",
+          "publisher": "SEC",
+          "source_kind": "primary",
+          "authority_basis": "Original official source",
+          "relation": "supports_claim"
+        },
+        "final_url": "https://www.sec.gov/files/form10-k.pdf",
+        "status": 200,
+        "content_type": "application/pdf",
+        "content_sha256": "65e8ce4f1364c7352124ed948c06826eed1e60520cd537310b2f858421d45307",
+        "text_sha256": "4c255e4df7b60ba66c4aeacfe14ce4726c79526057b57206d81d9c36866f16db",
+        "error": null,
+        "fallback_attempted": false,
+        "extraction_metadata": {
+          "kind": "pdf",
+          "pages": 19
+        },
+        "extracted_characters": 40527
+      },
+      {
+        "candidate": {
+          "url": "https://www.sec.gov/Archives/edgar/data/85535/000104746912008035/a2210566z10-k.htm",
+          "title": "SEC filing",
+          "publisher": "SEC",
+          "source_kind": "primary",
+          "authority_basis": "Original official source",
+          "relation": "supports_claim"
+        },
+        "final_url": "https://www.sec.gov/Archives/edgar/data/85535/000104746912008035/a2210566z10-k.htm",
+        "status": 200,
+        "content_type": "text/html",
+        "content_sha256": "e0bf1019e9599650e07e3508bc431eec15b0e064f3196326a4c99056f29cf3e3",
+        "text_sha256": "534d2a53f59389623806534ef3b1e28d823313a25b0de230845fe874f49311d8",
+        "error": null,
+        "fallback_attempted": false,
+        "extraction_metadata": {
+          "kind": "edgar-single-document",
+          "filename": "a2210566z10-k.htm",
+          "start_byte": 86,
+          "end_byte": 1515860
+        },
+        "extracted_characters": 311697
+      }
+    ],
+    "assertions": [
+      "Both exact regression URLs returned usable HTTP 200 captures with response and text digests.",
+      "Official Form 10-K text contains the shares-outstanding instruction and latest-practicable-date qualification.",
+      "The Royal Gold filing contains its registrant name and excludes the SGML preamble."
+    ]
+  },
+  "native_research": {
+    "engine": "codex",
+    "model": "gpt-6-astra",
+    "cli_version": "0.159.3",
+    "elapsed_seconds": 24.17047115508467,
+    "model_calls": 2,
+    "claims": 1,
+    "bound_sources": 1,
+    "claims_and_bindings": [
+      {
+        "claim": {
+          "kind": "fact",
+          "proposition": "The official Form 10-K cover instructs corporate registrants to indicate the number of shares outstanding of each class of common stock as of the latest practicable date.",
+          "candidate": {
+            "url": "https://www.sec.gov/about/forms/form10-k.pdf",
+            "title": "Form 10-K",
+            "publisher": "U.S. Securities and Exchange Commission",
+            "source_kind": "primary",
+            "authority_basis": "The SEC issues Form 10-K and its official instructions.",
+            "relation": "supports_claim"
+          },
+          "quote": "Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date."
+        },
+        "binding": {
+          "candidate": {
+            "url": "https://www.sec.gov/about/forms/form10-k.pdf",
+            "title": "Form 10-K",
+            "publisher": "U.S. Securities and Exchange Commission",
+            "source_kind": "primary",
+            "authority_basis": "The SEC issues Form 10-K and its official instructions.",
+            "relation": "supports_claim"
+          },
+          "capture": {
+            "candidate": {
+              "url": "https://www.sec.gov/about/forms/form10-k.pdf",
+              "title": "Form 10-K",
+              "publisher": "U.S. Securities and Exchange Commission",
+              "source_kind": "primary",
+              "authority_basis": "The SEC issues Form 10-K and its official instructions.",
+              "relation": "supports_claim"
+            },
+            "final_url": "https://www.sec.gov/about/forms/form10-k.pdf",
+            "status": 200,
+            "content_type": "application/pdf",
+            "content_sha256": "65e8ce4f1364c7352124ed948c06826eed1e60520cd537310b2f858421d45307",
+            "text_sha256": "4c255e4df7b60ba66c4aeacfe14ce4726c79526057b57206d81d9c36866f16db",
+            "error": null,
+            "fallback_attempted": false,
+            "extraction_metadata": {
+              "kind": "pdf",
+              "pages": 19
+            },
+            "extracted_characters": 40527
+          },
+          "location": "Page 10 of 19, cover instructions, lines 00371\u201300373",
+          "passage": "(APPLICABLE ONLY TO CORPORATE REGISTRANTS) Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date."
+        }
+      }
+    ],
+    "packet_text": "[{\"governing_eligible\":true,\"kind\":\"fact\",\"packet_id\":\"src-6f507da7e8391894\",\"proposition\":\"The official Form 10-K cover instructs corporate registrants to indicate the number of shares outstanding of each class of common stock as of the latest practicable date.\",\"source\":{\"authority_basis\":\"The SEC issues Form 10-K and its official instructions.\",\"content_sha256\":\"65e8ce4f1364c7352124ed948c06826eed1e60520cd537310b2f858421d45307\",\"location\":\"Page 10 of 19, cover instructions, lines 00371\u201300373\",\"passage\":\"(APPLICABLE ONLY TO CORPORATE REGISTRANTS) Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date.\",\"publisher\":\"U.S. Securities and Exchange Commission\",\"relation\":\"supports_claim\",\"source_kind\":\"primary\",\"text_sha256\":\"4c255e4df7b60ba66c4aeacfe14ce4726c79526057b57206d81d9c36866f16db\",\"title\":\"Form 10-K\",\"url\":\"https://www.sec.gov/about/forms/form10-k.pdf\"}}]",
+    "attempts": [
+      {
+        "phase": "discovery",
+        "status": "provider-completed",
+        "admitted": true,
+        "invoked": true,
+        "error": "",
+        "extracted_sha256": "ffa838e5e484262392be11b9eb56f174bb5642125250cbd2a87c5dcbecff2071",
+        "extracted_excerpt": "=== RESEARCH DISCOVERY JSON ===\n{\"claims\":[{\"kind\":\"fact\",\"proposition\":\"The official Form 10-K cover instructs corporate registrants to indicate the number of shares outstanding of each class of common stock as of the latest practicable date.\",\"candidate\":{\"url\":\"https://www.sec.gov/about/forms/form10-k.pdf\",\"title\":\"Form 10-K\",\"publisher\":\"U.S. Securities and Exchange Commission\",\"source_kind\":\"primary\",\"authority_basis\":\"The SEC issues Form 10-K and its official instructions.\",\"relation\":\"supports_claim\"},\"quote\":\"Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date.\"}]}",
+        "raw_sha256": "53711b6aa163ee999a5041e127edeb51c5cf768838f9a44c1b0cacf9cd6ae6d6",
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a1da54-d18c-72a3-a9f7-cc285da3935c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.started\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-bf5722d8-3e97-4998-a5ce-7a6a82f52e25\",\"query\":\"\",\"action\":{\"type\":\"other\"}}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"web_search\",\"id\":\"exec-bf5722d8-3e97-4998-a5ce-7a6a82f52e25\",\"query\":\"site.sec.gov/files/form10-k.pdf \\\"Indicate the number of shares outstanding\\\" ...\",\"action\":{\"type\":\"search\",\"queries\":[\"site.sec.gov/files/form10-k.pdf \\\"Indicate the number of shares outstanding\\\"\",\"site.sec.gov/Archives/edgar/data/85535/000104746912008035/a2210566z10-k.htm \\\"latest practicable date\\\"\"]},\"results\":[{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search12\",\"snippet\":\"State the aggregate market value of the voting and non-voting common equity held by non-affiliates computed by reference to the price at which the common\",\"title\":\"Form 10-K\",\"url\":\"https://www.sec.gov/about/forms/form10-k.pdf\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search0\",\"snippet\":\"The Company computes net income (loss) per share of common stock in accordance with ASC Topic 260, Earnings Per Share. ... Diluted net income (loss)\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1473490/000149315226027134/form10-q.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search1\",\"snippet\":\"Current installments of long-term debt (Note 10) | | | 64,500 | | | | 68,735 | ... Income taxes payable (Note 12) | |\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1698514/000149315226009139/form10-k.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search2\",\"snippet\":\"Common stock, $0.001 par value, 750,000,000 shares authorized; 35,800,996 and 33,146,517 shares issued and outstanding at September 30, 2026 and December 31, 2025, respectively |\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1760233/000149315226049717/form10-q.htm\"},{\"type\":\"text_result\",\"domain\":\"s25.q4cdn.com\",\"ref_id\":\"turn0search13\",\"snippet\":\"Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date. ... Common Stock (par\",\"title\":\"UNITED STATES\",\"url\":\"https://s25.q4cdn.com/634255556/files/doc_downloads/2024/02/amp-2023-form-10k.pdf\"},{\"type\":\"text_result\",\"domain\":\"d18rn0p25nwr6d.cloudfront.net\",\"ref_id\":\"turn0search14\",\"snippet\":\"If securities are registered pursuant to Section 12(b) of the Act, indicate by check mark whether the financial statements of the registrant included in the\",\"title\":\"Table of Contents\",\"url\":\"https://d18rn0p25nwr6d.cloudfront.net/CIK-0000037785/f6c7eed5-6a8f-477c-bcf2-50bc1955a31d.pdf\"},{\"type\":\"text_result\",\"domain\":\"pdf.secdatabase.com\",\"ref_id\":\"turn0search15\",\"snippet\":\"State the aggregate market value of the voting and non-voting common equity held by non-affiliates computed by reference to the price ... Indicate the number\",\"title\":\"SECURITIES AND EXCHANGE COMMISSION\",\"url\":\"https://pdf.secdatabase.com/113/0001096906-25-000535.pdf\"},{\"type\":\"text_result\",\"domain\":\"fortune.com\",\"ref_id\":\"turn0search16\",\"snippet\":\"Indicate the number of shares outstanding of each of the registrant's classes of common stock, as of the latest practicable date. ... <td>Common stock, par\",\"title\":\"Indicate the number of shares outstanding of each of the registrant's classes of common stock, as of the latest practicable date.\",\"url\":\"https://fortune.com/company-assets/833/quartr/annual-report-10-k-e3b9e-2026-02-27-11-50-12.pdf\"},{\"type\":\"text_result\",\"domain\":\"d18rn0p25nwr6d.cloudfront.net\",\"ref_id\":\"turn0search17\",\"snippet\":\"State the aggregate market value of the voting and non-voting common equity held by non-affiliates computed by reference to the price at which the common\",\"title\":\"0000007084-24-000009\",\"url\":\"https://d18rn0p25nwr6d.cloudfront.net/CIK-0000007084/f73c350f-a5b4-4f1c-8eae-64aa42d7b137.pdf\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search3\",\"snippet\":\"As of March 31, 2025, the total common shares issued and outstanding was &lt;span id=\\\"xdx_90D_eus-gaap--CommonStockSharesIssued_iI_pid_c20250331_z7sGE4bfbreg\\\" title=\\\"Common stock, shares issued\\\"&gt;&l\",\"title\":\"10-K \u2014 form10-k_htm.xml\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1122020/000149315226030242/form10-k_htm.xml\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search4\",\"snippet\":\"Common stock, $0.0001 par value, 600,000,000 shares authorized, 206,904,585 shares and 206,904,585 shares issued and outstanding as of December 31, 2025 and 2024 respectively |\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1652561/000149315226013865/form10-k.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search5\",\"snippet\":\"As of September 15, 2023, there were 799,141,770 shares of the registrant\u2019s common stock outstanding. ... ITEM 5 | MARKET FOR REGISTRANT\u2019S COMMON EQUITY, RELATED\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1281845/000149315223032701/form10-k.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search6\",\"snippet\":\"On April 17, 2025, our Board of Directors and majority stockholder approved an amendment to our articles of incorporation to increase the total number of\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1096275/000149315226012945/form10-k.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search7\",\"snippet\":\"Preferred stock, $0.01 par value; 50,000,000 shares authorized as of December 31, 2024 and 2023, respectively; none issued and outstanding | | | - |\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1014763/000149315225009568/form10-k.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search8\",\"snippet\":\"Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date. ... This Form 10-K/A\",\"url\":\"https://www.sec.gov/Archives/edgar/data/813716/000149315219005820/form10-ka.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search9\",\"snippet\":\"Indicate the number of shares outstanding of each of the registrant's classes of common stock, as of the latest practicable date. ... List hereunder the\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1680966/000159406218000156/form10ka.htm\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search10\",\"snippet\":\"contextRef=\\\"AsOf2024-12-31\\\" ... unitRef=\\\"Shares\\\">437946327</us-gaap:CommonStockSharesOutstanding> ... <us-gaap:CommonStockValue\",\"title\":\"10-K \u2014 form10-k_htm.xml\",\"url\":\"https://www.sec.gov/Archives/edgar/data/1946573/000149315226013601/form10-k_htm.xml\"},{\"type\":\"text_result\",\"domain\":\"www.sec.gov\",\"ref_id\":\"turn0search11\",\"snippet\":\"Common Stock, $0.0001 par value per share, 750,000,000,000 shares authorized; 339,741,632,384 issued and outstanding as of December 31, 2022 and 2021, respectively | | |\",\"url\":\"https://www.sec.gov/Archives/edgar/data/844856/000084485623000010/form10k.htm\"}]}}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_1\",\"type\":\"agent_message\",\"text\":\"=== RESEARCH DISCOVERY JSON ===\\n{\\\"claims\\\":[{\\\"kind\\\":\\\"fact\\\",\\\"proposition\\\":\\\"The official Form 10-K cover instructs corporate registrants to indicate the number of shares outstanding of each class of common stock as of the latest practicable date.\\\",\\\"candidate\\\":{\\\"url\\\":\\\"https://www.sec.gov/about/forms/form10-k.pdf\\\",\\\"title\\\":\\\"Form 10-K\\\",\\\"publisher\\\":\\\"U.S. Securities and Exchange Commission\\\",\\\"source_kind\\\":\\\"primary\\\",\\\"authority_basis\\\":\\\"The SEC issues Form 10-K and its official instructions.\\\",\\\"relation\\\":\\\"supports_claim\\\"},\\\"quote\\\":\\\"Indicate the number of shares outstanding of each of the registrant\u2019s classes of common stock, as of the latest practicable date.\\\"}]}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":34222,\"cached_input_tokens\":23552,\"cache_write_input_tokens\":0,\"output_tokens\":257,\"reasoning_output_tokens\":20}}\n",
+        "session_ref": "01a1da54-d18c-72a3-a9f7-cc285da3935c",
+        "returncode": 0,
+        "execution_error": false,
+        "failure_detail": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "usage": {
+          "input_tokens": 34222,
+          "cached_input_tokens": 23552,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 257,
+          "reasoning_output_tokens": 20
+        },
+        "duration_ms": 14976,
+        "prompt_sha256": "3c3c2319fe3c1fa1b3a0274e6986210ba9d9d6e7c018f80dfda05f65e17766d8",
+        "prompt_excerpt": "You are the bounded discovery phase for a technical decision.\n\nUse only your native WebSearch tool to discover candidate authoritative URLs. Do not fetch pages, use repository tools, invoke MCP/plugins/agents, recommend an option, rank options, or associate a proposition with an option label. Inventory only atomic load-bearing external facts, externally issued design principles, and promised external-system behaviors whose truth could change the comparison. Repository state, project preferences, implementation claims, forecasts, and incidental facts are out of scope. Prefer the governing vendor, standard, regulator, original paper, or official record. UGC may be a lead but must be labelled ugc and cannot govern.\n\nReturn only this marker and JSON, with at most 12 unique propositions and exactly one candidate per proposition:\n\n=== RESEARCH DISCOVERY JSON ===\n{\"claims\":[{\"kind\":\"behavior\",\"proposition\":\"one atomic externally promised behavior\",\"candidate\":{\"url\":\"https://official.example/reference\",\"title\":\"Official reference\",\"publisher\":\"Issuing authority\",\"source_kind\":\"primary\",\"authority_basis\":\"why this publisher governs this proposition\",\"relation\":\"supports_claim\"}}]}\n\nAllowed kind literals: \"fact\", \"design_principle\", \"behavior\". Allowed source_kind literals:\n\"primary\", \"authoritative\", \"secondary\", \"ugc\". Allowed relation literals:\n\"supports_claim\", \"refutes_claim\", \"context\".\nEach claim may also contain an optional quote string (1-1200 characters): an exact\nquoted locator from the discovered source. Supply one when available, especially\nfor long filings. This is only a hint: the server must find it in its own capture;\nsearch snippets and your quote never supply evidence.\n\n===== TASK INPUT =====\n\n=== DECISION ===\nShould a form-text index include the official Form 10-K cover instruction asking for the number of shares outstanding for each common stock class as of the latest practicable date?\n\n=== STAKES ===\nSingle trusted local user and OS; untrusted public text. Wrong source binding has high impact.\n\n=== CONTEXT ===\nEvidence subjects: https://www.sec.gov/files/form10-k.pdf and https://www.sec.gov/Archives/edgar/data/85535/000104746912008035/a2210566z10-k.htm. The instruction itself is the load-bearing external fact.\n\n=== OPTION STATEMENTS (unordered evidence subjects; do not choose) ===\n- Index this instruction when original official text is captured.\n- Leave it unindexed until the original official text is captured.",
+        "intended_session_ref": null
+      },
+      {
+        "phase": "binding",
+        "status": "provider-completed",
+        "admitted": true,
+        "invoked": true,
+        "error": "",
+        "extracted_sha256": "aa13890adde9156f7e30e4347821b757ec27f1f8c2819bcd9fa96ceeabfd0c4f",
+        "extracted_excerpt": "=== EVIDENCE BINDING JSON ===\n{\"bindings\":[{\"claim_index\":0,\"usable\":true,\"location\":\"Page 10 of 19, cover instructions, lines 00371\u201300373\",\"passage\":\"(APPLICABLE ONLY TO CORPORATE REGISTRANTS) \\nIndicate the number of shares outstanding of each of the registrant\u2019s classes of common \\nstock, as of the latest practicable date.\",\"reason\":null}]}",
+        "raw_sha256": "ec6291bc6ad2c114334a1bbf9836cb8d937275ce45be2638cf27849949556d82",
+        "raw_excerpt": "{\"type\":\"thread.started\",\"thread_id\":\"01a1da54-d18c-72a3-a9f7-cc285da3935c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"=== EVIDENCE BINDING JSON ===\\n{\\\"bindings\\\":[{\\\"claim_index\\\":0,\\\"usable\\\":true,\\\"location\\\":\\\"Page 10 of 19, cover instructions, lines 00371\u201300373\\\",\\\"passage\\\":\\\"(APPLICABLE ONLY TO CORPORATE REGISTRANTS) \\\\nIndicate the number of shares outstanding of each of the registrant\u2019s classes of common \\\\nstock, as of the latest practicable date.\\\",\\\"reason\\\":null}]}\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":65832,\"cached_input_tokens\":31744,\"cache_write_input_tokens\":0,\"output_tokens\":355,\"reasoning_output_tokens\":20}}\n",
+        "session_ref": "01a1da54-d18c-72a3-a9f7-cc285da3935c",
+        "returncode": 0,
+        "execution_error": false,
+        "failure_detail": "",
+        "failure_detail_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "usage": {
+          "input_tokens": 65832,
+          "cached_input_tokens": 31744,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 355,
+          "reasoning_output_tokens": 20
+        },
+        "duration_ms": 6633,
+        "prompt_sha256": "bb2efeb2dca56273cb2fa28d9b53ee712652efdffe143ed3f4d6e5939cbee519",
+        "prompt_excerpt": "You are binding previously discovered candidates to server-captured text.\n\nYou have no web, repository, MCP, plugin, browser, or delegation tools. Use only the supplied captures. For each claim_index, either copy one exact passage from that capture and give its precise section/location, or mark it unusable. Do not add or change a URL, source, proposition, publisher, relation, or claim. Provider search summaries are not evidence.\n\nReturn only this marker and JSON, with exactly one item for every claim_index:\n\n=== EVIDENCE BINDING JSON ===\n{\"bindings\":[{\"claim_index\":0,\"usable\":true,\"location\":\"section/table/page\",\"passage\":\"exact captured passage\",\"reason\":null},{\"claim_index\":1,\"usable\":false,\"location\":null,\"passage\":null,\"reason\":\"The supplied text does not address the claimed share class.\"}]}\n\nFor every unusable row give a specific nonempty reason through 600 characters;\nusable rows have null reason. Captures may supply an explicitly labelled contiguous\nquote window, with full-capture digests and zero-based end-exclusive character\noffsets. Use only text supplied for that row (or its exact capture_ref), and reject\nthe claim if the window lacks the context needed to bind it honestly.\n\n===== TASK INPUT =====\n\n{\"capture_ref_semantics\":\"A non-null capture_ref names an earlier claim_index in rows with identical final URL and content/text digests and identical window offsets; use that row's line-numbered text. Window offsets are zero-based, end-exclusive Unicode character offsets in the complete captured text; coordinate prefixes number only the displayed window. A quote locator is untrusted discovery data, never evidence.\",\"rows\":[{\"claim_index\":0,\"proposition\":\"The official Form 10-K cover instructs corporate registrants to indicate the number of shares outstanding of each class of common stock as of the latest practicable date.\",\"candidate\":{\"url\":\"https://www.sec.gov/about/forms/form10-k.pdf\",\"title\":\"Form 10-K\",\"publisher\":\"U.S. Securities and Exchange Commission\",\"source_kind\":\"primary\",\"authority_basis\":\"The SEC issues Form 10-K and its official instructions.\",\"relation\":\"supports_claim\"},\"capture\":{\"usable\":true,\"final_url\":\"https://www.sec.gov/about/forms/form10-k.pdf\",\"status\":200,\"content_type\":\"application/pdf\",\"content_sha256\":\"65e8ce4f1364c7352124ed948c06826eed1e60520cd537310b2f858421d45307\",\"text_sha256\":\"4c255e4df7b60ba66c4aeacfe14ce4726c79526057b57206d81d9c36866f16db\",\"error\":null,\"fallback_attempted\":false,\"capture_ref\":null,\"window\":{\"mode\":\"full-source\",\"start\":0,\"end\":40527,\"full_text_chars\":40527,\"text_sha256\":\"4c255e4df7b60ba66c4aeacfe14ce4726c79526057b57206d81d9c36866f16db\"},\"line_numbered_text\":\"00001: OMB APPROVAL \\n00002: OMB Number:         3235-0063 \\n00003: Expires:      September 30, 2029 \\n00004: Estimated average burden  \\n00005: hours per response\u2026\u20261,695.20 \\n00006: SEC 1673 (02-25)      Potential persons who are to respond to the collection of information \\n00007: contained in this Form are not required to respond unless the Form \\n00008: displays a currently valid OMB control number. \\n00009: UNITED STA\\n00010: TES \\n00011: SECURITIES AND EXCHANGE COMMISSION \\n00012: Washington, D.C. 20549 \\n00013: FORM 10-K \\n00014: ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(d) OF \\n00015: THE SECURITIES EXCHANGE ACT OF 1934 \\n00016: GENERAL INSTRUCTIONS \\n00017: A. Rule as to Use of Form 10-K.\\n00018: (1) This Form sha\\n00019: ll be used for annual reports pursuant to Section 13 or 15(d) of the\\n00020: Securities Exchange Act of 1934 (15 U.S.C. 78m or 78o(d)) (the \u201cAct\u201d) for which no\\n00021: other form is prescribed. This Form also shall be used for transition reports filed\\n00022: pursuant to Section 13 or 15(d) of the Act.\\n00023: (2) Annual reports\\n00024:  on this Form shall be filed within the following period:\\n00025: (a) 60 days after the end of the fiscal year covered by the report (75 days for fiscal\\n00026: years ending before December 15, 2006) for large accelerated filers (as defined in\\n00027: 17 CFR 240.12b-2):\\n00028: (b) 75 days after the end of the fiscal year covered by the report for accelerated filers\\n00029: (as defined in 17 CFR 240.12b-2); and\\n00030: (c) 90 days after the end of the fiscal year covered by the report for all other\\n00031: registrants.\\n00032: (3) Transition r\\n00033: eports on this Form shall be filed in accordance with the requirements set\\n00034: forth in Rule 13a-10 (17 CFR 240.13a-10) or Rule 15d-10 (17 CFR 240.15d-10)\\n00035: applicable when the registrant changes its fiscal year end.\\n00036: (4) Notwithsta\\n00037: nding paragraphs (2) and (3) of this General Instruction A., all schedules\\n00038: required by Article 12 of Regulation S-X (17 CFR 210.12-01 - 210.12-29) may, at the\\n00039: option of the registrant, be filed as an amendment to the report not later than 30 days\\n00040: after the applicable due date of the report.\\n00041: B. Application of General Rules and Regulations.\\n00042: (1) The General\\n00043:  Rules and Regulations under the Act (17 CFR 240) contain certain general\\n00044: requirements which are applicable to reports on any form. These general requirements\\n00045: should be carefully read and observed in the preparation and filing of reports on this\\n00046: Form.\\n00047:  \\n00048: 2 of 19 \\n00049: (2) Particular attention is directed to Regulation 12B which contains general requirements \\n00050: regarding matters such as the kind and size of paper to be used, the legibility of the \\n00051: report, the information to be given whenever the title of securities is required to be \\n00052: stated, and the filing of the report. The definitions contained in Rule 12b-2 should be \\n00053: especially noted. See also Regulations 13A and 15D. \\n00054: C. Preparation of Report. \\n00055: (1) This Form is not to be used as a blank form to be filled in, but only as a guide in the \\n00056: preparation of the report on paper meeting the requirements of Rule 12b-12. Except as \\n00057: provided in General Instruction G, the ans\n\u2026 [bounded research output] \u2026\nbilled in each of the last\\n00560: two fiscal years for products and services provided by the principal accountant, other\\n00561: than the services reported in Items 9(e)(1) through 9(e)(3) of Schedule 14A.\\n00562: Registrants shall describe the nature of the services comprising the fees disclosed\\n00563: under this category.\\n00564: (5) (i) Disclose the audit committee\u2019s pre-approval policies and procedures described in\\n00565: paragraph (c)(7)(i) of Rule 2-01 of Regulation S-X. \\n00566: (ii) Disclose the percentage of services described in each of Items 9(e)(2) through\\n00567: 9(e)(4) of Schedule 14A that were approved by the audit committee pursuant to\\n00568: paragraph (c)(7)(i)(C) of Rule 2-01 of Regulation S-X.\\n00569: (6) If greater than 50 percent, disclose the percentage of hours expended on the principal\\n00570: accountant\u2019s engagement to audit the registrant\u2019s financial statements for the most\\n00571: recent fiscal year that were attributed to work performed by persons other than the\\n00572: principal accountant\u2019s full-time, permanent employees.\\n00573: PART IV \\n00574: Item 15. Exhibits and Financial Statement Schedules. \\n00575: (a) List the following documents filed as a part of the report:\\n00576: (1) A\\n00577: ll financial statements;\\n00578: (2) T\\n00579: hose financial statement schedules required to be filed by Item 8 of this Form,\\n00580: and by paragraph (b) below.\\n00581: (3) T\\n00582: hose exhibits required by Item 601 of Regulation S-K (\u00a7 229.601 of this chapter)\\n00583: and by paragraph (b) below. Identify in the list each management contract or\\n00584: compensatory plan or arrangement required to be filed as an exhibit to this Form\\n00585: pursuant to Item 15(b) of this report.\\n00586: (b) R\\n00587: egistrants shall file, as exhibits to this Form, the exhibits required by Item 601 of\\n00588: Regulation S-K (\u00a7 229.601 of this chapter).\\n00589: 17 of 19 \\n00590: (c) Registrants shall file, as financial statement schedules to this Form, the financial\\n00591: statements required by Regulation S-X (17 CFR 210) which are excluded from the\\n00592: annual report to shareholders by Rule 14a-3(b) including\\n00593: (1) s\\n00594: eparate financial statements of subsidiaries not consolidated and fifty percent or\\n00595: less owned persons;\\n00596: (2) s\\n00597: eparate financial statements of a\ufb03liates whose securities are pledged as collateral;\\n00598: and\\n00599: (3) s\\n00600: chedules.\\n00601: Item 16. Form 10\u2013K Summary. \\n00602: Registrants may, at their option, include a summary of information required by this Form, \\n00603: but only if each item in the summary is presented fairly and accurately and includes a \\n00604: hyperlink to the material contained in this Form to which such item relates, including to \\n00605: materials contained in any exhibits filed with this Form. \\n00606: Instruction: The summary shall refer only to Form 10-K disclosure that is included in the \\n00607: form at the time it is filed. A registrant need not update the summary to reflect information \\n00608: required by Part III of Form 10-K that the registrant incorporates by reference from a proxy or \\n00609: information statement filed after the Form 10-K, but must state in the summary that the summary \\n00610: does not include Part III information because that information will be incorporated by reference \\n00611: from a later filed proxy or information statement involving the election of directors. \\n00612: 18 of 19 \\n00613: SIGNATURES \\n00614: [See General Instruction D] \\n00615: Pursuant to the requirements of Section 13 or 15(d) of the Securities Exchange Act of 1934, \\n00616: the registrant has duly caused this report to be signed on its behalf by the undersigned, thereunto \\n00617: duly authorized. \\n00618: (Registrant)  \\n00619: By (Signature and Title)*  \\n00620: Date  \\n00621: Pursuant to the requirements of the Securities Exchange Act of 1934, this report has been \\n00622: signed below by the following persons on behalf of the registrant and in the capacities and on the \\n00623: dates indicated. \\n00624: By (Signature and Title)*  \\n00625: Date  \\n00626: By (Signature and Title)*  \\n00627: Date  \\n00628: * Print the name and title of each signing officer under his signature.\\n00629: Sup\\n00630: plemental Information to be Furnished With Reports Filed Pursuant to Section 15(d) \\n00631: of the Act by Registrants Which Have Not Registered Securities Pursuant to Section 12 of \\n00632: the Act \\n00633: (a) Except to the extent that the materials enumerated in (1) and/or (2) below are\\n00634: specifically incorporated into this Form by reference, every registrant which files an\\n00635: annual report on this Form pursuant to Section 15(d) of the Act must furnish to the\\n00636: Commission for its information, at the time of filing its report on this Form, four copies\\n00637: of the following:\\n00638: (1) A\\n00639: ny annual report to security holders covering the registrant\u2019s last fiscal year; and\\n00640: (2) E\\n00641: very proxy statement, form of proxy or other proxy soliciting material sent to\\n00642: more than ten of the registrant\u2019s security holders with respect to any annual or\\n00643: other meeting of security holders.\\n00644: 19 of 19 \\n00645: (b) The foregoing material shall not be deemed to be \u201cfiled\u201d with the Commission or \\n00646: otherwise subject to the liabilities of Section 18 of the Act, except to the extent that the \\n00647: registrant specifically incorporates it in its annual report on this Form by reference. \\n00648: (c) If no such annual report or proxy material has been sent to security holders, a statement \\n00649: to that e\ufb00ect shall be included under this caption. If such report or proxy material is to \\n00650: be furnished to security holders subsequent to the filing of the annual report of this \\n00651: Form, the registrant shall so state under this caption and shall furnish copies of such \\n00652: material to the Commission when it is sent to security holders.\"}}]}",
+        "intended_session_ref": "01a1da54-d18c-72a3-a9f7-cc285da3935c"
+      }
+    ]
+  },
+  "plan_review": {
+    "lineage": "paranoia-issue-146-20261114-plan",
+    "rounds": 4,
+    "structural_result": "NOT-BLOCKED",
+    "claim_scope": "The initial unsupported-PDF claim failure is retained. Later bootstrap design rounds explicitly disabled claim verification; live capture/binding above supplies separate current-source evidence."
+  },
+  "production_diff_numstat": [
+    "79\t4\tsrc/paranoia_local/arbitrate_handler.py",
+    "120\t21\tsrc/paranoia_local/arbitration_research.py",
+    "100\t31\tsrc/paranoia_local/external_sources.py",
+    "12\t2\tsrc/paranoia_local/prompts.py",
+    "310\t0\tsrc/paranoia_local/source_extraction.py"
+  ],
+  "largest_modules": [
+    {
+      "path": "src/paranoia_local/handlers.py",
+      "bytes": 312871,
+      "lines": 6725
+    },
+    {
+      "path": "src/paranoia_local/arbitrate_handler.py",
+      "bytes": 136998,
+      "lines": 3208
+    },
+    {
+      "path": "src/paranoia_local/plan_claims.py",
+      "bytes": 86660,
+      "lines": 1922
+    },
+    {
+      "path": "src/paranoia_local/staged_protocol.py",
+      "bytes": 74484,
+      "lines": 1857
+    }
+  ]
+}

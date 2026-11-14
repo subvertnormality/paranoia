@@ -378,7 +378,7 @@ def test_binding_rejection_reason_is_bounded_and_legacy_is_explicit():
         ar.parse_binding_result(reply(), [claim], [capture])
 
 
-@pytest.mark.parametrize("name", ["filing-research-146-acceptance.json", "filing-research-146-acceptance-configuration.json", "filing-research-146-acceptance-streams.json"])
+@pytest.mark.parametrize("name", ["filing-research-146-acceptance.json", "filing-research-146-acceptance-configuration.json", "filing-research-146-acceptance-streams.json", "filing-research-146-acceptance-delivery.json"])
 def test_filing_research_native_receipt_retains_its_source_and_execution(name):
     root = Path(__file__).resolve().parents[1]
     receipt = json.loads((root / "docs" / name).read_text(encoding="utf-8"))
