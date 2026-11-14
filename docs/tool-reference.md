@@ -331,10 +331,52 @@ failure keeps its failure status prefix and retained attempt/capture diagnostics
 and appends these counters whenever a completed research run is available, even
 before shared-packet establishment. Summary rows cover only completed research runs.
 
-HTTP 200 alone does not establish usable evidence. Sources exceeding the binding
-budget are explicitly excluded as whole captures; admitted source text is not
-silently shortened. Research counts never replace decisive-evidence
+HTTP 200 alone does not establish usable evidence. Oversized binding inputs may
+use explicit quote windows as described below; remaining budget failures are
+excluded with a server-owned reason. Research counts never replace decisive-evidence
 substantiation or make a context-only packet governing.
+
+### Captured filing evidence
+
+The shared capturer accepts HTML, XHTML, plain text and `application/pdf`.
+Text-bearing PDF extraction uses pypdf; encrypted, empty/scanned, malformed and
+over-limit documents remain retrieval failures. HTML first uses Trafilatura
+precision extraction, then recall and clean HTML-to-text only when extraction is
+empty. A response beginning with an EDGAR `DOCUMENT` envelope must contain exactly
+one balanced `DOCUMENT` and `TEXT` block with an HTML payload; multipart or malformed
+envelopes fail closed. Capture metadata identifies the payload byte offsets and
+FILENAME, while digests bind the entire response and complete extracted text.
+
+Extraction workers have a 512 MiB memory limit (POSIX address space or Windows
+Job Object committed memory), run within the original capture deadline, and are
+killed and reaped on timeout or output overflow. Missing containment fails that
+source. PDF limits are 500 pages and 20,000,000 decoded bytes per page. No OCR,
+document scripts or external image decoder is used.
+
+Plan capture keeps 5,000,000 response bytes and 1,000,000 extracted characters,
+with complete-source binding and the existing cold attestation. Arbitration alone
+admits complete captures through 25,000,000 response bytes and 5,000,000 extracted
+characters. Its discovery may supply an optional exact quote locator through
+1,200 characters. When the aggregate binding input exceeds 400,000 characters,
+the server may select a single contiguous window containing a matching quote and
+up to 8,000 characters on either side. The first exact occurrence governs repeated
+quotes. A missing/mismatched locator keeps whole-source admission or explicit
+budget exclusion; provider text never becomes evidence.
+
+Binding rows label window offsets (zero-based, end-exclusive), full text length
+and window digest alongside the original capture digests. Deduplication includes
+the window, and passages must match the text actually supplied for that row.
+Complete original captures are retained under `original_captures` in research
+audits, including budget exclusions and binding failures. Both deciders receive
+the same bound packet and independently assess its authority and entailment.
+
+`research.diagnostics` and the report's binding diagnostics share per-claim status:
+`capture-not-completed`, `capture-failed`, `binding-budget-excluded`,
+`binding-not-completed`, `model-rejected`, or `bound`. The binder supplies a reason
+through 600 characters for rejection; legacy replies without a reason visibly say
+`no reason supplied`. These diagnostics include failed research lanes but the
+numeric summary still counts completed runs only. They never alter the independent
+arbitration verdict, source authority or two-round/call limits.
 
 `ADVISORY: human-owner` is informational. `SNAPSHOT` is provenance, not a durable
 replay handle, unless `retain_snapshot: true` was used. That option is the only

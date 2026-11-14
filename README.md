@@ -307,6 +307,12 @@ third model to choose between the votes.
 its [full reference](docs/tool-reference.md#arbitrate) before relying on the
 outcome or using `retain_snapshot`.
 
+Captured evidence supports text-bearing PDFs and single-document EDGAR SGML
+filings as well as ordinary HTML and plain text. Arbitration can use explicitly
+labelled quote windows from larger captures; plan verification retains complete
+source context. Per-claim binding diagnostics explain capture failure, budget
+exclusion and model rejection. See [capture and binding policy](docs/tool-reference.md#captured-filing-evidence).
+
 ## Tracked reviews
 
 Tracking is on by default for branch and plan reviews. A tracked review has three

@@ -368,7 +368,11 @@ Return only this marker and JSON, with at most 12 unique propositions and exactl
 
 Allowed kind literals: "fact", "design_principle", "behavior". Allowed source_kind literals:
 "primary", "authoritative", "secondary", "ugc". Allowed relation literals:
-"supports_claim", "refutes_claim", "context"."""
+"supports_claim", "refutes_claim", "context".
+Each claim may also contain an optional quote string (1-1200 characters): an exact
+quoted locator from the discovered source. Supply one when available, especially
+for long filings. This is only a hint: the server must find it in its own capture;
+search snippets and your quote never supply evidence."""
 
 
 ARBITRATION_BINDING_INSTRUCTIONS = """You are binding previously discovered candidates to server-captured text.
@@ -378,7 +382,13 @@ You have no web, repository, MCP, plugin, browser, or delegation tools. Use only
 Return only this marker and JSON, with exactly one item for every claim_index:
 
 === EVIDENCE BINDING JSON ===
-{"bindings":[{"claim_index":0,"usable":true,"location":"section/table/page","passage":"exact captured passage"},{"claim_index":1,"usable":false,"location":null,"passage":null}]}"""
+{"bindings":[{"claim_index":0,"usable":true,"location":"section/table/page","passage":"exact captured passage","reason":null},{"claim_index":1,"usable":false,"location":null,"passage":null,"reason":"The supplied text does not address the claimed share class."}]}
+
+For every unusable row give a specific nonempty reason through 600 characters;
+usable rows have null reason. Captures may supply an explicitly labelled contiguous
+quote window, with full-capture digests and zero-based end-exclusive character
+offsets. Use only text supplied for that row (or its exact capture_ref), and reject
+the claim if the window lacks the context needed to bind it honestly."""
 
 
 def compose(instructions: str, body: str) -> str:

@@ -4,6 +4,13 @@ The default Claude model is `ClaudeEngine.default_model` (`claude-fable-5-2`).
 Current tool descriptions and documentation follow that default. Keep historical
 provider evidence and frozen benchmark model pins bound to their original models.
 
+Issue #146 follows docs/filing-research-146-plan.md. Shared PDF/EDGAR extraction
+retains server-captured provenance. Only arbitration may use larger complete
+captures and explicitly labelled quote-located binding windows; plan verification
+keeps its existing complete-source limits and authority/attestation requirements.
+Research window locators are untrusted hints, never evidence. Preserve original
+capture digests and validate passages against the exact supplied window.
+
 Issue #142 follows docs/arbitration-diagnostics-142-plan.md. Preserve the intentional
 gained-carried-evidence gate for changed arbitration selections and the two-round
 ceiling. Report unanimous unsubstantiated agreement explicitly. Derive research

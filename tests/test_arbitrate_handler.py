@@ -208,6 +208,77 @@ def _no_preflight(monkeypatch):
     monkeypatch.setattr(ah.eng, "require_evidence_profile", lambda engine: "test")
 
 
+@pytest.mark.parametrize("terminal", ["success", "decider-failure", "binding-failure"])
+def test_filing_windows_and_rejection_diagnostics_through_public_handler(
+    repo, tmp_path, monkeypatch, terminal,
+):
+    from .test_filing_sources import pdf_bytes
+    from .test_external_sources import Response
+
+    quote = "The API retries twice."
+    original = "x" * 450_000 + quote
+    bodies = {"https://docs.example.com/large": (original.encode(), "text/plain"),
+              "https://docs.example.com/form.pdf": (pdf_bytes(), "application/pdf")}
+    capture_all = es.capture_all
+    monkeypatch.setattr(es, "_validate_public_url", lambda url: None)
+
+    def captured(candidates, **kwargs):
+        assert kwargs["research"] is True
+        return capture_all(candidates, capture_one=lambda candidate: es.capture(
+            candidate, research=True, opener=lambda request, timeout: Response(
+                *bodies[candidate.url], url=candidate.url,
+            ),
+        ))
+
+    monkeypatch.setattr(es, "capture_all", captured)
+    def researcher(**kwargs):
+        discovery = ar.DISCOVERY_MARKER + "\n" + json.dumps({"claims": [{
+            "kind": "behavior", "proposition": quote + str(index), "quote": quote,
+            "candidate": {"url": url, "title": "Official filing", "publisher": "Example",
+                          "source_kind": "primary", "authority_basis": "Issuer defines API",
+                          "relation": "supports_claim"},
+        } for index, url in enumerate(bodies)]})
+        binding = ar.BINDING_MARKER + "\n" + json.dumps({"bindings": [
+            {"claim_index": 0, "usable": True, "location": "API", "passage": quote, "reason": None},
+            {"claim_index": 1, "usable": False, "location": None, "passage": None,
+             "reason": "This PDF does not address the indexed claim."},
+        ]})
+        failure = terminal == "binding-failure" and kwargs["engine"].name == "claude"
+        scripted = ScriptedResearchEngine(kwargs["engine"].name, [
+            eng.Review(discovery, "session", discovery),
+            eng.Review("provider unavailable", None, "raw error", error=True, returncode=17)
+            if failure else eng.Review(binding, "session", binding),
+        ])
+        return ah._research_one(**{**kwargs, "engine": scripted})
+
+    scripted_agent = Agent(lambda engine, rnd: "opt-decimal")
+    def agent(**kwargs):
+        if terminal == "decider-failure" and kwargs["engine_name"] == "claude":
+            raise RuntimeError("decider unavailable")
+        return scripted_agent(**kwargs)
+
+    report = ah.arbitrate(
+        {**BASE, "repo_path": str(repo), "clean": False, "research": True},
+        log_dir=tmp_path / "logs", engines=ENGINES, run_agent=agent, run_research=researcher,
+    )
+    audit = json.loads(Path(trailer_field(report, "AUDIT")).read_text())
+    diagnostics = audit["research"]["diagnostics"]
+    rendered = json.loads(report.split("Research binding diagnostics:\n```json\n", 1)[1].split("\n```", 1)[0])
+    assert rendered == diagnostics
+    assert any(row["status"] == "model-rejected" and "does not address" in row["reason"] for row in diagnostics)
+    assert trailer_field(report, "ARBITRATION") == ("CONVERGED" if terminal == "success" else "FAILED")
+    for run in audit["research"]["runs"]:
+        assert run["original_captures"][0]["text"] == original
+        assert run["binding_views"][0]["mode"] == "quote-window"
+        assert run["original_captures"][1]["extraction_metadata"]["kind"] == "pdf"
+        assert run["calls"] == 2
+    if terminal == "binding-failure":
+        failure = audit["research"]["failures"][0]
+        assert failure["original_captures"][0]["text"] == original
+        assert failure["binding_views"][0]["mode"] == "quote-window"
+        assert all(row["status"] == "binding-not-completed" for row in failure["diagnostics"])
+
+
 def _options_by_engine(agent) -> dict:
     """Deciders run in parallel, so call order is nondeterministic — key by engine."""
     out = {}
