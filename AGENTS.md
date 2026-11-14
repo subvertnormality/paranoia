@@ -4,6 +4,16 @@ The default Claude model is `ClaudeEngine.default_model` (`claude-fable-5-2`).
 Current tool descriptions and documentation follow that default. Keep historical
 provider evidence and frozen benchmark model pins bound to their original models.
 
+Issue #141 follows the authoritative SEC request identity policy in
+docs/tool-reference.md#sec-request-identity-policy, including its email-token rule.
+It adds optional PARANOIA_SEC_USER_AGENT for exact sec.gov and its
+dot-delimited subdomains. Freeze the operator-owned printable ASCII identity
+once per capture; require a contact email and at most 512 characters when SEC
+is actually requested. Never echo it in diagnostics or forward it off SEC:
+recompute and replace the header at every validated redirect. Preserve the
+single 403 retry, fresh redirect counter and original deadline; configured SEC
+requests keep the declared identity on retry. Unset configuration stays compatible.
+
 Issue #146 follows docs/filing-research-146-plan.md. Shared PDF/EDGAR extraction
 retains server-captured provenance. Only arbitration may use larger complete
 captures and explicitly labelled quote-located binding windows; plan verification
@@ -453,7 +463,8 @@ of the resulting code and tests.
   uncaptured provenance outcome and must not invalidate independently captured HTTP(S) evidence.
   Partition unavailable captures before row construction, materialize their server-owned decision
   directly, and never expose them to provider binding output.
-  Retry HTTP 403 at most once with a browser-compatible user agent, a fresh redirect counter, and
+  Retry HTTP 403 at most once with a browser-compatible user agent (or the configured
+  declared SEC identity on SEC hosts), a fresh redirect counter, and
   the original absolute deadline and public-address/final-URL policy. A persistent 403 remains
   unusable and retains final URL, numeric status, bounded error, and retry fact; never add cookies,
   browser automation, access-control bypass, third-party mirrors, snippets, or provider bodies.

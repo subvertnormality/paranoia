@@ -103,9 +103,13 @@ prompt-size measurements describe their recorded source, not this later wording.
    is resumed with web and repository access disabled and may bind exact passages only from those
    captures. Search snippets, provider summaries, and provider-fetched page bodies never count.
    The initial attributable request carries explicit accept/language/identity-encoding headers.
-   Only HTTP 403 receives one browser-compatible same-URL retry, using a fresh five-redirect
+   Only HTTP 403 receives one same-URL retry, using a fresh five-redirect
    handler but the same absolute deadline and public-address/final-URL checks. Persistent 403
-   remains unusable and retains its final URL, numeric status, bounded error, and retry fact; no
+   remains unusable and retains its final URL, numeric status, bounded error, and retry fact.
+   The retry uses a browser-compatible header except on SEC hosts with an operator-owned
+   `PARANOIA_SEC_USER_AGENT`; those requests retain the declared identity. See the
+   authoritative [SEC request identity policy](tool-reference.md#sec-request-identity-policy). Header selection repeats at
+   every validated redirect, and the contact is never forwarded off SEC. No
    authentication, cookies, headless browser, CAPTCHA/paywall bypass, or mirror is attempted.
 4. A fresh tool-free attester receives only each atomic proposition, declared publisher and
    authority basis, capture metadata, relation, location, and exact passage. A source governs

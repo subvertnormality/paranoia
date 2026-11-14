@@ -261,8 +261,13 @@ Claude `WebFetch` is not used. Known UGC can provide leads but cannot govern
 closure. A repository's own web URL remains self-context, not evidence for its
 plan. Redirect destinations determine source eligibility and identity.
 
-HTTP 403 receives at most one browser-compatible same-URL retry. Paranoia does
-not add cookies, browser automation, mirrors, or access-control bypasses.
+HTTP 403 receives at most one same-URL retry with a fresh redirect counter and the
+original deadline. It uses the browser-compatible header unless an operator has
+configured `PARANOIA_SEC_USER_AGENT` under the authoritative
+[SEC request identity policy](tool-reference.md#sec-request-identity-policy); those requests retain the
+declared identity. Headers are recomputed at every validated redirect so that
+the contact never follows a redirect off SEC. Paranoia does not add cookies,
+browser automation, mirrors, or access-control bypasses.
 
 ### Outcomes and later rounds
 

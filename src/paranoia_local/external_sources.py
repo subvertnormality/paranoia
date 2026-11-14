@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import os
 import re
 import socket
 import subprocess
@@ -51,6 +52,16 @@ BROWSER_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/127.0.0.0 Safari/537.36"
+)
+SEC_USER_AGENT_ENV = "PARANOIA_SEC_USER_AGENT"
+SEC_USER_AGENT_ERROR = (
+    "invalid PARANOIA_SEC_USER_AGENT: expected at most 512 printable ASCII "
+    "characters containing a contact email token; see SEC request identity policy"
+)
+_CONTACT_EMAIL = re.compile(
+    r"(?:^|[ ()<>])[A-Za-z0-9_%+-]+(?:\.[A-Za-z0-9_%+-]+)*@"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z]{2,63}(?=$|[ ()<>])"
 )
 MAX_CAPTURE_ERROR_CHARS = 1200
 BINDING_BUDGET_ERROR = (
@@ -194,10 +205,35 @@ def _validate_public_url(url: str) -> None:
             raise SourceError(f"source host resolves to non-public address {address}")
 
 
+def _is_sec_host(url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower().removesuffix(".")
+    return host == "sec.gov" or host.endswith(".sec.gov")
+
+
+def _request_user_agent(url: str, *, browser_compatible: bool,
+                        sec_user_agent: str | None) -> str:
+    """One host/validation policy for initial requests and every redirect."""
+    if sec_user_agent is not None and _is_sec_host(url):
+        if (not 0 < len(sec_user_agent) <= 512
+                or any(not 32 <= ord(c) <= 126 for c in sec_user_agent)
+                or _CONTACT_EMAIL.search(sec_user_agent) is None):
+            raise SourceError(SEC_USER_AGENT_ERROR)
+        return sec_user_agent
+    return BROWSER_USER_AGENT if browser_compatible else BASE_REQUEST_HEADERS["User-Agent"]
+
+
+def _retry_description(url: str, sec_user_agent: str | None) -> str:
+    return ("configured SEC identity" if sec_user_agent is not None and _is_sec_host(url)
+            else "browser-compatible")
+
+
 class _SafeRedirect(urllib.request.HTTPRedirectHandler):
-    def __init__(self) -> None:
+    def __init__(self, *, browser_compatible: bool = False,
+                 sec_user_agent: str | None = None) -> None:
         super().__init__()
         self.count = 0
+        self.browser_compatible = browser_compatible
+        self.sec_user_agent = sec_user_agent
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
         self.count += 1
@@ -207,11 +243,19 @@ class _SafeRedirect(urllib.request.HTTPRedirectHandler):
             raise RedirectRejected(target, int(code), content_type, "too many redirects")
         try:
             _validate_public_url(target)
+            user_agent = _request_user_agent(
+                target, browser_compatible=self.browser_compatible,
+                sec_user_agent=self.sec_user_agent,
+            )
         except SourceError as exc:
             raise RedirectRejected(
                 target, int(code), content_type, _bounded_error(exc),
             ) from exc
-        return super().redirect_request(req, fp, code, msg, headers, target)
+        redirected = super().redirect_request(req, fp, code, msg, headers, target)
+        if redirected is not None:
+            redirected.remove_header("User-agent")
+            redirected.add_header("User-Agent", user_agent)
+        return redirected
 
 
 def _extract(body: bytes, content_type: str) -> str:
@@ -320,6 +364,7 @@ def _http_error_capture(
     *,
     fallback_attempted: bool,
     detail: str | None = None,
+    retry_description: str = "browser-compatible",
 ) -> Capture:
     final_url: str | None = None
     try:
@@ -333,7 +378,7 @@ def _http_error_capture(
         content_type = error.headers.get_content_type().lower()
     message = detail or _bounded_error(error)
     if fallback_attempted and error.code == 403:
-        message = f"{message}; browser-compatible retry attempted"
+        message = f"{message}; {retry_description} retry attempted"
     return Capture(
         candidate, final_url, int(error.code), content_type, None, None, None,
         _bounded_error(message), fallback_attempted,
@@ -357,6 +402,7 @@ def capture(
     text_sha256: str | None = None
     max_bytes = RESEARCH_MAX_RESPONSE_BYTES if research else MAX_RESPONSE_BYTES
     max_chars = RESEARCH_MAX_EXTRACTED_CHARS if research else MAX_EXTRACTED_CHARS
+    sec_user_agent = os.environ.get(SEC_USER_AGENT_ENV)
     try:
         started = clock()
         capture_deadline = started + CONNECT_TIMEOUT_SEC + READ_TIMEOUT_SEC
@@ -377,18 +423,24 @@ def capture(
                     return _http_error_capture(
                         candidate, first_403, fallback_attempted=False,
                         detail=(
-                            "HTTP 403; browser-compatible retry not attempted because the "
+                            f"HTTP 403; {_retry_description(first_403.geturl(), sec_user_agent)} "
+                            "retry not attempted because the "
                             "source capture deadline expired"
                         ),
                     )
                 raise SourceError("source capture deadline expired before request")
             headers = dict(BASE_REQUEST_HEADERS)
+            headers["User-Agent"] = _request_user_agent(
+                candidate.url, browser_compatible=browser_compatible,
+                sec_user_agent=sec_user_agent,
+            )
             if browser_compatible:
-                headers["User-Agent"] = BROWSER_USER_AGENT
                 fallback_attempted = True
             request = urllib.request.Request(candidate.url, headers=headers)
             if opener is None:
-                handler = _SafeRedirect()
+                handler = _SafeRedirect(
+                    browser_compatible=browser_compatible, sec_user_agent=sec_user_agent,
+                )
                 built_opener = urllib.request.build_opener(handler)
 
                 def open_call(req: urllib.request.Request, timeout: float):
@@ -406,6 +458,7 @@ def capture(
                     continue
                 return _http_error_capture(
                     candidate, exc, fallback_attempted=fallback_attempted,
+                    retry_description=_retry_description(exc.geturl(), sec_user_agent),
                 )
         assert response is not None
         with response:  # type: ignore[attr-defined]

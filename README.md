@@ -499,6 +499,16 @@ Audit records default to `~/.paranoia/logs/`. Durable review state defaults to
 `~/.paranoia/lineages/` and deliberately does not follow `--log-dir`. Set
 `PARANOIA_STATE_ROOT` to relocate lineage state.
 
+For SEC evidence capture, optionally set `PARANOIA_SEC_USER_AGENT` in the server's
+environment to your real application/operator identity and contact email, for
+example `YourResearchTool contact@your-real-domain.example` (replace the example
+with your own details). The authoritative [SEC request identity policy](docs/tool-reference.md#sec-request-identity-policy)
+defines accepted contact tokens and limits. It is used only for `sec.gov` and its subdomains, including
+after redirects, and retained on the existing single 403 retry. Other hosts keep
+the generic headers. Invalid configuration blocks SEC capture with a value-free
+diagnostic; unset configuration preserves existing behavior. A declared identity
+does not guarantee access or establish source authority.
+
 ## Safety and cost
 
 - Reviewers are read-only. The calling coding agent owns all edits and test runs.

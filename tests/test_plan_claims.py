@@ -1752,6 +1752,56 @@ def test_pdf_capture_binding_and_cold_attestation_through_public_plan(repo, tmp_
     assert source["quote"] in engine.calls[2][1]
 
 
+@pytest.mark.parametrize("invalid", [False, True])
+def test_sec_identity_capture_and_rejection_through_public_plan(repo, tmp_path, monkeypatch, invalid):
+    from .test_external_sources import Response
+
+    identity = "Private invalid contact" if invalid else "ResearchTool alice@example.com"
+    monkeypatch.setenv(external_sources.SEC_USER_AGENT_ENV, identity)
+    sources = [_source(url="https://www.sec.gov/source"), _source()]
+    usable = [1] if invalid else [0, 1]
+    discovery = _audit(_claim(evidence=sources))
+    binding = handlers.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [{
+        "claim_index": 0, "evidence_index": index, "usable": True,
+        "location": sources[index]["location"], "passage": sources[index]["quote"],
+    } for index in usable]})
+    attestation = '=== EVIDENCE ATTESTATION JSON ===\n' + json.dumps({"attestations": [{
+        "claim_index": 0, "evidence_index": index, "publisher_authority": True,
+        "authority_reason": "official publisher", "passage_entailment": True,
+        "entailment_reason": "direct statement",
+    } for index in usable]})
+    engine = _RoleScript({"evidence-discovery": [discovery], "evidence-binding": [binding],
+                          "evidence-text": [attestation], "evidence-repository": [STRUCTURAL_CLEAR]})
+    monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
+    monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: "test")
+    monkeypatch.setattr(external_sources, "_validate_public_url", lambda url: None)
+    original_capture_all, requests, captured_rows = external_sources.capture_all, [], []
+    def open_call(request, timeout):
+        requests.append(request.full_url)
+        sec = request.full_url.startswith("https://www.sec.gov/")
+        assert request.get_header("User-agent") == (identity if sec else external_sources.BASE_REQUEST_HEADERS["User-Agent"])
+        return Response(sources[0]["quote"].encode(), "text/plain", url=request.full_url)
+    def captured(candidates, **kwargs):
+        rows = original_capture_all(candidates, capture_one=lambda candidate:
+                                    external_sources.capture(candidate, opener=open_call))
+        captured_rows.extend(rows)
+        return rows
+    monkeypatch.setattr(external_sources, "capture_all", captured)
+    report = handlers.critique_plan(
+        {"repo_path": str(repo), "plan_text": PLAN, "class_closure": False,
+         "claim_verification": True}, engine=engine, log_dir=tmp_path / "logs",
+    )
+    assert "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" in report
+    assert captured_rows[0].usable is (not invalid) and captured_rows[1].usable
+    assert len(requests) == len(usable)
+    if invalid:
+        assert captured_rows[0].error == external_sources.SEC_USER_AGENT_ERROR
+        assert "RETRIEVAL-FAILED (non-governing sibling" in report
+    assert identity not in report
+    for audit in (tmp_path / "logs").glob("*.json"):
+        assert identity not in audit.read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize(
     "form", ["always", "invariably", "nothing", "nobody", "nowhere", "both", "neither"],
 )
