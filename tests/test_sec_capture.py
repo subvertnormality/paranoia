@@ -2,7 +2,10 @@
 
 from dataclasses import asdict
 from email.message import Message
+import hashlib
 import json
+from pathlib import Path
+import subprocess
 import urllib.request
 
 import pytest
@@ -166,3 +169,22 @@ def test_unset_sec_identity_keeps_generic_browser_retry(monkeypatch):
     got = es.capture(candidate("https://sec.gov/a"), opener=open_call)
     assert calls == [es.BASE_REQUEST_HEADERS["User-Agent"], es.BROWSER_USER_AGENT]
     assert got.status == 403 and "browser-compatible retry attempted" in got.error
+
+
+def test_native_sec_identity_receipt_is_bound_to_source_and_real_capture():
+    root = Path(__file__).resolve().parents[1]
+    record = json.loads((root / "docs/sec-identity-141-acceptance.json").read_text(encoding="utf-8"))
+    assert record["qualified"] and record["kind"] == "issue141-sec-identity-native-capture"
+    for name, digest in record["source_sha256"].items():
+        blob = subprocess.check_output(["git", "show", record["source_revision"] + ":" + name], cwd=root)
+        assert hashlib.sha256(blob).hexdigest() == digest
+    assert len(record["direct_capture"]) == 2
+    assert all(c["status"] == 200 and c["extracted_characters"] > 0
+               and c["content_sha256"] and c["text_sha256"] for c in record["direct_capture"])
+    assert all(row["declared"] is row["sec"] for row in record["request_identity_checks"])
+    research = record["research"]
+    assert research["engine"] == "codex" and 2 <= research["calls"] <= 4
+    assert all(row["returncode"] == 0 and not row["execution_error"] and row["session_ref"]
+               for row in research["attempts"])
+    assert "shares outstanding" in record["packet_text"]
+    assert "latest practicable date" in record["packet_text"]
