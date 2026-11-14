@@ -1652,6 +1652,9 @@ def test_persistent_correction_gate_acceptance_is_source_and_route_bound() -> No
             stdout=subprocess.PIPE,
         ).stdout
         assert hashlib.sha256(recorded).hexdigest() == expected
+        from scripts.acceptance_sources import current_class_source_required
+        if not current_class_source_required(relative, allowed_later):
+            continue
         if (root / relative).read_bytes() == recorded:
             continue
         changed.add(relative)

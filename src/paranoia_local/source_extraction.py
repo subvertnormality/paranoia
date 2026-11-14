@@ -13,10 +13,83 @@ import os
 import re
 import sys
 import warnings
+import zlib
+from contextlib import contextmanager
 
 MEMORY_BYTES = 512 * 1024 * 1024
 MAX_PDF_PAGES = 500
 MAX_PDF_STREAM_BYTES = 20_000_000
+
+
+def _strict_pdf_stream(stream: object) -> bytes:
+    """Decode only the closed lossless subset; never use pypdf repair fallbacks."""
+    from pypdf.generic import NullObject
+    from pypdf.filters import FlateDecode
+
+    raw = stream._data
+    filters = stream.get("/Filter")
+    if filters is not None:
+        filters = filters.get_object()
+    if isinstance(filters, list):
+        if len(filters) != 1:
+            raise ValueError("unsupported PDF stream filter chain")
+        filters = filters[0].get_object()
+    params = stream.get("/DecodeParms")
+    if params is not None:
+        params = params.get_object()
+    if isinstance(params, list) and len(params) == 1:
+        params = params[0].get_object()
+    if params is None or isinstance(params, NullObject):
+        params = {}
+    if not isinstance(params, dict) or set(params) - {"/Predictor", "/Columns", "/Colors", "/BitsPerComponent"}:
+        raise ValueError("unsupported PDF stream decode parameters")
+    if filters is None or isinstance(filters, NullObject):
+        decoded = raw
+    elif filters == "/FlateDecode":
+        decoder = zlib.decompressobj()
+        decoded = decoder.decompress(raw, MAX_PDF_STREAM_BYTES + 1)
+        if len(decoded) > MAX_PDF_STREAM_BYTES:
+            raise ValueError("PDF decoded stream exceeds extraction limit")
+        if not decoder.eof or decoder.unconsumed_tail or decoder.unused_data:
+            raise ValueError("incomplete or trailing PDF Flate stream")
+    else:
+        raise ValueError(f"unsupported PDF stream filter {str(filters)[:80]}")
+    if len(decoded) > MAX_PDF_STREAM_BYTES:
+        raise ValueError("PDF decoded stream exceeds extraction limit")
+    predictor = params.get("/Predictor", 1)
+    if hasattr(predictor, "get_object"):
+        predictor = predictor.get_object()
+    if predictor != 1:
+        if filters != "/FlateDecode" or not 10 <= predictor <= 15:
+            raise ValueError("unsupported PDF stream predictor")
+        columns, colors, bits = FlateDecode._get_parameters(params)
+        row_length = columns * colors + 1
+        if bits != 8 or row_length > 4_000_000:
+            raise ValueError("unsupported PDF predictor geometry")
+        if len(decoded) % row_length:
+            raise ValueError("incomplete PDF predictor row")
+        # This operation has no stream recovery path. Complete rows are checked
+        # first so the library cannot silently pad a missing row suffix.
+        predicted = FlateDecode._decode_png_prediction(decoded, columns, row_length)
+        if len(predicted) != len(decoded) // row_length * (row_length - 1):
+            raise ValueError("incomplete PDF predictor output")
+        decoded = predicted
+    return decoded
+
+
+@contextmanager
+def _complete_pdf_streams():
+    # EncodedStreamObject imports this single decoder at each first decode,
+    # including object streams and font maps during reader construction. The
+    # adapter is local to this one-document worker and restored for pure callers.
+    from pypdf import filters
+
+    original = filters.decode_stream_data
+    filters.decode_stream_data = _strict_pdf_stream
+    try:
+        yield
+    finally:
+        filters.decode_stream_data = original
 
 
 class _ParserNotices(logging.Handler):
@@ -79,7 +152,7 @@ def _pdf_extract(body: bytes, max_chars: int) -> tuple[str, dict]:
     logger.setLevel(logging.WARNING)
     logging.disable(logging.NOTSET)
     try:
-        with warnings.catch_warnings(), pypdf.apply_configuration(
+        with warnings.catch_warnings(), _complete_pdf_streams(), pypdf.apply_configuration(
             zlib_maximum_output_length=MAX_PDF_STREAM_BYTES,
             lzw_maximum_output_length=MAX_PDF_STREAM_BYTES,
             run_length_maximum_output_length=MAX_PDF_STREAM_BYTES,

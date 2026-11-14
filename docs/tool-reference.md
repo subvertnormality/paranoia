@@ -355,6 +355,14 @@ document scripts or external image decoder is used.
 PDF parser warnings, recovered Form decoding failures and decoded page/Form
 resource budgets fail the entire source; readable remainder text never becomes
 usable partial evidence.
+Text extraction supports unfiltered streams and complete zlib `/FlateDecode`
+streams, including a single-element filter array. Other filters, filter chains
+fail visibly as unsupported. Flate permits identity prediction or complete 8-bit
+PNG predictor rows with bounded geometry; other predictors fail visibly. The worker validates
+end-of-stream and rejects recovery, truncation and trailing data before pypdf can
+admit decoded text, font maps or object streams. Additional encodings are a
+maintainer-owned follow-up requiring complete-decoding and omission regressions;
+the current extractor does not fall back to partial evidence.
 
 Plan capture keeps 5,000,000 response bytes and 1,000,000 extracted characters,
 with complete-source binding and the existing cold attestation. Arbitration alone

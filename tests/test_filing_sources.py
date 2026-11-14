@@ -145,7 +145,7 @@ def test_pdf_decoded_stream_limit_is_enforced_before_text_extraction(monkeypatch
     assert got.content_sha256
 
 
-def form_pdf(data, filter_name=None):
+def form_pdf(data, filter_name=None, decode_params=None):
     from pypdf import PdfReader
     from pypdf.generic import ArrayObject, EncodedStreamObject, NumberObject
 
@@ -160,6 +160,10 @@ def form_pdf(data, filter_name=None):
     form[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): page["/Resources"]["/Font"]})
     if filter_name:
         form[NameObject("/Filter")] = NameObject(filter_name)
+    if decode_params is not None:
+        form[NameObject("/DecodeParms")] = DictionaryObject({
+            NameObject(key): NumberObject(value) for key, value in decode_params.items()
+        })
     page["/Resources"][NameObject("/XObject")] = DictionaryObject({NameObject("/Fm"): writer._add_object(form)})
     stream = DecodedStreamObject()
     stream.set_data(page.get_contents().get_data() + b"\n/Fm Do\n")
@@ -186,19 +190,32 @@ def test_pdf_configuration_is_active_during_reader_construction(monkeypatch):
     assert observed and "The API retries twice." in text
 
 
-@pytest.mark.parametrize("case", ["valid", "malformed", "undecodable", "over-limit"])
+@pytest.mark.parametrize("case", ["valid", "valid-flate", "valid-png", "incomplete-png", "header-only", "truncated-flate", "malformed", "undecodable", "over-limit"])
 def test_pdf_forms_cannot_silently_remove_qualifying_content(monkeypatch, case):
     import zlib
     data, filter_name = b"BT /F1 12 Tf 10 20 Td (Qualifier from the Form.) Tj ET", None
-    if case == "malformed":
+    params = None
+    if case in {"valid-png", "incomplete-png"}:
+        params = {"/Predictor": 15, "/Columns": len(data)}
+        predicted = b"\x00" + data
+        if case == "incomplete-png":
+            predicted = predicted[:-1]
+        data, filter_name = zlib.compress(predicted), "/FlateDecode"
+    elif case in {"valid-flate", "header-only", "truncated-flate"}:
+        data, filter_name = zlib.compress(data), "/FlateDecode"
+        if case == "header-only":
+            data = data[:2]
+        elif case == "truncated-flate":
+            data = data[:-4]
+    elif case == "malformed":
         data = b"BT /F1 12 Tf (unterminated"
     elif case == "undecodable":
         filter_name = "/UnsupportedDecode"
     elif case == "over-limit":
         data = zlib.compress(b" " * (worker.MAX_PDF_STREAM_BYTES + 1))
         filter_name = "/FlateDecode"
-    got = serve(monkeypatch, form_pdf(data, filter_name))
-    if case == "valid":
+    got = serve(monkeypatch, form_pdf(data, filter_name, params))
+    if case in {"valid", "valid-flate", "valid-png"}:
         assert got.usable, got.error
         assert "The API retries twice." in got.text and "Qualifier from the Form." in got.text
     else:
@@ -331,9 +348,10 @@ def test_binding_rejection_reason_is_bounded_and_legacy_is_explicit():
         ar.parse_binding_result(reply(), [claim], [capture])
 
 
-def test_filing_research_native_receipt_retains_its_source_and_execution():
+@pytest.mark.parametrize("name", ["filing-research-146-acceptance.json", "filing-research-146-acceptance-configuration.json"])
+def test_filing_research_native_receipt_retains_its_source_and_execution(name):
     root = Path(__file__).resolve().parents[1]
-    receipt = json.loads((root / "docs/filing-research-146-acceptance.json").read_text(encoding="utf-8"))
+    receipt = json.loads((root / "docs" / name).read_text(encoding="utf-8"))
     assert receipt["kind"] == "issue146-captured-filing-research" and receipt["qualified"]
     revision = receipt["source_revision"]
     inventory = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", revision, "--", "src/paranoia_local"], cwd=root, text=True)
