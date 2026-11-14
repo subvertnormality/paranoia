@@ -10,6 +10,8 @@ captures and explicitly labelled quote-located binding windows; plan verificatio
 keeps its existing complete-source limits and authority/attestation requirements.
 Research window locators are untrusted hints, never evidence. Preserve original
 capture digests and validate passages against the exact supplied window.
+Keep PDF limits active throughout parsing; parser omissions and recovered Form
+failures must reject the whole source rather than return readable partial text.
 Structural-only historical class fixtures still check original capture/research
 blobs, but do not qualify later behavior in those unrelated modules. Keep existing
 allowance entries exact, add none, and retain current capture evidence separately.

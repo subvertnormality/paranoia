@@ -352,6 +352,9 @@ Job Object committed memory), run within the original capture deadline, and are
 killed and reaped on timeout or output overflow. Missing containment fails that
 source. PDF limits are 500 pages and 20,000,000 decoded bytes per page. No OCR,
 document scripts or external image decoder is used.
+PDF parser warnings, recovered Form decoding failures and decoded page/Form
+resource budgets fail the entire source; readable remainder text never becomes
+usable partial evidence.
 
 Plan capture keeps 5,000,000 response bytes and 1,000,000 extracted characters,
 with complete-source binding and the existing cold attestation. Arbitration alone

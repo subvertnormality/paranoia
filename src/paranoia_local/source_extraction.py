@@ -12,10 +12,102 @@ import logging
 import os
 import re
 import sys
+import warnings
 
 MEMORY_BYTES = 512 * 1024 * 1024
 MAX_PDF_PAGES = 500
 MAX_PDF_STREAM_BYTES = 20_000_000
+
+
+class _ParserNotices(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.message: str | None = None
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if self.message is None:
+            self.message = record.getMessage()[:600]
+
+    def check(self) -> None:
+        if self.message is not None:
+            raise ValueError("PDF parser reported incomplete content: " + self.message)
+
+
+def _pdf_streams(page: object) -> None:
+    """Bound decoded page and Form resource streams together before text parsing."""
+    from pypdf.generic import ContentStream
+
+    total = 0
+    seen: dict[int, object] = {}
+
+    def admit(stream: object) -> None:
+        nonlocal total
+        if stream is not None and id(stream) not in seen:
+            # Retain identities for this traversal so temporary ContentStream
+            # objects cannot be freed and have their IDs reused by later Forms.
+            seen[id(stream)] = stream
+            total += len(stream.get_data())
+            if total > MAX_PDF_STREAM_BYTES:
+                raise ValueError("PDF decoded page/Form streams exceed extraction limit")
+            # The text extractor's fast path can suppress malformed Form parse
+            # errors before emitting any warning. Force complete tokenization
+            # here, outside its recovery boundary, including nested Forms.
+            ContentStream(stream, page.pdf).operations
+
+    def forms(resources: object) -> None:
+        if resources is None:
+            return
+        resources = resources.get_object()
+        xobjects = resources.get("/XObject", {}).get_object() if "/XObject" in resources else {}
+        for reference in xobjects.values():
+            form = reference.get_object()
+            if form.get("/Subtype") == "/Form" and id(form) not in seen:
+                admit(form)
+                forms(form.get("/Resources"))
+
+    admit(page.get_contents())
+    forms(page.get("/Resources"))
+
+
+def _pdf_extract(body: bytes, max_chars: int) -> tuple[str, dict]:
+    import pypdf
+
+    notices = _ParserNotices()
+    logger = logging.getLogger("pypdf")
+    previous = logger.handlers[:], logger.level, logger.propagate, logging.root.manager.disable
+    logger.handlers, logger.propagate = [notices], False
+    logger.setLevel(logging.WARNING)
+    logging.disable(logging.NOTSET)
+    try:
+        with warnings.catch_warnings(), pypdf.apply_configuration(
+            zlib_maximum_output_length=MAX_PDF_STREAM_BYTES,
+            lzw_maximum_output_length=MAX_PDF_STREAM_BYTES,
+            run_length_maximum_output_length=MAX_PDF_STREAM_BYTES,
+            array_based_stream_maximum_output_length=MAX_PDF_STREAM_BYTES,
+            brotli_maximum_output_length=MAX_PDF_STREAM_BYTES,
+            maximum_declared_stream_length=MAX_PDF_STREAM_BYTES,
+            jbig2dec_binary=None,
+        ):
+            warnings.simplefilter("error")
+            reader = pypdf.PdfReader(io.BytesIO(body), strict=True)
+            if reader.is_encrypted:
+                raise ValueError("encrypted PDF is unsupported")
+            if len(reader.pages) > MAX_PDF_PAGES:
+                raise ValueError(f"PDF exceeds {MAX_PDF_PAGES} pages")
+            notices.check()
+            pages, count = [], 0
+            for page in reader.pages:
+                _pdf_streams(page)
+                text = page.extract_text() or ""
+                notices.check()
+                count += len(text) + (1 if pages else 0)
+                if count > max_chars:
+                    raise ValueError(f"extracted page exceeds {max_chars} characters")
+                pages.append(text)
+            return "\n".join(pages), {"kind": "pdf", "pages": len(reader.pages)}
+    finally:
+        logger.handlers, logger.level, logger.propagate = previous[:3]
+        logging.disable(previous[3])
 
 
 def contain() -> object:
@@ -98,32 +190,7 @@ def edgar_payload(body: bytes) -> tuple[bytes, dict | None]:
 def extract(body: bytes, content_type: str, max_chars: int) -> tuple[str, dict | None]:
     metadata = None
     if content_type == "application/pdf":
-        from pypdf import PdfReader, apply_configuration
-
-        apply_configuration(
-            zlib_maximum_output_length=MAX_PDF_STREAM_BYTES,
-            lzw_maximum_output_length=MAX_PDF_STREAM_BYTES,
-            run_length_maximum_output_length=MAX_PDF_STREAM_BYTES,
-            array_based_stream_maximum_output_length=MAX_PDF_STREAM_BYTES,
-            jbig2dec_binary=None,
-        )
-        reader = PdfReader(io.BytesIO(body))
-        if reader.is_encrypted:
-            raise ValueError("encrypted PDF is unsupported")
-        if len(reader.pages) > MAX_PDF_PAGES:
-            raise ValueError(f"PDF exceeds {MAX_PDF_PAGES} pages")
-        pages, count = [], 0
-        for number, page in enumerate(reader.pages, 1):
-            contents = page.get_contents()
-            if contents is not None and len(contents.get_data()) > MAX_PDF_STREAM_BYTES:
-                raise ValueError("PDF decoded page stream exceeds extraction limit")
-            text = page.extract_text() or ""
-            count += len(text) + (1 if pages else 0)
-            if count > max_chars:
-                raise ValueError(f"extracted page exceeds {max_chars} characters")
-            pages.append(text)
-        text = "\n".join(pages)
-        metadata = {"kind": "pdf", "pages": len(reader.pages)}
+        text, metadata = _pdf_extract(body, max_chars)
     else:
         body, metadata = edgar_payload(body)
         if content_type == "text/plain" and metadata is None:

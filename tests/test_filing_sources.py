@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 import time
@@ -142,6 +143,82 @@ def test_pdf_decoded_stream_limit_is_enforced_before_text_extraction(monkeypatch
     got = serve(monkeypatch, output.getvalue())
     assert not got.usable and "limit" in got.error.lower()
     assert got.content_sha256
+
+
+def form_pdf(data, filter_name=None):
+    from pypdf import PdfReader
+    from pypdf.generic import ArrayObject, EncodedStreamObject, NumberObject
+
+    writer = PdfWriter()
+    writer.add_page(PdfReader(io.BytesIO(pdf_bytes())).pages[0])
+    page = writer.pages[0]
+    form = EncodedStreamObject() if filter_name else DecodedStreamObject()
+    form._data = data
+    form[NameObject("/Type")] = NameObject("/XObject")
+    form[NameObject("/Subtype")] = NameObject("/Form")
+    form[NameObject("/BBox")] = ArrayObject([NumberObject(n) for n in (0, 0, 600, 800)])
+    form[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): page["/Resources"]["/Font"]})
+    if filter_name:
+        form[NameObject("/Filter")] = NameObject(filter_name)
+    page["/Resources"][NameObject("/XObject")] = DictionaryObject({NameObject("/Fm"): writer._add_object(form)})
+    stream = DecodedStreamObject()
+    stream.set_data(page.get_contents().get_data() + b"\n/Fm Do\n")
+    page[NameObject("/Contents")] = writer._add_object(stream)
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
+def test_pdf_configuration_is_active_during_reader_construction(monkeypatch):
+    import pypdf
+    original = pypdf.PdfReader
+    observed = []
+    def reader(*args, **kwargs):
+        config = pypdf.get_configuration()
+        observed.append(config)
+        assert config.zlib_maximum_output_length == worker.MAX_PDF_STREAM_BYTES
+        assert config.lzw_maximum_output_length == worker.MAX_PDF_STREAM_BYTES
+        assert config.jbig2dec_binary is None
+        assert kwargs["strict"] is True
+        return original(*args, **kwargs)
+    monkeypatch.setattr(pypdf, "PdfReader", reader)
+    text, _ = worker.extract(pdf_bytes(), "application/pdf", 1000)
+    assert observed and "The API retries twice." in text
+
+
+@pytest.mark.parametrize("case", ["valid", "malformed", "undecodable", "over-limit"])
+def test_pdf_forms_cannot_silently_remove_qualifying_content(monkeypatch, case):
+    import zlib
+    data, filter_name = b"BT /F1 12 Tf 10 20 Td (Qualifier from the Form.) Tj ET", None
+    if case == "malformed":
+        data = b"BT /F1 12 Tf (unterminated"
+    elif case == "undecodable":
+        filter_name = "/UnsupportedDecode"
+    elif case == "over-limit":
+        data = zlib.compress(b" " * (worker.MAX_PDF_STREAM_BYTES + 1))
+        filter_name = "/FlateDecode"
+    got = serve(monkeypatch, form_pdf(data, filter_name))
+    if case == "valid":
+        assert got.usable, got.error
+        assert "The API retries twice." in got.text and "Qualifier from the Form." in got.text
+    else:
+        assert not got.usable and got.error and got.content_sha256 and got.status == 200
+        claim = ar.DiscoveryClaim("behavior", "The API retries twice.", got.candidate)
+        reply = ar.BINDING_MARKER + '\n{"bindings":[{"claim_index":0,"usable":true,"location":"page 1","passage":"The API retries twice."}]}'
+        with pytest.raises(ar.ResearchError, match="unavailable capture"):
+            ar.parse_binding(reply, [claim], [got])
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX executable sentinel; configuration is checked on both platforms")
+def test_jbig2_filter_cannot_launch_an_external_decoder(monkeypatch, tmp_path):
+    decoder = tmp_path / "jbig2dec"
+    marker = tmp_path / "decoder-ran"
+    decoder.write_text(f"#!/bin/sh\ntouch '{marker}'\nexit 1\n")
+    decoder.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ["PATH"])
+    got = serve(monkeypatch, form_pdf(b"inert JBIG2 bytes", "/JBIG2Decode"))
+    assert not got.usable and got.error
+    assert not marker.exists()
 
 
 def test_containment_failure_becomes_a_source_local_capture_error(monkeypatch, tmp_path):
