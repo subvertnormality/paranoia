@@ -111,5 +111,527 @@
     "failures": 3,
     "context": "Earlier stale installed package and oversized auto-generated pytest labels; preserved as failed history, not current acceptance."
   },
-  "scope": "Current passing full filing suite and changed argv/history guards. Short explicit PDF IDs alter labels only; page-limit, containment and source-provenance assertions remain intact. JUnit copies add a terminal newline; original report digests are retained."
+  "scope": "The complete current acceptance gate is complete_run, with every required suite and the original compressed JUnit report. Earlier focused results and failed-run provenance remain unchanged. Production source hashes match the explicit-no-web Astra/Sol native receipt.",
+  "complete_run": {
+    "outcome": "passed",
+    "source_revision": "caffa3cca65a6011046b6ba55935644cd6a393f1",
+    "command": [
+      "/tmp/paranoia-astra-6.2-runtime/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "--disable-warnings",
+      "--tb=short",
+      "--junitxml=/tmp/paranoia-astra-6.2-validation/full-suite.xml"
+    ],
+    "returncode": 0,
+    "elapsed_seconds": 507.686,
+    "source_sha256": {
+      "src/paranoia_local/__init__.py": "9a4f96289cd92e1377d57a6da33f56b840a8960654c2f7873d565f8e6c3f6c77",
+      "src/paranoia_local/arbitrate_handler.py": "f9fe0cf2ed8e95ac07c499eb6e9ed78b1b2856bd27a05bc082d231488aca2f47",
+      "src/paranoia_local/arbitration.py": "1abf862841ece8db197ba347d431df9aa89679d74a900b93a922c1a65aeb32df",
+      "src/paranoia_local/arbitration_research.py": "b26aa60a5f9bf35c18c0e7ad3e779d97cf37fb45a4a1591d46c02e7df76cc049",
+      "src/paranoia_local/census_execution.py": "b7975f6d223e74e098c2d3010f1d290d5d6c405ebbe8d76475bef722219437e6",
+      "src/paranoia_local/class_closure.py": "6cfbcc72000d84d46b0504f84e66af537ae457bc38b66cdd744f6bab6e98fb59",
+      "src/paranoia_local/cli.py": "e519980c447890680cca599ccefd70d909858a5d6b4f1cf810725f9f3f9ec59c",
+      "src/paranoia_local/config.py": "3117a7dd5db8e2ab20fa50a51080e08104d525ceaec3fecd95adfab3d3aa12ea",
+      "src/paranoia_local/decision_evidence.py": "0b004c17ab979975764bd09178152f1d85ce319d419f8132b857facaec7fd65b",
+      "src/paranoia_local/engines.py": "66229f2cf4985baa0183b9ab48af6fd952b53b5426a04357df0a80a4cd4b512f",
+      "src/paranoia_local/evidence.py": "0cfa9998ad3d4ae8d61f47fc6085c804aae117c4a1b1afaa2f9df4dfbc03b52f",
+      "src/paranoia_local/external_sources.py": "63dca74b56b8ae42e91990f574c144b846072e9f8eb943ef5c321ce2d6fdfb99",
+      "src/paranoia_local/git_objects.py": "caa9180338e0b996f331da605f8f2b46e1684d3a2ba11ef84a1094e1150129b0",
+      "src/paranoia_local/handlers.py": "6abd1c902591448fc92e23c9ce2a4898819557f174f964b198c7f19377d25593",
+      "src/paranoia_local/inert_git.py": "3cdb3163e42c1e6988fdefe65944485cd2dfad03c63c250356436daf28928e26",
+      "src/paranoia_local/inert_tree.py": "b33766fee776b9006810ba6ca1460a62e8d42f002570909267b5db70036d2218",
+      "src/paranoia_local/lifecycle_decisions.py": "ed02ea6ffc4ab50ec3899ac7cccbefd9934f63c90df1261f05cd037466d8680a",
+      "src/paranoia_local/logs.py": "82839aab90a5724322fb05e1ef03d46d77187793bc7b215ce95de5a02895b545",
+      "src/paranoia_local/orientation.py": "45e93ed96eb13260dad609ac677128629964d01892beabf7539a34638eedbcb9",
+      "src/paranoia_local/patch_experiments.py": "d0a50131f91d3a2fa9770cd83445a284eb6d7f386f7cf8dc49e720d4d57f87e7",
+      "src/paranoia_local/patch_proposals.py": "891e0d4a984ebf7bd548816951440e45502181d6212b5ecc2e32e9d6e1327dd8",
+      "src/paranoia_local/plan_claims.py": "7cf4b345824bb8c83c0d11f8cd99c6530c26002fd53b7c26af8bfd12cd878027",
+      "src/paranoia_local/prompts.py": "d33a7d54d6d51306c77e060e56564ab1108d328d3fe86415944c31d6c3be7610",
+      "src/paranoia_local/proposal_checkout.py": "7fac1f318095a2f4f6eaf9bdb4683187fe4140b5e995e99d551980cf13151930",
+      "src/paranoia_local/proposal_disposition.py": "e5bb87aee073e8613b570f11e69915c1c3fa2ebf182125b8f96c41edce38f5c1",
+      "src/paranoia_local/review_census.py": "48097d3bb7e27890dc7c8d0462ed3707a2095a2927a4e2080bfc311b00827d0f",
+      "src/paranoia_local/review_policy.py": "3fca61e52e1d4ad1ebac158b4c82ef26934aa712217e30a2b5447dbeea557928",
+      "src/paranoia_local/review_transitions.py": "b657111ed0db8ea6fd1afdaa4c297ffbcec6915d658e16300829300231d0cac7",
+      "src/paranoia_local/runner.py": "748459db36b1a9e4f0094ae9cc146594edd50e9f372e67c76257d9f33971eb77",
+      "src/paranoia_local/server.py": "ff0104c026d519356d0b407f99a5f24b499f5a123bb55bde5559ef22d35a17b2",
+      "src/paranoia_local/session_routing.py": "349014898c1f2aa9292f1f7e5c0b6e8860e6bb1db9dabf791141a60ab7d9a30e",
+      "src/paranoia_local/source_extraction.py": "3aeebc58e6898b3c8ea02ed96358e3185e0bd17ea0d4cf73b92ed693571f7420",
+      "src/paranoia_local/staged_protocol.py": "27bc0ceb38264c4514ca53a2c60a1cbcc50559720fbd5a4ef779d95dc549dc85",
+      "src/paranoia_local/telemetry.py": "db569fdb6572d6066ceada01280dc1d98a2cf4980e4aab757c36187ecd5c874f",
+      "src/paranoia_local/textsafe.py": "2244699f33d46e023a8202be791dade64c22e1f3639c84a218a9b2679575bd0f",
+      "src/paranoia_local/worktree.py": "a10546b376e7f342641eb2cb5d4555f99934726df40f405b8d76d8012134d121",
+      "tests/test_acceptance_validator.py": "a2c069fa3394865a3676315b4728a3a567e2bf094dd80ee35a5c7dad19f1095f",
+      "tests/test_arbitrate_handler.py": "ececad74b3fcea323c50158a76f18880ceea7b89aa5a054a5432b00b6c25fac1",
+      "tests/test_arbitration.py": "0074b8740ae505cd3544b7ebbe277c77583e1605fd558c1cbbe97ccacd15b040",
+      "tests/test_arbitration_consequence_acceptance.py": "da838f63845733ee4b0b2baa0af5779a1ab046e0f3573a12dbbd9cb3a3da1cdb",
+      "tests/test_arbitration_fallback_acceptance.py": "e29214a714dce58f5dadc6a4c4b9973b62a0eb0cf9bf87a80aba82b45ec0fa15",
+      "tests/test_arbitration_research.py": "d563e48b60f719419e89314301a34fa3a9874d99727d4c6816aeb2e24f11dc6d",
+      "tests/test_architecture_performance.py": "07423ac03d8f5d1a961a757596201a478cacdde1b8d3c848d88f9bf378075ee3",
+      "tests/test_benchmark_committed_sources.py": "7a56f8a143b504587943a324166b35a440283d1f41fca1c6da79ced98efe1d85",
+      "tests/test_beta_tiered_review.py": "55ff21d62bb48fc9249bf44a36d9516fefffff8a5f0c8684a8790b5d8cdf94cf",
+      "tests/test_branch_plan_fidelity.py": "c12b9b8ddf37c80e8a111e2a79f7d21864464caea1469020e5804e64c28c4c65",
+      "tests/test_census_execution.py": "04e4ae690c8a763572c48ef71140fc2b7e09f6f1825e935298bb08915325611d",
+      "tests/test_claim_admission_acceptance.py": "e212945772e9870924934dd2891e39a5e0536784ca3954f825c631a61acc0bf3",
+      "tests/test_class_authoring_acceptance.py": "264082904c27203a50c4f8daaf1accf643649483ba7082d175063f5404f8a513",
+      "tests/test_class_closure.py": "f88860dea784370bc4a11aa806dec258923ed1f0027495f98e1bca05dde01df3",
+      "tests/test_class_closure_integration.py": "626d130abe1bfae1070539cc362063ac18b4b8b28bc545e05dbc54f5f4d12f28",
+      "tests/test_class_occurrence_batch_acceptance.py": "52a810c66250819b8acb071b70e901a2711d20fed26fdbbaf6a166fdea4dddf2",
+      "tests/test_config_logs.py": "b5b77a5ab4adf43968fba1d1add074924da62ded5b82b4d70ede9f1ffdb6cda2",
+      "tests/test_converge.py": "503585b93e95c33804f685d55833f01ea84d82dc158d9ef493d33bb9c9a5f0de",
+      "tests/test_decision_benchmark.py": "3bb49adc1e77d074d6cd00d75d729f34d2d4f1819accb7dd6a4264b5403b9385",
+      "tests/test_decision_evidence.py": "2169f7699f6aff95e21533146babffab6facb971da3c2a60f0bd4676b3ab4939",
+      "tests/test_effectiveness_benchmark.py": "05bc9b048ecd48849ae5f3ee1d12c8a8bbb96ad4fe36e50f78cf3b2e89dc7c7d",
+      "tests/test_effectiveness_calibration.py": "2d56f0e6972bc020276f3685bfa80527ffc7490b29f9f20899709e0ecf548d69",
+      "tests/test_empty_census_acceptance.py": "b31d9595c037c9b2955348e423c37e68b5d4b46d22ce1e71e64ff4ae9d3bce12",
+      "tests/test_engines.py": "ad631ff61bc26e6472caff866c9eea0f7040c74abc17360f06918c0026865b89",
+      "tests/test_evidence.py": "71b7b6c7cdb3c2b5e8ec5623cebc73eb92150c4e2561343fa05cdae06f059b28",
+      "tests/test_external_sources.py": "daf18e640117d4b7becf19b0ae3f2317e63cdf240a92e9350bfd686cd44cc8b8",
+      "tests/test_filing_sources.py": "aae14d36951951aa379a974ca235e771db081da0fb680cd284f9a343b7a03a37",
+      "tests/test_git_objects.py": "f7257fb053b6d08a9b250b668e9365aaab31492d80b34dae3702ca7869df1671",
+      "tests/test_handlers.py": "2e812e9eedf5831d245307998c6e331d720238d3877023524d8e1b76c2f8ee0a",
+      "tests/test_inert_tree.py": "5b8acec11bf641a547a26e9e9a14c6035a222e459a1e1a0ba507c48919060a00",
+      "tests/test_instrumentation.py": "ab68740add559bf8b48061ab229de73ac452c1d93f4d7b90cb9654e1db5f2f27",
+      "tests/test_integration.py": "172f56084a649ed76d5a89336fd508ab0ec2bcecc453b4497ac58725ce5ba55c",
+      "tests/test_issue115_history.py": "619932b6d50208be5a64042e0b98f02ea2ff7646e502171359d76ed94b6122e4",
+      "tests/test_issue117.py": "4a3973d7f8f766abaa206aa3c1ae8ee148e2b5b00b9c538f31f97bdf025b52c0",
+      "tests/test_issue126_history.py": "2d529f9294a628755e743f1a8f123a5118d1c2948620ada3fb5c926887b00163",
+      "tests/test_issue133_history.py": "b9046ee2b38e931c110db756ac4e1c2069f7e3eabc56d1a156d9c9560b843f8d",
+      "tests/test_issue146_history.py": "e2ad6738fbd9f1f5935b112f4d1d4d857a20c2b33cbfd4ea2b49dd088b9671fa",
+      "tests/test_lfs_proposal_cleanliness.py": "4033fc9a33593fcb2181ff95a9f4510843f57f72d5d3af33eac520ffd8d5b90c",
+      "tests/test_lifecycle_decisions.py": "3a034f952dda9c3dda58430c918958fadc8e71b6750cc2171c236a63e21d3a9d",
+      "tests/test_orientation.py": "b071ac36f6e6e6aa200955d89df16ae8e770480dcf35f8885e592ecc264b27d2",
+      "tests/test_packet.py": "2ae449c258afad36a1b72ab4d668d525d983bd63402ec70c84f242cf8f882896",
+      "tests/test_patch_experiments.py": "c174df5689e02c1951131cdc5da1f8b14a08c501cc7542e56d5d40ea7872476f",
+      "tests/test_patch_proposals.py": "457f0fbcfec341f36f67e264dd3d5d2a3e8b66c56fd45576743c2d425f0097a2",
+      "tests/test_patch_proposals_integration.py": "fb4d6c600057d750cd2bd4b728c749fee551001448485bb4505850f9d964dcb7",
+      "tests/test_plan_claims.py": "3494f618dccbe34cf61e98123e850381dde100f603ea90f091c05f1f83f1a41e",
+      "tests/test_plan_class_closure.py": "a808d75a71a5ac04b8a7791c00a925395b1342813ede95828057ee5ac17bb15d",
+      "tests/test_plan_restatement_acceptance.py": "523dd4d0fc0efd1d9536d52a89f846652dca32a660d8eb8ca69438715f9de71d",
+      "tests/test_progress.py": "f9d89912e2068ee1c636ca43cfdd172aad7640cf1d071b1914def06f7e9092ac",
+      "tests/test_prompts.py": "2cf346eddca57ecc94c3352865fca7f25b2d19789fd4ea4e45e67bd649413455",
+      "tests/test_proposal_disposition.py": "691d2a7669bfa56a2a42cb10a9e09fdbd5a0339fced514a0ae0475124fef1c45",
+      "tests/test_proposal_disposition_acceptance.py": "e490f99d05f907d4d3eecd5fd95766d680d776b0e9d8e0db20a92a0abf0ecdc2",
+      "tests/test_provider_quota.py": "ef6e984cca308b3eb37cdb2af0fa7b85af43bc41bc19a599809d05bc76d5c125",
+      "tests/test_review_census.py": "efb43d61438baaaaae2fd862561fb988bcb9f1792a9f83829d1f56f8a8165131",
+      "tests/test_review_modes_benchmark.py": "77429762e1d014e7e629bbe5e4c2fe750db04b2a36b276f8725a4c06ae63c630",
+      "tests/test_review_recovery_131_132.py": "2681a242a93d9581cf4fe40c31b296a1eb25785ee1e483744306cf965c0f1d1b",
+      "tests/test_sec_capture.py": "96af8763dee40eb4e8999f004ecbea973b163c319e00444e405d747d0e185ef1",
+      "tests/test_server.py": "bd32aaf135f5e0ac9dc3bb022ae9cf973bf0475412498be63a82aaba9b8c1bb4",
+      "tests/test_snapshot.py": "5fc4728de71883f3282dfad61f3482d37fcd00dd276027ef1632e9de5777c34d",
+      "tests/test_snapshot_batch_acceptance.py": "3cae1ce2f73154237e0d6c0092d1f6b4245d2375e647892beb43cbfd76cb6ed4",
+      "tests/test_snapshot_batch_integration.py": "a531155fb6f114a792ed892ed15f0d925e3d1c7d78c848caccb62e04e7861b6f",
+      "tests/test_snapshot_benchmark.py": "e36ac2be61e7a35dfeb53565f82799d6df975fe94f100db8aa89af608fb9ac01",
+      "tests/test_staged_protocol.py": "bd90867a5b01083ed3aa024a8283f9e5e00661e5c6d46dd5bf53cd67d7abb22f",
+      "tests/test_worktree.py": "84c818036cf480c47c86f6010c63fbc529302eff6744fb1a133f470e61103447"
+    },
+    "totals": {
+      "tests": 2832,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "by_module": {
+      "tests/test_acceptance_validator.py": {
+        "tests": 96,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_arbitrate_handler.py": {
+        "tests": 230,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_arbitration.py": {
+        "tests": 116,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_arbitration_consequence_acceptance.py": {
+        "tests": 66,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_arbitration_fallback_acceptance.py": {
+        "tests": 24,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_arbitration_research.py": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_architecture_performance.py": {
+        "tests": 69,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_benchmark_committed_sources.py": {
+        "tests": 50,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_beta_tiered_review.py": {
+        "tests": 40,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_branch_plan_fidelity.py": {
+        "tests": 47,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_census_execution.py": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_claim_admission_acceptance.py": {
+        "tests": 45,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_class_authoring_acceptance.py": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_class_closure.py": {
+        "tests": 77,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_class_closure_integration.py": {
+        "tests": 28,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_class_occurrence_batch_acceptance.py": {
+        "tests": 44,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_config_logs.py": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_converge.py": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_decision_benchmark.py": {
+        "tests": 24,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_decision_evidence.py": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_effectiveness_benchmark.py": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_effectiveness_calibration.py": {
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_empty_census_acceptance.py": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_engines.py": {
+        "tests": 70,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_evidence.py": {
+        "tests": 60,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_external_sources.py": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_filing_sources.py": {
+        "tests": 51,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_git_objects.py": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_handlers.py": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_inert_tree.py": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_instrumentation.py": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_integration.py": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_issue115_history.py": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_issue117.py": {
+        "tests": 49,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_issue126_history.py": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_issue133_history.py": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_issue146_history.py": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_lfs_proposal_cleanliness.py": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_lifecycle_decisions.py": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_orientation.py": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_packet.py": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_patch_experiments.py": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_patch_proposals.py": {
+        "tests": 43,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_patch_proposals_integration.py": {
+        "tests": 63,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_plan_claims.py": {
+        "tests": 255,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_plan_class_closure.py": {
+        "tests": 76,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_plan_restatement_acceptance.py": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_progress.py": {
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_prompts.py": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_proposal_disposition.py": {
+        "tests": 101,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_proposal_disposition_acceptance.py": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_provider_quota.py": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_review_census.py": {
+        "tests": 312,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_review_modes_benchmark.py": {
+        "tests": 50,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_review_recovery_131_132.py": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_sec_capture.py": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_server.py": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_snapshot.py": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_snapshot_batch_acceptance.py": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_snapshot_batch_integration.py": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_snapshot_benchmark.py": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_staged_protocol.py": {
+        "tests": 135,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "tests/test_worktree.py": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "required_suites": [
+      "tests/test_engines.py",
+      "tests/test_beta_tiered_review.py",
+      "tests/test_handlers.py",
+      "tests/test_server.py",
+      "tests/test_arbitrate_handler.py",
+      "tests/test_proposal_disposition_acceptance.py",
+      "tests/test_issue115_history.py",
+      "tests/test_issue126_history.py",
+      "tests/test_issue146_history.py",
+      "tests/test_review_census.py",
+      "tests/test_filing_sources.py"
+    ],
+    "required_suites_complete": true,
+    "report": {
+      "path": "docs/astra-sol-6.2-full-suite.xml.gz",
+      "sha256": "15ab7bffa20d8ac778a7c97aba5abcb9c2da87e026944686d9f969d36b6c067e",
+      "uncompressed_sha256": "514a66f84dc4e6303d24dfbeede2038d41a91d038837c77838e4f39e7afc4c97",
+      "format": "gzip-compressed JUnit XML"
+    }
+  }
 }
