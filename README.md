@@ -35,9 +35,9 @@ You need:
 - Python 3.11 or later;
 - Git 2.36 or later on `PATH`; and
 - the reviewing agent's stable CLI, installed and signed in:
-  [Codex CLI](https://developers.openai.com/codex) 0.169.0 or later for the default Astra 6.2 model, or
+  [Codex CLI](https://developers.openai.com/codex) 0.169.0 or later for the default Astra/Sol 6.2 models, or
   [Claude Code](https://code.claude.com) 2.1.251 or later.
-  Default tiered Codex review also needs a CLI that offers the `gpt-6.1-sol`
+  Default tiered Codex review also needs a CLI that offers the `gpt-6.2-sol`
   correction model; see [model routing](#tracked-reviews).
 
 Most tools need only the reviewer CLI. `arbitrate` uses both vendors and needs
@@ -326,12 +326,15 @@ phases:
 
 Model routing (`review_model_policy`, default `tiered`): census lanes, consolidation
 and the cold final use the engine's strongest model (`gpt-6.2-astra` / `claude-fable-5-2`,
-medium effort); targeted correction uses `gpt-6.1-sol` / `claude-opus-5-5` at high effort.
-`strongest` uses the strongest model for every structural phase. Tiered Codex routing
-needs a Codex CLI/account that offers `gpt-6.1-sol`: on a ChatGPT account, Codex CLI
-0.156.1 rejected it as unsupported (2026-09-29) and 0.159.3 accepted it (2026-10-02), so
-use 0.159.3 or later. An unsupported model fails visibly rather than substituting a
-model: update the CLI or pass `review_model_policy: "strongest"`. Set effort per model family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
+medium effort); targeted correction uses `gpt-6.2-sol` / `claude-opus-5-5` at high effort.
+`strongest` uses the strongest model for every structural phase. Current Astra 6.2
+and Sol 6.2 routes are qualified with Codex CLI 0.169.0; use that version or later.
+The earlier CLI 0.159.3 qualification applied to Sol 6.1, not these 6.2 routes.
+Unsupported models fail visibly. If Astra works but Sol is unavailable, use
+`review_model_policy: "strongest"`. If Astra is unavailable, upgrade the CLI or
+explicitly select a supported review model; that is a custom override without
+qualified acceptance. Model overrides do not replace the fixed arbitration
+attester, which still requires Astra 6.2. Set effort per model family with `effort_by_model` (argument or a `.paranoia.toml` `[effort_by_model]` table,
 merged per family); a family entry beats the global `effort`, so
 `{"sol": "high", "opus": "high"}` keeps correction at high. The model is chosen from
 the authoritative durable phase, never from round labels. An explicit `model` (argument or

@@ -55,15 +55,18 @@ Tracked review selects the structural model from the durable phase
 chosen by `review_transitions.incoming` under the lineage latch, never from round labels
 or caller prose. With the default `tiered` policy, census lanes, consolidation and the
 cold final use the engine's strongest model at medium effort; correction uses
-`gpt-6.1-sol` / `claude-opus-5-5` at high effort. `strongest` keeps every structural phase
+`gpt-6.2-sol` / `claude-opus-5-5` at high effort. `strongest` keeps every structural phase
 on the strongest model. Effort resolves per model family: an `effort_by_model` entry,
 then the global `effort`, then the release family default. Validation retries keep their role's model, effort and session.
 Claim discovery, binding and attestation keep the call-level model, so routing a
 correction never weakens external claim adjudication.
 Model IDs pass verbatim; an unsupported model fails the round visibly and is never
-substituted. On a ChatGPT account Codex CLI 0.156.1 rejected `gpt-6.1-sol` (2026-09-29) and
-0.159.3 accepted it (2026-10-02), so tiered Codex review needs 0.159.3 or later, or
-`review_model_policy: "strongest"`.
+substituted. Current Astra/Sol 6.2 routes are qualified with CLI 0.169.0; the
+earlier CLI 0.159.3 qualification applied to Sol 6.1 only. If Astra is available
+but Sol is not, `review_model_policy: "strongest"` keeps correction on Astra.
+If Astra is unavailable, upgrade or explicitly select a supported review model;
+that is a custom override without qualified acceptance. The fixed arbitration
+attester still requires Astra 6.2 regardless of decider-model overrides.
 
 A clean census advances to a cold final owned by its engine instead of clearing.
 A final that settles clear writes a closed `acceptance` record (release, engine, model,

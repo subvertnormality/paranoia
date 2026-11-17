@@ -1,8 +1,9 @@
 # Repository agent instructions
 
 The default Codex model and fixed arbitration attester use `gpt-6.2-astra`.
-Keep tiered correction on `gpt-6.1-sol` and the general evidence-profile CLI
-minimum unchanged; CLI 0.169.0 is the qualified path for the Astra 6.2 default.
+Keep tiered correction on `gpt-6.2-sol` and the general evidence-profile CLI
+minimum unchanged; CLI 0.169.0 qualifies both current 6.2 routes. Explicitly
+disable web search on ordinary fresh and resumed calls when web_search is false.
 
 The default Claude model is `ClaudeEngine.default_model` (`claude-fable-5-2`).
 Current tool descriptions and documentation follow that default. Keep historical
@@ -73,8 +74,8 @@ proposal default below. Omitted `propose_patch` means automatic eligibility (nev
 coerced to a boolean); false makes zero proposal calls; explicit true keeps its preflight
 rejection. Proposals run only after a blocked census or blocked cold final, resuming that
 source session with its actual model/effort. Structural roles route by durable phase
-(`review_model_policy`, default `tiered`: census/final strongest, correction `gpt-6.1-sol`/Opus 5.5
-at high; `gpt-6.1-sol` needs Codex CLI 0.159.3 or later); effort resolves per model family
+(`review_model_policy`, default `tiered`: census/final strongest, correction `gpt-6.2-sol`/Opus 5.5
+at high; `gpt-6.2-sol` needs Codex CLI 0.169.0 or later); effort resolves per model family
 (`effort_by_model`, then global `effort`, then release family default); claim roles, query, rebut
 and arbitrate are not routed. Every tiered acceptance needs a strongest-model cold final bound
 by the durable `acceptance` record to the exact snapshot, including after a clean census; legacy

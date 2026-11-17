@@ -31,7 +31,7 @@ def test_native_proposal_disposition_acceptance(name, current):
     for path, digest in record["source"]["files"].items():
         assert hashlib.sha256(blob(path)).hexdigest() == digest
     # Bind the critical route while preserving the trace's historical model.
-    # Default/description model spelling may differ. Arbitration-only instruction
+    # Default/description model spelling and exact no-web flag additions may differ. Arbitration-only instruction
     # constants are outside this proposal route; all other prompt AST stays exact.
     # The retained run does not qualify either later change as new native evidence.
     if current:
@@ -51,9 +51,14 @@ def test_native_proposal_disposition_acceptance(name, current):
                     b'default_model = "gpt-6-astra"',
                     1,
                 ).replace(b'ATTESTER_MODEL = "gpt-6.2-astra"', b'ATTESTER_MODEL = "gpt-6-astra"', 1)
+                source = source.replace(b'correction_model = "gpt-6.2-sol"', b'correction_model = "gpt-6.1-sol"', 1)
+                disabled = b'        else:\n            argv += ["-c", \'web_search="disabled"\']\n'
+                assert source.count(disabled) == 2
+                source = source.replace(disabled, b"", 2)
             elif path == "server.py":
                 source = source.replace(b"claude-fable-5-2", b"claude-fable-5-1")
                 source = source.replace(b"gpt-6.2-astra", b"gpt-6-astra")
+                source = source.replace(b"gpt-6.2-sol", b"gpt-6.1-sol")
             elif path == "prompts.py":
                 def proposal_route_ast(raw):
                     tree = ast.parse(raw)

@@ -43,6 +43,7 @@ class TestFactory:
 
     def test_default_models(self) -> None:
         assert engines.get_engine("codex").default_model == "gpt-6.2-astra"
+        assert engines.get_engine("codex").correction_model == "gpt-6.2-sol"
         assert engines.get_engine("claude").default_model == "claude-fable-5-2"
 
     def test_arbitration_attester_uses_codex_default_generation(self) -> None:
@@ -194,6 +195,7 @@ def test_codex_terminal_error_remains_a_failure() -> None:
     ("claude-fable-5-2", "medium"),
     ("claude-fable-5-1", "medium"),
     ("gpt-6.2-astra", "medium"),
+    ("gpt-6.2-sol", "high"),
     ("gpt-6-astra", "medium"),
     ("claude-opus-5", "high"),
     ("gpt-5.6-sol", "high"),
@@ -222,15 +224,17 @@ class TestCodexArgv:
         assert "tools.web_search=true" in joined
         assert argv[-1] == "-"  # prompt read from stdin
 
-    def test_web_search_off_omits_flag(self) -> None:
+    def test_web_search_off_explicitly_disables_search(self) -> None:
         e = engines.get_engine("codex")
         argv = e.build_argv(cwd=Path("/repo"), model="m", effort="high", web_search=False)
-        assert "tools.web_search=true" not in " ".join(argv)
+        assert "tools.web_search=true" not in argv
+        assert '-c web_search="disabled"' in " ".join(argv)
 
     def test_resume_argv_targets_session(self) -> None:
         e = engines.get_engine("codex")
         argv = e.build_resume_argv(session_ref="abc-123", cwd=Path("/repo"), model="m", effort="high", web_search=False)
         assert argv[:3] == ["codex", "exec", "resume"]
+        assert '-c web_search="disabled"' in " ".join(argv)
         assert "abc-123" in argv
         assert argv[-1] == "-"
         # `codex exec resume` rejects -s and -C; they must not appear
