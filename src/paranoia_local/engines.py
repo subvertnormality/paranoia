@@ -454,9 +454,9 @@ class Engine(ABC):
 
 class CodexEngine(Engine):
     name = "codex"
-    default_model = "gpt-6-astra"
+    default_model = "gpt-6.2-astra"
     # Release-pinned beta structural-correction model (docs/beta-tiered-review-plan.md).
-    correction_model = "gpt-6.1-sol"
+    correction_model = "gpt-6.2-sol"
     binary = "codex"
 
     def _evidence_flags(self, *, resumed: bool = False) -> list[str]:
@@ -504,6 +504,8 @@ class CodexEngine(Engine):
         ]
         if web_search:
             argv += ["-c", "tools.web_search=true"]
+        else:
+            argv += ["-c", 'web_search="disabled"']
         argv.append("-")  # read prompt from stdin
         return argv
 
@@ -531,6 +533,8 @@ class CodexEngine(Engine):
         ]
         if web_search:
             argv += ["-c", "tools.web_search=true"]
+        else:
+            argv += ["-c", 'web_search="disabled"']
         argv.append("-")
         return argv
 
@@ -768,7 +772,7 @@ _ENGINES: dict[str, type[Engine]] = {
 CLEANER_ENGINE = "claude"
 CLEANER_MODEL = "claude-opus-5"
 ATTESTER_ENGINE = "codex"
-ATTESTER_MODEL = "gpt-6-astra"
+ATTESTER_MODEL = "gpt-6.2-astra"
 
 
 # Default reasoning effort by model family, used only when neither the call nor

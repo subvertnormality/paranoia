@@ -56,7 +56,7 @@ def test_pdf_capture_retains_complete_text_and_response_digests(monkeypatch):
     (pdf_bytes(text=""), "no text"),
     (pdf_bytes(encrypted=True), "encrypted"),
     (pdf_bytes(pages=501), "500 pages"),
-])
+], ids=["not-pdf", "no-text", "encrypted", "page-limit"])
 def test_pdf_errors_are_source_local_with_response_provenance(monkeypatch, body, expected):
     got = serve(monkeypatch, body)
     assert not got.usable and expected in got.error

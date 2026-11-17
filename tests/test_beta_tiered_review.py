@@ -25,7 +25,7 @@ from tests.test_review_census import _task_from_prompt, lane, payload, wire
 GOOD_PLAN = "The value is two.\n"
 BAD_PLAN = "The value is broken.\n"
 ENGINES = {
-    "codex": (engines.CodexEngine, "gpt-6-astra", "gpt-6.1-sol"),
+    "codex": (engines.CodexEngine, "gpt-6.2-astra", "gpt-6.2-sol"),
     "claude": (engines.ClaudeEngine, "claude-fable-5-2", "claude-opus-5-5"),
 }
 
@@ -331,7 +331,7 @@ def test_clean_census_still_requires_strongest_cold_final(tmp_path, monkeypatch,
     assert h.provider.proposals == []
     seen = len(h.provider.calls)
     final = h.review()
-    assert call_models(h, seen) == {("final", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("final", "gpt-6.2-astra", "medium")}
     assert verdict(final).startswith("CONVERGENCE: NOT-BLOCKED")
     assert "BETA-ACCEPTANCE: qualified" in final
 
@@ -394,7 +394,7 @@ def test_strongest_policy_routes_correction_to_strongest(tmp_path, monkeypatch):
     h.repair()
     seen = len(h.provider.calls)
     corrected = h.review(review_model_policy="strongest", propose_patch=False)
-    assert call_models(h, seen) == {("correction", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("correction", "gpt-6.2-astra", "medium")}
     assert "policy=strongest policy-source=argument" in corrected
 
 
@@ -407,18 +407,18 @@ def test_repository_config_policy_and_argument_precedence(tmp_path, monkeypatch)
     h.repair()
     seen = len(h.provider.calls)
     out = h.review(propose_patch=False)
-    assert call_models(h, seen) == {("correction", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("correction", "gpt-6.2-astra", "medium")}
     assert "policy=strongest policy-source=repository-config" in out
     h.write_code("value = 4\n")
     seen = len(h.provider.calls)
     h.review(propose_patch=False)
     # The pending final runs on the changed snapshot, finds the regression, and reopens.
-    assert call_models(h, seen) == {("final", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("final", "gpt-6.2-astra", "medium")}
     assert h.state()["phase"] == "correction"
     h.repair()
     seen = len(h.provider.calls)
     out = h.review(propose_patch=False, review_model_policy="tiered")
-    assert call_models(h, seen) == {("correction", "gpt-6.1-sol", "high")}
+    assert call_models(h, seen) == {("correction", "gpt-6.2-sol", "high")}
     assert "policy=tiered policy-source=argument" in out
 
 
@@ -426,11 +426,11 @@ def test_explicit_model_pins_every_phase_and_cannot_claim_beta_qualification(
     tmp_path, monkeypatch,
 ):
     h = Harness(tmp_path, monkeypatch, mode="branch", engine_name="codex")
-    h.review(model="gpt-6.1-sol", propose_patch=False)
+    h.review(model="gpt-6.2-sol", propose_patch=False)
     h.repair()
-    h.review(model="gpt-6.1-sol", propose_patch=False)
-    custom = h.review(model="gpt-6.1-sol", propose_patch=False)
-    assert {row["model"] for row in h.provider.calls} == {"gpt-6.1-sol"}
+    h.review(model="gpt-6.2-sol", propose_patch=False)
+    custom = h.review(model="gpt-6.2-sol", propose_patch=False)
+    assert {row["model"] for row in h.provider.calls} == {"gpt-6.2-sol"}
     assert "custom-override=yes (not beta-qualified)" in custom
     assert "BETA-ACCEPTANCE: custom-override (not beta-qualified)" in custom
     assert h.state()["acceptance"]["custom_override"] is True
@@ -438,7 +438,7 @@ def test_explicit_model_pins_every_phase_and_cannot_claim_beta_qualification(
     # The same snapshot without the override needs its own strongest cold final.
     seen = len(h.provider.calls)
     requalified = h.review(propose_patch=False)
-    assert call_models(h, seen) == {("final", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("final", "gpt-6.2-astra", "medium")}
     assert "BETA-ACCEPTANCE: qualified" in requalified
 
 
@@ -449,7 +449,7 @@ def test_explicit_effort_wins_and_is_a_custom_override(tmp_path, monkeypatch):
     h.review(effort="low", propose_patch=False)
     final = h.review(effort="low", propose_patch=False)
     assert {row["effort"] for row in h.provider.calls} == {"low"}
-    assert {row["model"] for row in h.provider.calls} == {"gpt-6-astra", "gpt-6.1-sol"}
+    assert {row["model"] for row in h.provider.calls} == {"gpt-6.2-astra", "gpt-6.2-sol"}
     assert "custom-override=yes (not beta-qualified)" in final
     assert "BETA-ACCEPTANCE: custom-override (not beta-qualified)" in final
     assert h.state()["acceptance"]["custom_override"] is True
@@ -471,7 +471,7 @@ def test_legacy_clear_without_acceptance_requires_beta_final(tmp_path, monkeypat
     assert verdict(rc.trailer(lineage.review_state)).startswith("CONVERGENCE: BLOCKED")
     seen = len(h.provider.calls)
     out = h.review(propose_patch=False)
-    assert call_models(h, seen) == {("final", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("final", "gpt-6.2-astra", "medium")}
     assert "BETA-ACCEPTANCE: qualified" in out
 
 
@@ -558,7 +558,7 @@ def test_invalid_policy_and_non_boolean_proposal_refuse_before_provider(tmp_path
 def test_census_cache_binding_includes_policy():
     common = dict(
         mode=cc.BRANCH_MODE, snapshot="s", stakes="k", body="b", active_classes=[],
-        existing_debt=[], engine_name="codex", model="gpt-6-astra", effort="medium",
+        existing_debt=[], engine_name="codex", model="gpt-6.2-astra", effort="medium",
         web_search=False, plan_lines=None, lane_prompts={},
     )
     assert handlers._census_cache_binding(**common, policy="tiered") != \
@@ -619,7 +619,7 @@ def test_effort_by_model_beats_global_effort_and_keeps_final_qualified(tmp_path,
     corrected = h.review(propose_patch=False, **efforts)
     final = h.review(propose_patch=False, **efforts)
     assert h.provider.roles()[-2:] == [
-        ("correction", "gpt-6.1-sol", "high"), ("final", "gpt-6-astra", "medium"),
+        ("correction", "gpt-6.2-sol", "high"), ("final", "gpt-6.2-astra", "medium"),
     ]
     assert {row["effort"] for row in h.provider.calls if row["role"] != "correction"} == {
         "medium",
@@ -691,7 +691,7 @@ def test_acceptance_is_dropped_when_the_snapshot_changes(tmp_path, monkeypatch):
     seen = len(h.provider.calls)
     out = h.review(propose_patch=False)
     # A changed snapshot re-enters a broad census; the old acceptance cannot clear it.
-    assert call_models(h, seen) == {("census", "gpt-6-astra", "medium")}
+    assert call_models(h, seen) == {("census", "gpt-6.2-astra", "medium")}
     assert "acceptance" not in h.state()
     assert not verdict(out).startswith("CONVERGENCE: NOT-BLOCKED")
 
@@ -705,7 +705,7 @@ def test_repository_configured_routing_values_cannot_forge_trailer_fields(
     tmp_path, monkeypatch, key, provider_failure,
 ):
     h = Harness(tmp_path, monkeypatch, mode="branch", engine_name="codex")
-    value = ("gpt-6-astra" if key == "model" else "medium") + FORGED
+    value = ("gpt-6.2-astra" if key == "model" else "medium") + FORGED
     (h.repo / ".paranoia.toml").write_bytes(f"{key} = {json.dumps(value)}\n".encode())
     git(h.repo, "add", ".paranoia.toml")
     git(h.repo, "-c", "commit.gpgsign=false", "commit", "-qm", "config")

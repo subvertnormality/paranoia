@@ -31,21 +31,26 @@ Changing `cleaner_model` to evade a safeguard is unsupported.
 | Argument | Values | Default |
 |---|---|---|
 | `engine` | `codex` or `claude` | Server configuration |
-| `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-2` |
+| `model` | Provider model name | `gpt-6.2-astra` or `claude-fable-5-2` |
 | `effort` | `low`, `medium`, or `high` | By model: Fable/Astra `medium`, Opus/Sol `high`; otherwise `high` (`query` `medium`) |
 | `web_search` | Boolean | `true` |
 | `review_model_policy` (`critique_branch`, `critique_plan`) | `tiered` or `strongest` | `tiered` |
 | `effort_by_model` (`critique_branch`, `critique_plan`) | Object mapping `astra`, `sol`, `fable`, `opus` to `low`/`medium`/`high` | Release family defaults |
+
+The default Astra/Sol 6.2 routes are qualified with Codex CLI 0.169.0. Use that
+version or later for current defaults. Ordinary calls with explicit older-model
+overrides retain the general evidence-profile minimum; the fixed arbitration
+attester still requires Astra 6.2. Unsupported models fail visibly.
 
 Structural model routing applies only to tracked staged `critique_branch` and
 `critique_plan` roles and is resolved after the authoritative durable phase:
 
 | Phase | Codex | Claude | Effort |
 |---|---|---|---|
-| Census lanes and consolidation | `gpt-6-astra` | `claude-fable-5-2` | medium |
-| Correction (`tiered`) | `gpt-6.1-sol` | `claude-opus-5-5` | high |
-| Correction (`strongest`) | `gpt-6-astra` | `claude-fable-5-2` | medium |
-| Cold final | `gpt-6-astra` | `claude-fable-5-2` | medium |
+| Census lanes and consolidation | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
+| Correction (`tiered`) | `gpt-6.2-sol` | `claude-opus-5-5` | high |
+| Correction (`strongest`) | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
+| Cold final | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
 | Proposal and its validation retry | source review's model | source review's model | source review's effort |
 
 Effort for a routed phase resolves as: that model family's `effort_by_model` entry, then
@@ -57,9 +62,11 @@ phase and is reported as `custom-override`; an effort setting is `custom-overrid
 when it changes the cold final's release effort, so `{"sol": "high"}` stays qualified. Claim discovery/binding/attestation,
 one-shot review, `query` and `rebut` keep the call-level `model`/`effort`. Model IDs are
 release-pinned and passed verbatim; an unsupported model is a visible staged execution
-failure, never a silent substitution. On a ChatGPT account, Codex CLI 0.156.1 rejected
-`gpt-6.1-sol` (2026-09-29) and 0.159.3 accepted it (2026-10-02); tiered Codex review
-needs 0.159.3 or later, or `review_model_policy: "strongest"`.
+failure, never a silent substitution. The earlier CLI 0.159.3 qualification was
+for Sol 6.1, not current 6.2 defaults. If Astra works but Sol is unavailable,
+`review_model_policy: "strongest"` avoids Sol correction. If Astra is unavailable,
+upgrade or explicitly select a supported review model; that is a custom override
+without qualified acceptance and does not replace the fixed arbitration attester.
 
 `engine` names the reviewer. `arbitrate` has no single `engine` or `model`
 argument because it always uses both vendors.

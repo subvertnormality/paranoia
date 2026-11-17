@@ -19,16 +19,18 @@ the proposal's addressed IDs. The optional API reports `none-recorded` on omissi
 with a pending receipt. This accounting never establishes repair or clearance.
 
 Routing rule: `review_model_policy` defaults to `tiered` (census/final strongest at
-medium, correction `gpt-6.1-sol` / `claude-opus-5-5` at high); `strongest` keeps every
+medium, correction `gpt-6.2-sol` / `claude-opus-5-5` at high); `strongest` keeps every
 structural phase on the strongest model. Do not pass `model` unless you intend a custom
 override that cannot claim a qualified acceptance. Use `effort_by_model` (keys `astra`, `sol`,
 `fable`, `opus`) for per-family effort; it beats the global `effort` and is a custom
 override only if it changes the cold final's release effort. A clean census is followed by a
 required cold final on the same snapshot; parse `REVIEW-ROUTING`, `FINAL-REGRESSION`
 and `BETA-ACCEPTANCE` from the trailer (`tiered-review-beta-1` and `BETA-ACCEPTANCE` are
-stable wire names, not an opt-in). Tiered Codex correction needs a CLI offering
-`gpt-6.1-sol`: on a ChatGPT account 0.156.1 rejected it and 0.159.3 accepted it; with an
-older CLI pass `review_model_policy: "strongest"`.
+stable wire names, not an opt-in). Current Astra/Sol 6.2 routes are qualified with
+CLI 0.169.0; the earlier 0.159.3 qualification was for Sol 6.1 only. If Astra works
+but Sol is unavailable, use `review_model_policy: "strongest"`. If Astra is unavailable,
+upgrade or select a supported review model explicitly (custom override, not qualified).
+The fixed arbitration attester still requires Astra 6.2.
 
 ## Identity
 
@@ -37,10 +39,11 @@ older CLI pass `review_model_policy: "strongest"`.
 - Requirements: Python 3.11+, Git 2.36+
 - Engines: `codex`, `claude`
 - Minimum evidence-profile CLIs: Codex 0.144.6; Claude Code 2.1.251
-- Tiered correction models: `gpt-6.1-sol` (Codex CLI 0.159.3+ verified); `claude-opus-5-5`
-- Default models: `gpt-6-astra`; `claude-fable-5-2`
+- Tiered correction models: `gpt-6.2-sol` (Codex CLI 0.169.0 qualified); `claude-opus-5-5`
+- Default Astra/Sol 6.2 CLI qualification: Codex 0.169.0; ordinary older-model overrides retain the evidence-profile minimum
+- Default models: `gpt-6.2-astra`; `claude-fable-5-2`
 - Arbitration cleaner: `claude-opus-5`
-- Arbitration attester: `gpt-6-astra`
+- Arbitration attester: `gpt-6.2-astra`
 - Tools: `critique_branch`, `critique_plan`, `query`, `rebut`, `arbitrate`
 
 ## Host/reviewer invariant
