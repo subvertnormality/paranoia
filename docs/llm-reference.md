@@ -38,9 +38,10 @@ older CLI pass `review_model_policy: "strongest"`.
 - Engines: `codex`, `claude`
 - Minimum evidence-profile CLIs: Codex 0.144.6; Claude Code 2.1.251
 - Tiered correction models: `gpt-6.1-sol` (Codex CLI 0.159.3+ verified); `claude-opus-5-5`
-- Default models: `gpt-6-astra`; `claude-fable-5-2`
+- Default Astra 6.2 CLI qualification: Codex 0.169.0; older model overrides retain the evidence-profile minimum
+- Default models: `gpt-6.2-astra`; `claude-fable-5-2`
 - Arbitration cleaner: `claude-opus-5`
-- Arbitration attester: `gpt-6-astra`
+- Arbitration attester: `gpt-6.2-astra`
 - Tools: `critique_branch`, `critique_plan`, `query`, `rebut`, `arbitrate`
 
 ## Host/reviewer invariant

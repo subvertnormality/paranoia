@@ -35,7 +35,7 @@ You need:
 - Python 3.11 or later;
 - Git 2.36 or later on `PATH`; and
 - the reviewing agent's stable CLI, installed and signed in:
-  [Codex CLI](https://developers.openai.com/codex) 0.144.6 or later, or
+  [Codex CLI](https://developers.openai.com/codex) 0.169.0 or later for the default Astra 6.2 model, or
   [Claude Code](https://code.claude.com) 2.1.251 or later.
   Default tiered Codex review also needs a CLI that offers the `gpt-6.1-sol`
   correction model; see [model routing](#tracked-reviews).
@@ -325,7 +325,7 @@ phases:
    A clean census also advances to a final rather than clearing directly.
 
 Model routing (`review_model_policy`, default `tiered`): census lanes, consolidation
-and the cold final use the engine's strongest model (`gpt-6-astra` / `claude-fable-5-2`,
+and the cold final use the engine's strongest model (`gpt-6.2-astra` / `claude-fable-5-2`,
 medium effort); targeted correction uses `gpt-6.1-sol` / `claude-opus-5-5` at high effort.
 `strongest` uses the strongest model for every structural phase. Tiered Codex routing
 needs a Codex CLI/account that offers `gpt-6.1-sol`: on a ChatGPT account, Codex CLI

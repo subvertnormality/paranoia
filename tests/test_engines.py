@@ -42,12 +42,12 @@ class TestFactory:
             engines.get_engine("gemini")
 
     def test_default_models(self) -> None:
-        assert engines.get_engine("codex").default_model == "gpt-6-astra"
+        assert engines.get_engine("codex").default_model == "gpt-6.2-astra"
         assert engines.get_engine("claude").default_model == "claude-fable-5-2"
 
     def test_arbitration_attester_uses_codex_default_generation(self) -> None:
         assert engines.ATTESTER_ENGINE == "codex"
-        assert engines.ATTESTER_MODEL == "gpt-6-astra"
+        assert engines.ATTESTER_MODEL == "gpt-6.2-astra"
 
 
 @pytest.mark.parametrize(
@@ -193,6 +193,7 @@ def test_codex_terminal_error_remains_a_failure() -> None:
 @pytest.mark.parametrize("model, expected", [
     ("claude-fable-5-2", "medium"),
     ("claude-fable-5-1", "medium"),
+    ("gpt-6.2-astra", "medium"),
     ("gpt-6-astra", "medium"),
     ("claude-opus-5", "high"),
     ("gpt-5.6-sol", "high"),

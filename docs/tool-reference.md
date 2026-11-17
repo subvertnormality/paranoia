@@ -31,21 +31,25 @@ Changing `cleaner_model` to evade a safeguard is unsupported.
 | Argument | Values | Default |
 |---|---|---|
 | `engine` | `codex` or `claude` | Server configuration |
-| `model` | Provider model name | `gpt-6-astra` or `claude-fable-5-2` |
+| `model` | Provider model name | `gpt-6.2-astra` or `claude-fable-5-2` |
 | `effort` | `low`, `medium`, or `high` | By model: Fable/Astra `medium`, Opus/Sol `high`; otherwise `high` (`query` `medium`) |
 | `web_search` | Boolean | `true` |
 | `review_model_policy` (`critique_branch`, `critique_plan`) | `tiered` or `strongest` | `tiered` |
 | `effort_by_model` (`critique_branch`, `critique_plan`) | Object mapping `astra`, `sol`, `fable`, `opus` to `low`/`medium`/`high` | Release family defaults |
+
+The default Astra 6.2 route is qualified with Codex CLI 0.169.0. Use that version
+or later for the default model; the general evidence-profile minimum remains
+for explicit older-model overrides. Unsupported models fail visibly.
 
 Structural model routing applies only to tracked staged `critique_branch` and
 `critique_plan` roles and is resolved after the authoritative durable phase:
 
 | Phase | Codex | Claude | Effort |
 |---|---|---|---|
-| Census lanes and consolidation | `gpt-6-astra` | `claude-fable-5-2` | medium |
+| Census lanes and consolidation | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
 | Correction (`tiered`) | `gpt-6.1-sol` | `claude-opus-5-5` | high |
-| Correction (`strongest`) | `gpt-6-astra` | `claude-fable-5-2` | medium |
-| Cold final | `gpt-6-astra` | `claude-fable-5-2` | medium |
+| Correction (`strongest`) | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
+| Cold final | `gpt-6.2-astra` | `claude-fable-5-2` | medium |
 | Proposal and its validation retry | source review's model | source review's model | source review's effort |
 
 Effort for a routed phase resolves as: that model family's `effort_by_model` entry, then

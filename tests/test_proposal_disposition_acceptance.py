@@ -46,8 +46,14 @@ def test_native_proposal_disposition_acceptance(name, current):
                     b'default_model = "claude-fable-5-1"',
                     1,
                 )
+                source = source.replace(
+                    b'default_model = "gpt-6.2-astra"',
+                    b'default_model = "gpt-6-astra"',
+                    1,
+                ).replace(b'ATTESTER_MODEL = "gpt-6.2-astra"', b'ATTESTER_MODEL = "gpt-6-astra"', 1)
             elif path == "server.py":
                 source = source.replace(b"claude-fable-5-2", b"claude-fable-5-1")
+                source = source.replace(b"gpt-6.2-astra", b"gpt-6-astra")
             elif path == "prompts.py":
                 def proposal_route_ast(raw):
                     tree = ast.parse(raw)

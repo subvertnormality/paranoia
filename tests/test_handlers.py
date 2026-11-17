@@ -54,9 +54,9 @@ class TestModelKeyedEffort:
 
     @pytest.mark.parametrize("default_model, override, expected", [
         ("claude-fable-5-2", None, "medium"),
-        ("gpt-6-astra", None, "medium"),
+        ("gpt-6.2-astra", None, "medium"),
         ("claude-fable-5-2", "claude-opus-5", "high"),
-        ("gpt-6-astra", "gpt-5.6-sol", "high"),
+        ("gpt-6.2-astra", "gpt-5.6-sol", "high"),
     ])
     def test_critique_branch(
         self, repo_with_branch: Path, tmp_path: Path, default_model, override, expected,
@@ -94,7 +94,7 @@ class TestModelKeyedEffort:
         assert eng.calls[0]["effort"] == expected
 
     @pytest.mark.parametrize("model, expected", [
-        ("gpt-6-astra", "medium"), ("claude-opus-5", "high"),
+        ("gpt-6.2-astra", "medium"), ("claude-opus-5", "high"),
     ])
     def test_query(self, repo: Path, tmp_path: Path, model, expected) -> None:
         eng = ModelEngine(model)

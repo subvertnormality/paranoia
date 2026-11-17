@@ -1,5 +1,9 @@
 # Repository agent instructions
 
+The default Codex model and fixed arbitration attester use `gpt-6.2-astra`.
+Keep tiered correction on `gpt-6.1-sol` and the general evidence-profile CLI
+minimum unchanged; CLI 0.169.0 is the qualified path for the Astra 6.2 default.
+
 The default Claude model is `ClaudeEngine.default_model` (`claude-fable-5-2`).
 Current tool descriptions and documentation follow that default. Keep historical
 provider evidence and frozen benchmark model pins bound to their original models.
