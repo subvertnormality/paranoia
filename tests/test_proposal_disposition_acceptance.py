@@ -26,7 +26,7 @@ def _historical_codex_no_web_source(source):
     for name, segment in segments.items():
         suffix = '        argv.append("-")'
         if name == "build_argv":
-            suffix += '  # prompt read from stdin'
+            suffix += '  # read prompt from stdin'
         current = ('        if web_search:\n'
                    '            argv += ["-c", "tools.web_search=true"]\n'
                    + disabled + suffix)
