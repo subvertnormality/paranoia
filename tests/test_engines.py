@@ -228,13 +228,17 @@ class TestCodexArgv:
         e = engines.get_engine("codex")
         argv = e.build_argv(cwd=Path("/repo"), model="m", effort="high", web_search=False)
         assert "tools.web_search=true" not in argv
-        assert '-c web_search="disabled"' in " ".join(argv)
+        settings = [value for flag, value in zip(argv, argv[1:])
+                    if flag == "-c" and value.split("=", 1)[0] in {"web_search", "tools.web_search"}]
+        assert settings == ['web_search="disabled"']
 
     def test_resume_argv_targets_session(self) -> None:
         e = engines.get_engine("codex")
         argv = e.build_resume_argv(session_ref="abc-123", cwd=Path("/repo"), model="m", effort="high", web_search=False)
         assert argv[:3] == ["codex", "exec", "resume"]
-        assert '-c web_search="disabled"' in " ".join(argv)
+        settings = [value for flag, value in zip(argv, argv[1:])
+                    if flag == "-c" and value.split("=", 1)[0] in {"web_search", "tools.web_search"}]
+        assert settings == ['web_search="disabled"']
         assert "abc-123" in argv
         assert argv[-1] == "-"
         # `codex exec resume` rejects -s and -C; they must not appear

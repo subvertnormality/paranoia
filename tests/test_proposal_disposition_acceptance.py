@@ -10,6 +10,46 @@ import pytest
 from paranoia_local import proposal_disposition as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _historical_codex_no_web_source(source):
+    text = source.decode("utf-8")
+    classes = [node for node in ast.parse(text).body
+               if isinstance(node, ast.ClassDef) and node.name == "CodexEngine"]
+    assert len(classes) == 1
+    names = {"build_argv", "build_resume_argv"}
+    methods = [node for node in classes[0].body
+               if isinstance(node, ast.FunctionDef) and node.name in names]
+    assert len(methods) == 2 and {node.name for node in methods} == names
+    segments = {node.name: ast.get_source_segment(text, node) for node in methods}
+    disabled = '        else:\n            argv += ["-c", \'web_search="disabled"\']\n'
+    for name, segment in segments.items():
+        suffix = '        argv.append("-")'
+        if name == "build_argv":
+            suffix += '  # prompt read from stdin'
+        current = ('        if web_search:\n'
+                   '            argv += ["-c", "tools.web_search=true"]\n'
+                   + disabled + suffix)
+        assert segment.count(current) == 1, name
+        assert text.count(segment) == 1, name
+        historical = segment.replace(current, current.replace(disabled, "", 1), 1)
+        text = text.replace(segment, historical, 1)
+    return text.encode("utf-8")
+
+
+@pytest.mark.parametrize("name", ["build_argv", "build_resume_argv"])
+def test_no_web_history_projection_rejects_relocated_branch(name):
+    source = (ROOT / "src/paranoia_local/engines.py").read_text()
+    cls = next(node for node in ast.parse(source).body
+               if isinstance(node, ast.ClassDef) and node.name == "CodexEngine")
+    method = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == name)
+    segment = ast.get_source_segment(source, method)
+    disabled = '        else:\n            argv += ["-c", \'web_search="disabled"\']\n'
+    assert segment.count(disabled) == 1
+    moved = segment.replace(disabled, "", 1).replace('        argv = [', disabled + '        argv = [', 1)
+    with pytest.raises(AssertionError):
+        _historical_codex_no_web_source(source.replace(segment, moved, 1).encode("utf-8"))
+
 @pytest.mark.parametrize("name,current", [
     ("proposal_disposition_acceptance_2026-10-01.json", False),
     ("proposal_disposition_acceptance_2026-10-01-integration.json", False),
@@ -31,9 +71,10 @@ def test_native_proposal_disposition_acceptance(name, current):
     for path, digest in record["source"]["files"].items():
         assert hashlib.sha256(blob(path)).hexdigest() == digest
     # Bind the critical route while preserving the trace's historical model.
-    # Default/description model spelling and exact no-web flag additions may differ. Arbitration-only instruction
+    # Default/description model spelling and exact no-web flag additions may differ.
+    # Reversals bind each original command builder. Arbitration-only instruction
     # constants are outside this proposal route; all other prompt AST stays exact.
-    # The retained run does not qualify either later change as new native evidence.
+    # The retained run does not qualify these later changes as new native evidence.
     if current:
         for path in ("handlers.py", "class_closure.py", "proposal_disposition.py", "server.py",
                      "patch_proposals.py", "engines.py", "review_census.py", "prompts.py",
@@ -52,9 +93,7 @@ def test_native_proposal_disposition_acceptance(name, current):
                     1,
                 ).replace(b'ATTESTER_MODEL = "gpt-6.2-astra"', b'ATTESTER_MODEL = "gpt-6-astra"', 1)
                 source = source.replace(b'correction_model = "gpt-6.2-sol"', b'correction_model = "gpt-6.1-sol"', 1)
-                disabled = b'        else:\n            argv += ["-c", \'web_search="disabled"\']\n'
-                assert source.count(disabled) == 2
-                source = source.replace(disabled, b"", 2)
+                source = _historical_codex_no_web_source(source)
             elif path == "server.py":
                 source = source.replace(b"claude-fable-5-2", b"claude-fable-5-1")
                 source = source.replace(b"gpt-6.2-astra", b"gpt-6-astra")
