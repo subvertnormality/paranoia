@@ -11,6 +11,8 @@ Every resumed claim reply must return the requested provider session before its
 contents can be used. Keep mismatches in the actual attempt ledger.
 Reject model fields that cannot encode as strict UTF-8 within their producing
 claim role's existing validation window, before they enter a downstream prompt.
+Escape legacy unpaired surrogates in retained prompt and report projections while
+preserving original lineage fields and historical audits.
 Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
 versus provider code provenance. Shared capture/packing expiry is retrieval failure.
 Retain source-local prompt-limit provenance as a closed server-assigned record with

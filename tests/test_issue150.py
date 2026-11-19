@@ -131,6 +131,8 @@ def public(monkeypatch, repo, tmp_path, shared, *, lineage="issue150", round_no=
     monkeypatch.setattr(h.eng, "require_evidence_profile", lambda engine: "test")
     monkeypatch.setattr(h.inert_git, "require_supported_version", lambda: (2, 50, 1))
     def stop(**kwargs):
+        if (bodies := shared.get("structural_bodies")) is not None:
+            bodies.append(kwargs["body"])
         raise rc.CensusError("stop after durable claims; structural acceptance is separate")
     monkeypatch.setattr(h, "_staged_structural_review", stop)
     report = h.critique_plan(
@@ -603,6 +605,50 @@ def test_unpaired_surrogate_stays_in_its_producing_role(repo, tmp_path, monkeypa
         assert debt["attempts"] == attempts
         assert "strict UTF-8" in report and not state["claims"]
         assert audit["attempt_ledger"][-1] == attempts[-1]
+
+
+@pytest.mark.parametrize("frozen", [False, True])
+def test_retained_surrogate_in_failed_source_is_safe_to_render(repo, tmp_path, monkeypatch, frozen):
+    plan, current_claims, texts = fixture(count=1, expanded=0)
+    failed = _source(url="https://www.python.org/failed", quote=current_claims[0]["anchor"])
+    sources = current_claims[0]["evidence"] + [failed] if frozen else [failed]
+    capture_fixture(monkeypatch, texts)
+    lineage = "issue150-legacy-text"
+    old_claims = [dict(current_claims[0], evidence=sources)]
+    _, state, _ = public(monkeypatch, repo, tmp_path, dict(plan=plan, claims=old_claims), lineage=lineage)
+    claim_id, retained = next(iter(state["claims"].items()))
+    assert retained["verdict"] == ("supported" if frozen else "unverified")
+    assert retained["capture_provenance"][-1]["error"]
+    previous_audit, = (tmp_path / "logs").glob("*-critique_plan-*.json")
+    previous_bytes = previous_audit.read_bytes()
+    # The older validator stored candidate titles even when their capture never bound.
+    legacy = cc.load_lineage(cc.default_state_root(), lineage, stamp="T", mode=cc.PLAN_MODE)
+    legacy_title = "Retained \ud800 source"
+    legacy.claim_state["claims"][claim_id]["evidence"][-1]["title"] = legacy_title
+    cc.save_lineage(cc.default_state_root(), legacy)
+    escaped = r"Retained \ud800 source"
+
+    shared = dict(plan=plan, claims=current_claims, structural_bodies=[])
+    if frozen:
+        monkeypatch.setattr(es, "capture_all", lambda *a, **k: pytest.fail("frozen claim recaptured"))
+    result, current, audit = public(monkeypatch, repo, tmp_path, shared, lineage=lineage, round_no=2)
+    result.encode("utf-8", errors="strict")
+    (body,) = shared["structural_bodies"]
+    body.encode("utf-8", errors="strict")
+    assert previous_audit.read_bytes() == previous_bytes
+    assert list(current["claims"]) == [claim_id] and current["claims"][claim_id]["verdict"] == "supported"
+    if frozen:
+        assert not shared.get("calls")
+        assert "non-governing sibling" in result and escaped in result and escaped in body
+        assert current["claims"][claim_id]["evidence"][-1]["title"] == legacy_title
+        assert audit["claim_model_calls"] == 0
+    else:
+        roles = [call[0] for call in shared["calls"]]
+        assert roles == ["evidence-discovery", "evidence-binding", "evidence-text"]
+        discovery = shared["calls"][0][1]
+        discovery.encode("utf-8", errors="strict")
+        assert escaped in discovery and claim_id in discovery
+        assert audit["claim_model_calls"] == 3
 
 
 @pytest.mark.parametrize("returned", [None, "another-session", "session"])

@@ -1255,7 +1255,7 @@ def evidence_context(state_raw: Any, include_ids: Iterable[str] | None = None) -
             "proposition": claim.get("proposition"),
             "evidence": claim.get("evidence", []),
         })
-    return json.dumps(records, ensure_ascii=False, separators=(",", ":"))
+    return _utf8_projection(json.dumps(records, ensure_ascii=False, separators=(",", ":")))
 
 
 def review_context(state_raw: Any) -> str:
@@ -1327,7 +1327,7 @@ def review_context(state_raw: Any) -> str:
             )
     if state.get("debt"):
         lines.append(f"- AUDIT DEBT: {state['debt'].get('reason')}")
-    return "\n".join(lines)
+    return _utf8_projection("\n".join(lines))
 
 
 def render_trailer(state_raw: Any) -> str:
@@ -1406,7 +1406,7 @@ def render_trailer(state_raw: Any) -> str:
         ))
 
     if audit_failed:
-        return "\n".join(lines)
+        return _utf8_projection("\n".join(lines))
 
     actionable = [
         claim for claim in claims
@@ -1418,7 +1418,7 @@ def render_trailer(state_raw: Any) -> str:
         lines.append("ACTIONABLE SOURCE PACKETS:")
     for claim in actionable:
         lines.extend(_packet_lines(claim))
-    return "\n".join(lines)
+    return _utf8_projection("\n".join(lines))
 
 
 def prompt_limit_detail(limit: dict[str, Any]) -> str:
@@ -1726,6 +1726,11 @@ PRIOR EVIDENCE PACKETS (JSON):
 {scope_text}"""
 
 
+def _utf8_projection(value: str) -> str:
+    """Escape legacy unpaired surrogates at text boundaries without editing stored rows."""
+    return value.encode("utf-8", errors="backslashreplace").decode("utf-8")
+
+
 def _require_utf8(value: str, name: str) -> None:
     try:
         value.encode("utf-8", errors="strict")
@@ -1928,7 +1933,7 @@ def _removal_candidates(prior_state: Any, plan_text: str) -> str:
         and claim["anchor"].strip()
         and not _anchor_in_plan(claim["anchor"], plan_text)
     ]
-    return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+    return _utf8_projection(json.dumps(candidates, ensure_ascii=False, separators=(",", ":")))
 
 
 def _full_packet_candidate_ids(
