@@ -11,7 +11,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-URL = "https://www.python.org/downloads/release/python-3110/"
+URL = "https://www.python.org/doc/versions/"
 PLAN = (
     "# Release premise\n\nPython 3.11.0 was released on October 24, 2022.\n\n"
     f"Candidate official source: <{URL}>\n"

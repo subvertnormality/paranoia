@@ -106,7 +106,7 @@ Named production entry point and acceptance obligations:
 - `scripts/run_claim_binding_150_acceptance.py` is the executable native qualification
   route. Its frozen fixture is: `# Release premise\n\nPython 3.11.0 was released on
   October 24, 2022.\n`, followed by a blank line and a candidate-source link to
-  `https://www.python.org/downloads/release/python-3110/`, with a captured release-date
+  `https://www.python.org/doc/versions/`, with a captured release-date
   passage. Run tracked `critique_plan` with Codex and a dedicated stable lineage,
   POSIX synthetic fixture repository containing one committed README, preserving all
   original rounds and failed trials. A passing receipt binds the
