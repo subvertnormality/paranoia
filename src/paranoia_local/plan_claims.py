@@ -1347,9 +1347,13 @@ def render_trailer(state_raw: Any) -> str:
         )
     if state.get("debt"):
         debt = state["debt"]
+        if debt.get("failure_kind") in {"limit", "admission", "deadline"} and not debt.get("rejected_excerpt"):
+            reply = "no provider response for this failure"
+        else:
+            reply = f"rejected sha256 {debt.get('raw_sha256')}"
         lines.append(
             f"CLAIM-AUDIT-DEBT: round {debt.get('round')}: {debt.get('reason')} "
-            f"(rejected sha256 {debt.get('raw_sha256')})"
+            f"({reply})"
         )
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])

@@ -4754,11 +4754,15 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
     outputs: dict[str, list[str | Review]] = {
         "evidence-discovery": [_audit(_claim())],
     }
+    invalid_correction = Review(
+        text="correction invalid", session_ref="session", raw="correction stdout",
+        returncode=0, failure_detail="correction detail", stderr="correction stderr",
+    )
     if phase == "binding":
-        outputs["evidence-binding"] = ["initial invalid", "correction invalid"]
+        outputs["evidence-binding"] = ["initial invalid", invalid_correction]
     elif phase == "attestation":
         outputs["evidence-binding"] = [binding]
-        outputs["evidence-text"] = ["initial invalid", "correction invalid"]
+        outputs["evidence-text"] = ["initial invalid", invalid_correction]
     engine = _RoleScript(outputs)
     monkeypatch.setattr(handlers.eng, "CodexEngine", _RoleScript)
     monkeypatch.setattr(handlers.eng, "require_evidence_profile", lambda engine: None)
@@ -4830,6 +4834,10 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
         assert len(row["error"]) <= pc.DIAGNOSTIC_CHARS + 64
         assert row["error_sha256"] == hashlib.sha256(completed_error.encode()).hexdigest()
     else:
+        assert debt["returncode"] == 0
+        assert debt["rejected_excerpt"] == "correction stdout"
+        assert debt["failure_detail"] == "correction detail"
+        assert debt["stderr"] == "correction stderr"
         expected = [
             f"claim-{phase}", f"claim-{phase}-validation-retry",
         ]

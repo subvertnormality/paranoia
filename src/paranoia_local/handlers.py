@@ -5314,6 +5314,7 @@ class _CapturedClaimEngine:
             tuple[str | None, str | None, str | None], tuple[int, int]
         ] = {}
         for (claim_index, evidence_index), capture in captures.items():
+            self._check_non_model_deadline()
             if not capture.usable:
                 continue
             claim = discovery.claims[claim_index]
@@ -5403,6 +5404,7 @@ class _CapturedClaimEngine:
                 seen_captures[identity] = (claim_index, evidence_index)
         if current:
             batches.append(current)
+        self._check_non_model_deadline()
         limit = _plan_evidence_batch_limit(len(discovery.claims))
         if len(batches) > limit:
             raise pc.AuditError(
@@ -5510,7 +5512,12 @@ class _CapturedClaimEngine:
                     if expanded:
                         source_local_failure(str(second))
                         continue
-                    raise
+                    raise pc.AuditError(
+                        f"initial binding invalid ({first.reason}); correction invalid ({second.reason})",
+                        correction.raw, failure_detail=correction.failure_detail or "",
+                        stderr=correction.stderr or "", returncode=correction.returncode,
+                        failure_kind="validation",
+                    ) from second
                 review = correction
             decisions.update(parsed)
             current_session = review.session_ref
@@ -5875,11 +5882,11 @@ class _CapturedClaimEngine:
                         )
                         local_failures[key] = pc.bounded_diagnostic(str(exc))
                         continue
-                    return _EvidencePhaseReview(
-                        text="[paranoia-local error] evidence attestation invalid and "
-                        f"cannot be corrected without a provider session: {exc}",
-                        raw=review.raw, error=True, evidence_phase="attestation",
-                        evidence_reason=pc.bounded_diagnostic(str(exc)),
+                    return replace(
+                        _evidence_phase_review(review, "attestation"),
+                        evidence_reason=pc.bounded_diagnostic(
+                            f"attestation invalid without a provider session: {exc}",
+                        ),
                         failure_kind="validation", phase_attempts=self._phase_attempts(),
                     )
                 rendered = json.dumps(
@@ -5936,11 +5943,11 @@ class _CapturedClaimEngine:
                         )
                         local_failures[key] = pc.bounded_diagnostic(str(second))
                         continue
-                    return _EvidencePhaseReview(
-                        text=f"[paranoia-local error] evidence attestation invalid: {second}",
-                        session_ref=correction.session_ref, raw=correction.raw, error=True,
-                        evidence_phase="attestation",
-                        evidence_reason=pc.bounded_diagnostic(str(second)),
+                    return replace(
+                        _evidence_phase_review(correction, "attestation"),
+                        evidence_reason=pc.bounded_diagnostic(
+                            f"initial attestation invalid ({exc}); correction invalid ({second})",
+                        ),
                         failure_kind="validation", phase_attempts=self._phase_attempts(),
                     )
             decisions.update(parsed)

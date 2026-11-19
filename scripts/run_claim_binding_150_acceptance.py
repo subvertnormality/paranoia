@@ -11,8 +11,12 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-PLAN = "# Release premise\n\nPython 3.11.0 was released on October 24, 2022.\n"
 URL = "https://www.python.org/downloads/release/python-3110/"
+PLAN = (
+    "# Release premise\n\nPython 3.11.0 was released on October 24, 2022.\n\n"
+    f"Candidate official source: <{URL}>\n"
+)
+FIXTURE_README = "# Issue 150 native qualification fixture\n"
 HARNESS = ("scripts/run_claim_binding_150_acceptance.py", "scripts/benchmark_bootstrap.py")
 
 
@@ -47,6 +51,8 @@ def validate(record, handlers, pc):
         raise ValueError("changed retained report")
     if record["request"]["plan_text"] != PLAN or record["request"]["engine"] != "codex":
         raise ValueError("qualification input or provider mismatch")
+    if record["fixture_readme_sha256"] != sha(FIXTURE_README.encode()):
+        raise ValueError("qualification repository mismatch")
     audit, state, report = record["audit"], record["state"], record["report"]
     if (audit["error"] or audit["returncode"] != 0 or audit["claim_audit_failed"]
             or audit["lineage"] != record["request"]["lineage"]
@@ -142,11 +148,25 @@ def main():
     directory = args.output.resolve()
     directory.mkdir(parents=True, exist_ok=False)
     os.environ["PARANOIA_STATE_ROOT"] = str(directory / "state")
-    request = dict(repo_path=str(ROOT), plan_text=PLAN, engine="codex", round=1,
+    # The reviewed content is a synthetic repository. The implementation under
+    # qualification still loads from the committed, verified production checkout.
+    fixture_repo = directory / "repository"
+    fixture_repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=fixture_repo, check=True)
+    (fixture_repo / "README.md").write_text(FIXTURE_README, encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=fixture_repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Qualification Fixture", "-c", "user.email=fixture@example.com",
+         "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+         "commit", "-qm", "Freeze qualification fixture"],
+        cwd=fixture_repo, check=True,
+    )
+    request = dict(repo_path=str(fixture_repo), plan_text=PLAN, engine="codex", round=1,
                    lineage="issue150-native-"+str(time.time_ns()), propose_patch=False,
                    stakes="Trusted single local user and OS; untrusted static content; no hostile race. "
                           "One external claim. Wrong evidence binding is high impact; recoverable blocking is acceptable.")
     record = dict(kind="issue150-native-claim-qualification", source=identity, request=request,
+                  fixture_readme_sha256=sha((fixture_repo / "README.md").read_bytes()),
                   captures=[], reviews=[], outcome="failed")
     original_capture, original_record = es.capture_all, handlers._CapturedClaimEngine._record
     def capture(*a, **k):

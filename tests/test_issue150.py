@@ -411,6 +411,7 @@ def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, m
     assert debt["failure_phase"] == phase and debt["failure_kind"] == "admission"
     assert len(debt["attempts"]) == (1 if correction else 0)
     assert debt["rejected_excerpt"] == ""  # no response to the refused call
+    assert "no provider response for this failure" in report
     assert debt["returncode"] == 124
     assert "later role admission refused" in report
     if correction:
