@@ -68,6 +68,13 @@ class Provider:
                     for i, j in keys
                 ]})
             else:
+                attempts = sum(role == self.role for role, _, _ in s["calls"])
+                if s.get("attestation_execution_failure") == attempts:
+                    return Review(
+                        "provider failed", "fixture-session", "actual attestation stdout",
+                        error=True, returncode=73, failure_detail="actual attestation detail",
+                        stderr="actual attestation stderr",
+                    )
                 text = "=== EVIDENCE ATTESTATION JSON ===\n" + json.dumps({"attestations": [
                     {"claim_index": i, "evidence_index": j, "publisher_authority": True,
                      "authority_reason": f"official publisher {i}", "passage_entailment": True,
@@ -593,6 +600,30 @@ def test_final_expanded_binding_mismatch_keeps_discovery_session(repo, tmp_path,
     rejected = audit["attempt_ledger"][attempt - 1]
     assert rejected["role"] == role and rejected["outcome"] == "validation-invalid"
     assert rejected["session_ref"] == "different-provider-session"
+
+
+@pytest.mark.parametrize("repair", [False, True])
+def test_attestation_execution_kind_reaches_public_report_and_debt(repo, tmp_path, monkeypatch, repair):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    capture_fixture(monkeypatch, texts)
+    shared = dict(plan=plan, claims=claims, repair=repair, attestation_execution_failure=2 if repair else 1)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    debt = state["debt"]
+    assert debt["failure_phase"] == "attestation" and debt["failure_kind"] == "execution"
+    assert debt["returncode"] == 73
+    assert "EVIDENCE failure kind: execution" in report
+    assert "ATTESTATION-FAILED" in report and "exit 73" in report
+    assert audit["claim_audit_debt"] == debt
+    terminal_attempts = [row for row in audit["attempt_ledger"] if row["role"].startswith("claim-attestation")]
+    assert debt["attempts"] == terminal_attempts
+    assert [row["outcome"] for row in terminal_attempts] == (
+        ["validation-invalid", "failed"] if repair else ["failed"]
+    )
+    assert terminal_attempts[-1]["returncode"] == 73
+    for key, expected in (("raw", "stdout"), ("failure_detail", "detail"), ("stderr", "stderr")):
+        value = f"actual attestation {expected}"
+        assert terminal_attempts[-1][key + "_excerpt"] == value
+        assert terminal_attempts[-1][key + "_sha256"] == hashlib.sha256(value.encode()).hexdigest()
 
 
 @pytest.mark.parametrize("phase", ["binding","attestation"])

@@ -5775,8 +5775,10 @@ class _CapturedClaimEngine:
                         or "dedicated expanded attestation call failed"
                     )
                     continue
-                return replace(_evidence_phase_review(review, "attestation"),
-                               phase_attempts=self._phase_attempts())
+                return replace(
+                    _evidence_phase_review(review, "attestation"),
+                    failure_kind="execution", phase_attempts=self._phase_attempts(),
+                )
             try:
                 parsed = parse_attestation(review, attestation_batch)
             except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
@@ -5843,9 +5845,10 @@ class _CapturedClaimEngine:
                     return replace(
                         _evidence_phase_review(correction, "attestation"),
                         evidence_reason=pc.bounded_diagnostic(
-                            f"initial attestation invalid ({exc}); {session_issue}",
-                        ) if session_issue else "",
-                        failure_kind="validation" if session_issue else None,
+                            f"initial attestation invalid ({exc}); "
+                            + (session_issue or f"provider correction failed (exit {correction.returncode})"),
+                        ),
+                        failure_kind="validation" if session_issue else "execution",
                         phase_attempts=self._phase_attempts(),
                     )
                 try:
