@@ -121,8 +121,8 @@ class AuditError(ValueError):
 
 
 def bounded_diagnostic(text: str) -> str:
-    """Bound one model-controlled diagnostic using the canonical head/tail excerpt."""
-    return _excerpt(text)
+    """Bound an encoding-safe diagnostic for prompts, packet metadata, or reports."""
+    return _excerpt(_utf8_projection(text))
 
 
 def evidence_recovery(kind: str | None, *, phase: str | None = None, frozen: bool = False) -> str:

@@ -62,6 +62,11 @@ class Provider:
             rows = json.loads(prompt.rsplit("\n\n", 1)[1])
             keys = tuple((r["claim_index"], r["evidence_index"]) for r in rows)
             attempts = sum(role == self.role for role, _, _ in s["calls"])
+            if s.get("malformed_provider_error") == (self.role, attempts):
+                detail = "provider \ud800 diagnostic"
+                raw = json.dumps({"type": "error", "message": detail})
+                return Review("provider failed", "fixture-session", raw, error=True, returncode=73,
+                              failure_detail=detail, stderr="original stderr")
             surrogate = s.get("surrogate_replies", {}).get(self.role, 0) >= attempts
             if self.role == "evidence-binding":
                 text = h.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [
@@ -649,6 +654,40 @@ def test_retained_surrogate_in_failed_source_is_safe_to_render(repo, tmp_path, m
         discovery.encode("utf-8", errors="strict")
         assert escaped in discovery and claim_id in discovery
         assert audit["claim_model_calls"] == 3
+
+
+@pytest.mark.parametrize("phase,role", [("binding", "evidence-binding"), ("attestation", "evidence-text")])
+@pytest.mark.parametrize("correction", [False, True])
+def test_expanded_provider_diagnostic_cannot_discard_supported_sibling(
+    repo, tmp_path, monkeypatch, phase, role, correction,
+):
+    plan, claims, texts = fixture(count=1, expanded=1)
+    anchor = claims[0]["anchor"]
+    sibling = _source(url="https://www.python.org/ordinary", quote=anchor)
+    claims[0]["evidence"].append(sibling)
+    texts[sibling["url"]] = anchor
+    capture_fixture(monkeypatch, texts)
+    # Binding visits the expanded source first. Attestation visits the ordinary sibling first.
+    batch_number = 1 if phase == "binding" else 2
+    shared = dict(plan=plan, claims=claims, repair=correction,
+                  malformed_provider_error=(role, batch_number * (2 if correction else 1)))
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    report.encode("utf-8", errors="strict")
+    assert not audit["claim_audit_failed"] and not state["debt"]
+    claim = next(iter(state["claims"].values()))
+    assert claim["verdict"] == "supported" and pc._captured_support(claim)
+    assert claim["capture_provenance"][1]["error"] is None
+    expected_prefix = pc.BINDING_FAILURE_PREFIX if phase == "binding" else pc.ATTESTATION_FAILURE_PREFIX
+    assert claim["capture_provenance"][0]["error"] == expected_prefix + r"provider \ud800 diagnostic"
+    assert f"{phase.upper()}-FAILED (non-governing sibling; claim independently supported)" in report
+    failed, = [row for row in audit["attempt_ledger"] if row["outcome"] == "failed"]
+    expected_role = f"claim-{phase}" + ("-validation-retry" if correction else "")
+    assert failed["role"] == expected_role and failed["returncode"] == 73
+    detail = "provider \ud800 diagnostic"
+    raw = json.dumps({"type": "error", "message": detail})
+    for key, value in (("raw", raw), ("failure_detail", detail), ("stderr", "original stderr")):
+        assert failed[key + "_excerpt"] == value
+        assert failed[key + "_sha256"] == hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 @pytest.mark.parametrize("returned", [None, "another-session", "session"])
