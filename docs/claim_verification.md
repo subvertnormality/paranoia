@@ -173,8 +173,8 @@ correction and repeat attestation.
 Each resumed claim reply must return the requested provider session. A different or missing
 handle fails validation before the reply can govern a claim or supply a continuation.
 The producing claim role uses its existing correction window for duplicate JSON keys,
-JSON nesting beyond 64 containers, and numbers the decoder cannot parse. Discovery
-also treats incorrectly typed claim fields as validation failures.
+JSON nesting beyond 64 containers, non-finite numbers, and numbers the decoder cannot
+parse. Discovery also treats incorrectly typed claim fields as validation failures.
 Claim roles validate decoded text for strict UTF-8
 before passing it to a later prompt or persisting it as governing evidence.
 Prompts and reports escape any unpaired surrogate from an older retained packet.

@@ -795,6 +795,8 @@ def test_indexed_binding_accepts_marker_inside_complete_passage(repo, tmp_path, 
     ("binding", "evidence-binding", "integer"),
     ("attestation", "evidence-text", "integer"),
     ("discovery", "evidence-discovery", "coverage-depth"),
+    ("discovery", "evidence-discovery", "NaN"),
+    ("discovery", "evidence-discovery", "1e309"),
 ])
 def test_malformed_reply_uses_producing_roles_correction(
     repo, tmp_path, monkeypatch, phase, provider_role, defect, repair,
@@ -822,6 +824,11 @@ def test_malformed_reply_uses_producing_roles_correction(
             # CPython can decode this, but the wire bound protects consumers.
             nested = "[" * 80 + "0" + "]" * 80
             text = review.text.replace('"coverage": {', f'"coverage": {{"nested": {nested}, ')
+        elif defect in {"NaN", "1e309"}:
+            text = (
+                pc.AUDIT_MARKER + '\n{"claims":[],"coverage":{"prior_dispositions":[],'
+                f'"prior_assessments":[],"sections_scanned":{defect}}}}}'
+            )
         else:
             value = "[" * 2000 + "0" + "]" * 2000 if defect == "depth" else "9" * 8000
             text = review.text.split("\n", 1)[0] + "\n" + '{"malformed": ' + value + "}"
@@ -844,6 +851,8 @@ def test_malformed_reply_uses_producing_roles_correction(
         "depth": "JSON nesting exceeds",
         "coverage-depth": "JSON nesting exceeds",
         "integer": "integer string conversion",
+        "NaN": "non-finite number",
+        "1e309": "non-finite number",
     }[defect]
     assert any(issue in prompt for name, prompt, _ in shared["calls"] if name == provider_role)
     for row, text in zip(attempts, rejected):

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from copy import deepcopy
 from dataclasses import dataclass
@@ -412,6 +413,8 @@ def decode_reply_json(payload: str, reply: str, *, label: str) -> tuple[Any, int
                 raise AuditError(f"{label} JSON nesting exceeds {MAX_REPLY_JSON_DEPTH}", reply)
             children = node.values() if isinstance(node, dict) else node
             pending.extend((child, depth + 1) for child in children)
+        elif isinstance(node, float) and not math.isfinite(node):
+            raise AuditError(f"{label} JSON contains a non-finite number", reply)
     return value, end
 
 
