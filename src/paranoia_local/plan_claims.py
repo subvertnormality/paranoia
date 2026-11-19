@@ -390,12 +390,15 @@ def parse_audit(
     discovery_only: bool = False,
 ) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
-    if text.count(AUDIT_MARKER) != 1:
+    _, marker, tail = text.partition(AUDIT_MARKER)
+    if not marker:
         raise AuditError(
-            f"expected exactly one {AUDIT_MARKER!r} marker, found {text.count(AUDIT_MARKER)}",
+            f"expected exactly one {AUDIT_MARKER!r} marker, found 0",
             text,
         )
-    tail = text.split(AUDIT_MARKER, 1)[1].strip()
+    # The decoder owns the body. A marker inside a JSON string is data. Another
+    # envelope after the decoded object is rejected by the remainder check.
+    tail = tail.strip()
     if tail.startswith("```json"):
         tail = tail[7:].lstrip()
     elif tail.startswith("```"):

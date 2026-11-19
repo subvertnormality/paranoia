@@ -5390,7 +5390,9 @@ class _CapturedClaimEngine:
                 capture = captures[only_key]
                 captures[only_key] = replace(
                     capture, text=None,
-                    error=pc.BINDING_FAILURE_PREFIX + pc.bounded_diagnostic(detail),
+                    error=pc.BINDING_FAILURE_PREFIX + pc.bounded_diagnostic(
+                        detail.strip() or "Server-owned source processing failure prevented binding."
+                    ),
                 )
                 decisions[only_key] = None
 
@@ -5413,8 +5415,9 @@ class _CapturedClaimEngine:
             if review.error or session_issue:
                 if expanded:
                     source_local_failure(
-                        session_issue or claude_provider_guidance(review, self.binding_engine.name) or review.failure_detail or review.stderr or
-                        "dedicated expanded binding call failed"
+                        session_issue or claude_provider_guidance(review, self.binding_engine.name)
+                        or (review.failure_detail or "").strip() or (review.stderr or "").strip()
+                        or "dedicated expanded binding call failed"
                     )
                     continue
                 raise pc.AuditError(
@@ -5445,8 +5448,9 @@ class _CapturedClaimEngine:
                 if correction.error or session_issue:
                     if expanded:
                         source_local_failure(
-                            session_issue or claude_provider_guidance(correction, self.binding_engine.name) or correction.failure_detail or correction.stderr or
-                            "dedicated expanded binding correction failed"
+                            session_issue or claude_provider_guidance(correction, self.binding_engine.name)
+                            or (correction.failure_detail or "").strip() or (correction.stderr or "").strip()
+                            or "dedicated expanded binding correction failed"
                         )
                         continue
                     raise pc.AuditError(
@@ -5795,7 +5799,10 @@ class _CapturedClaimEngine:
                         attestation_batch[0]["evidence_index"],
                     )
                     local_failures[key] = pc.bounded_diagnostic(
-                        claude_provider_guidance(review, attester.name) or review.failure_detail or review.stderr or review.text
+                        claude_provider_guidance(review, attester.name)
+                        or (review.failure_detail or "").strip()
+                        or (review.stderr or "").strip()
+                        or review.text.strip()
                         or "dedicated expanded attestation call failed"
                     )
                     continue
@@ -5861,8 +5868,9 @@ class _CapturedClaimEngine:
                         )
                         local_failures[key] = pc.bounded_diagnostic(
                             session_issue or claude_provider_guidance(correction, attester.name)
-                            or correction.failure_detail or correction.stderr
-                            or correction.text
+                            or (correction.failure_detail or "").strip()
+                            or (correction.stderr or "").strip()
+                            or correction.text.strip()
                             or "dedicated expanded attestation correction failed"
                         )
                         continue
@@ -5918,6 +5926,8 @@ class _CapturedClaimEngine:
             for evidence_index, item in enumerate(claim["evidence"]):
                 row = decisions.get((index, evidence_index))
                 local_failure = local_failures.get((index, evidence_index))
+                if local_failure is not None:
+                    local_failure = local_failure.strip() or "Server-owned source processing failure prevented attestation."
                 bounded_local_failure = (
                     rc.bounded_diagnostic(
                         local_failure, MAX_ATTESTATION_REASON_CHARS,
