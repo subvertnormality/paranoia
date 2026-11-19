@@ -309,12 +309,11 @@ def validate_timing(record):
     claim_ms = audit["claim_duration_ms"]
     durations = [row["duration_ms"] for row in audit["attempt_ledger"] if row["role"].startswith("claim-")]
     serial_ms = sum(durations)
-    # Each serial attempt and the encompassing phase are recorded in whole milliseconds.
+    # Both the serial attempts and the encompassing phase truncate to whole milliseconds.
     if (type(elapsed) not in (int, float) or not 0 < elapsed < float("inf")
             or type(claim_ms) is not int or claim_ms < 0
-            or serial_ms > claim_ms + len(durations)
-            or serial_ms > elapsed * 1000
-            or claim_ms > elapsed * 1000 + 1):
+            or serial_ms > claim_ms
+            or claim_ms > elapsed * 1000):
         raise ValueError("measured native dispatch, claim phase and serial attempts disagree")
 
 

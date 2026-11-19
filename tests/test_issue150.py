@@ -896,6 +896,8 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
     variant = getattr(request, "param", None)
     directory, fixture = native.prepare_trial(tmp_path)
     record = dict(**fixture, source={"revision": "fixture"}, reviews=[], captures=[], elapsed_seconds=1)
+    clock = h.time.monotonic
+    scripted_seconds = [0.0]
     quote = "Python 3.11.0, released on 24 October 2022"
     source = _source(url=native.URL, quote=quote)
     discovery = _audit(_claim(anchor=native.PROPOSITION, proposition=native.PROPOSITION, evidence=[source]))
@@ -918,6 +920,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
         })
 
     def run(engine, prompt, *args, **kwargs):
+        scripted_seconds[0] += 0.005
         if engine.role == "evidence-discovery":
             return native_review(discovery, "discovery")
         if engine.role == "evidence-text":
@@ -937,6 +940,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
         }), "staged-consolidation")
 
     def resume(engine, session, *args, **kwargs):
+        scripted_seconds[0] += 0.005
         if engine.role == "evidence-binding":
             return native_review(bound if "rejected" in args[0] else "invalid initial binding", session)
         if engine.role == native.STRUCTURAL_ROLE:
@@ -961,6 +965,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
             scope.setattr(CodexEngine, "run", run)
             scope.setattr(CodexEngine, "resume", resume)
             scope.setattr(es, "capture_all", capture)
+            scope.setattr(h, "time", SimpleNamespace(monotonic=lambda: clock() + scripted_seconds[0]))
             native.observe_evidence_calls(CodexEngine, record)
             schedule_native_lanes(scope, ("domain", "execution", "integrity"), [])
             if interrupt:
@@ -1076,10 +1081,16 @@ def test_complete_native_receipt_accepts_repaired_empty_reply(native_replay_rece
     validate_native_receipt(record, tmp_path)
 
 
-def test_complete_native_receipt_requires_consistent_dispatch_duration(native_replay_receipt, tmp_path):
+@pytest.mark.parametrize("field", ["elapsed_seconds", "claim_duration_ms"])
+def test_complete_native_receipt_requires_consistent_dispatch_duration(native_replay_receipt, tmp_path, field):
     record = native_replay_receipt
     validate_native_receipt(record, tmp_path)
-    record["elapsed_seconds"] = 0.000001
+    if field == "elapsed_seconds":
+        record[field] = 0.000001
+    else:
+        total = sum(row["duration_ms"] for row in record["audit"]["attempt_ledger"]
+                    if row["role"].startswith("claim-"))
+        record["audit"][field] = total - 1
     with pytest.raises(ValueError, match="measured native dispatch"):
         validate_native_receipt(record, tmp_path)
 
