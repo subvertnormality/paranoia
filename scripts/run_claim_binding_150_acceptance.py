@@ -245,35 +245,56 @@ def validate_attempts(record, handlers):
         raise ValueError("unexpected native evidence role after complete graph")
 
 
-def structural_sequences(audit):
+def structural_sequences(audit, observations, rc):
     rows = [row for row in audit["attempt_ledger"] if not row["role"].startswith("claim-")]
     structural = {row["role"]: row for row in rows}
     sequences = {role: row["sequence"] for role, row in structural.items()}
     if (not rows or len(structural) != len(rows) or any(type(seq) is not int for seq in sequences.values())
             or sorted(sequences.values()) != list(range(1, len(rows) + 1))):
         raise ValueError("invalid tracked structural attempt sequence")
+    native = {
+        sha(review.raw.encode("utf-8", "surrogatepass")): (position, call, review)
+        for position, (call, review) in enumerate(observations)
+    }
+    if len(native) != len(observations) or len(native) != len(rows):
+        raise ValueError("structural attempt inventory differs from observed native calls")
+    bound = {}
     for role, row in structural.items():
+        observed = native.pop(row["raw_sha256"], None)
+        if observed is None or observed[2].session_ref != row["session_ref"]:
+            raise ValueError("structural attempt differs from observed native stdout")
+        bound[role] = observed
+    for role, row in structural.items():
+        position, call, _ = bound[role]
         if role.endswith("-validation-retry"):
-            initial = structural.get(role.removesuffix("-validation-retry"))
+            initial_role = role.removesuffix("-validation-retry")
+            initial = structural.get(initial_role)
             if (not initial or initial["sequence"] >= row["sequence"]
                     or initial["outcome"] != "validation-invalid" or row["outcome"] != "completed"
-                    or initial["session_ref"] != row["session_ref"]):
+                    or initial["session_ref"] != row["session_ref"]
+                    or call["resumed_session"] != initial["session_ref"]):
                 raise ValueError("structural correction lacks an invalid attempt in the same session")
-        elif row["outcome"] != "completed" and (
-            row["outcome"] != "validation-invalid" or role + "-validation-retry" not in structural
+            if position <= bound[initial_role][0]:
+                raise ValueError("observed structural correction precedes its initial invocation")
+        elif call["resumed_session"] is not None or (
+            row["outcome"] != "completed" and (
+                row["outcome"] != "validation-invalid" or role + "-validation-retry" not in structural
+            )
         ):
             raise ValueError("native structural attempt did not complete or receive a repair")
     if "consolidation" in sequences and any(
-        seq >= sequences["consolidation"] for role, seq in sequences.items() if role.startswith("census-")
+        seq >= sequences["consolidation"] or bound[role][0] >= bound["consolidation"][0]
+        for role, seq in sequences.items() if role.startswith("census-")
     ):
         raise ValueError("structural consolidation precedes lane completion")
     expected_rejections = [
-        (row["role"], row["sequence"], row["response_sha256"], row["validation_issue"])
+        rc.rejected_payload(
+            row["role"], bound[row["role"]][2].text,
+            sequence=row["sequence"], validation_issue=row["validation_issue"],
+        )
         for row in sorted(rows, key=lambda row: row["sequence"]) if row["outcome"] == "validation-invalid"
     ]
-    rejections = [(row["role"], row["sequence"], row["sha256"], row["validation_issue"])
-                  for row in (audit.get("rejected_payloads") or [])]
-    if rejections != expected_rejections:
+    if (audit.get("rejected_payloads") or []) != expected_rejections:
         raise ValueError("structural rejected replies differ from their invalid attempts")
     return sequences
 
@@ -287,17 +308,23 @@ def replay_review(record, handlers, pc):
     from paranoia_local.engines import CodexEngine
 
     request = record["request"]
-    sequences = structural_sequences(record["audit"])
     run_staged = handlers._staged_call
     def call_key(call):
         return call["role"], call["resumed_session"], call["prompt"]
 
     pending = {}
+    structural_observations = []
     for call in record["reviews"]:
         key = call_key(call)
         if key in pending:
             raise ValueError("duplicate observed native invocation")
-        pending[key] = (call, read_native_review(call))
+        review = read_native_review(call)
+        pending[key] = (call, review)
+        if call["role"] == STRUCTURAL_ROLE:
+            structural_observations.append((call, review))
+        elif structural_observations:
+            raise ValueError("observed claim invocation follows structural review")
+    sequences = structural_sequences(record["audit"], structural_observations, handlers.rc)
     calls_lock = Lock()
     captures = [
         pc.sources.Capture(**{**row, "candidate": pc.sources.CandidateSource(**row["candidate"])})

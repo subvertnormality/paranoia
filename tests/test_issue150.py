@@ -742,7 +742,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
         lane = next((line.split()[-1] for line in prompt.splitlines()
                      if line.startswith("ROLE: census lane ")), None)
         if lane == "domain":
-            return native_review("invalid initial domain reply", "staged-domain")
+            return native_review("", "staged-domain")
         if lane == "execution":
             return native_review(staged_reply("domain"), "staged-execution")
         if lane:
@@ -881,6 +881,17 @@ def test_complete_native_receipt_preserves_diagnostics_under_different_lane_sche
     assert starts == ["execution", "integrity", "domain"]
 
 
+def test_complete_native_receipt_accepts_repaired_empty_reply(native_replay_receipt, tmp_path):
+    from scripts import run_claim_binding_150_acceptance as native
+    record = native_replay_receipt
+    attempt = next(row for row in record["audit"]["attempt_ledger"] if row["role"] == "census-domain")
+    rejected = next(row for row in record["audit"]["rejected_payloads"] if row["role"] == "census-domain")
+    assert attempt["response_sha256"] is None
+    assert rejected["sha256"] == native.sha(b"")
+    assert rejected["excerpt"] == ""
+    validate_native_receipt(record, tmp_path)
+
+
 @pytest.mark.parametrize("native_replay_receipt", ["wrong-session"], indirect=True)
 def test_complete_native_receipt_rejects_structural_repair_from_different_session(native_replay_receipt, tmp_path):
     with pytest.raises(ValueError, match="same session"):
@@ -905,7 +916,7 @@ def test_complete_native_receipt_rejects_contradictory_trailer(native_replay_rec
 
 @pytest.mark.parametrize("mutation", [
     "missing-settlement", "nonzero", "fake-outcome", "fake-duration", "fake-channel",
-    "wrong-rejected-sequence", "wrong-requested-session",
+    "wrong-rejected-sequence", "wrong-requested-session", "retry-before-initial",
 ])
 def test_complete_native_receipt_binds_tracked_structural_result(native_replay_receipt, tmp_path, mutation):
     record = native_replay_receipt
@@ -921,6 +932,10 @@ def test_complete_native_receipt_binds_tracked_structural_result(native_replay_r
     elif mutation == "wrong-requested-session":
         retry = next(row for row in record["reviews"] if row["resumed_session"] == "staged-domain")
         retry["resumed_session"] = "unrelated-session"
+    elif mutation == "retry-before-initial":
+        initial, retry = [i for i, row in enumerate(record["reviews"])
+                          if row["review"]["session_ref"] == "staged-domain"]
+        record["reviews"][initial], record["reviews"][retry] = record["reviews"][retry], record["reviews"][initial]
     else:
         attempt = next(row for row in record["audit"]["attempt_ledger"] if row["role"] == "census-domain")
         field, value = {
@@ -928,7 +943,10 @@ def test_complete_native_receipt_binds_tracked_structural_result(native_replay_r
             "fake-channel": ("raw_sha256", "f" * 64),
         }[mutation]
         attempt[field] = value
-    with pytest.raises(ValueError, match="misbound native|native execution|production replay|rejected replies|lacks an invalid attempt"):
+    with pytest.raises(ValueError, match=(
+        "misbound native|native execution|production replay|rejected replies|lacks an invalid attempt"
+        "|precedes its initial invocation|differs from observed native stdout"
+    )):
         validate_native_receipt(record, tmp_path)
 
 
