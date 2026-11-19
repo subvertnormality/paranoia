@@ -186,6 +186,9 @@ Source packets escape malformed Unicode in provider diagnostics before copying
 such text into evidence and use a server reason when the diagnostic is blank.
 The attempt ledger retains the original output channels. In claim and binding
 replies, marker text inside a quoted JSON value belongs to that value.
+The report lists the bounded failure reason with the affected source and preserves
+its bound passage. Terminal claim debt and the attempt ledger hash raw output,
+failure detail and stderr separately using UTF-8 with surrogate preservation.
 Every source outcome carries a closed server-owned `capture_provenance` row with its requested
 location, nullable effective HTTP(S) final URL, explicit nullable status, content type, both capture
 digests, fallback fact, and bounded error. A null final URL preserves non-web context as an

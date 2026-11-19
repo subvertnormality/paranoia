@@ -693,9 +693,13 @@ def test_expanded_provider_diagnostic_cannot_discard_supported_sibling(
     else:
         rendered_detail = detail
     assert claim["capture_provenance"][0]["error"] == expected_prefix + rendered_detail
+    assert "Source 1 failure: " + expected_prefix + rendered_detail in report
+    assert "Source 2 failure:" not in report
     if phase == "attestation":
         failed_decision = claim["capture_attestations"][0]
         assert failed_decision["authority_reason"] == failed_decision["entailment_reason"] == rendered_detail
+        assert claim["evidence"][0]["quote"] == anchor
+        assert f"Exact passage: {anchor}" in report
     assert f"{phase.upper()}-FAILED (non-governing sibling; claim independently supported)" in report
     failed, = [row for row in audit["attempt_ledger"] if row["outcome"] == "failed"]
     expected_role = f"claim-{phase}" + ("-validation-retry" if correction else "")
@@ -704,6 +708,44 @@ def test_expanded_provider_diagnostic_cannot_discard_supported_sibling(
     for key, value in (("raw", raw), ("failure_detail", detail), ("stderr", stderr)):
         assert failed[key + "_excerpt"] == value
         assert failed[key + "_sha256"] == hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def test_expanded_attestation_report_names_failed_source_when_claim_blocks(repo, tmp_path, monkeypatch):
+    plan, claims, texts = fixture(count=1, expanded=1)
+    capture_fixture(monkeypatch, texts)
+    detail = "attester \ud800 unavailable"
+    shared = dict(plan=plan, claims=claims, malformed_provider_error=("evidence-text", 1),
+                  provider_failure_detail=detail, provider_failure_stderr="", provider_failure_text="failed")
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    claim = next(iter(state["claims"].values()))
+    error = pc.ATTESTATION_FAILURE_PREFIX + r"attester \ud800 unavailable"
+    assert claim["verdict"] == "unverified" and not audit["claim_audit_failed"]
+    assert claim["capture_provenance"][0]["error"] == error
+    assert "Source 1 failure: " + error in report
+    assert "ATTESTATION-FAILED (blocking; bound passage not adjudicated)" in report
+    assert f"Exact passage: {claims[0]['anchor']}" in report
+    report.encode("utf-8", errors="strict")
+
+
+def test_terminal_provider_channel_hashes_match_ledger_for_surrogate_text(repo, tmp_path, monkeypatch):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    capture_fixture(monkeypatch, texts)
+    detail, stderr = "provider \ud800 diagnostic", "original stderr"
+    shared = dict(plan=plan, claims=claims, repair=True, malformed_provider_error=("evidence-text", 2),
+                  provider_failure_detail=detail, provider_failure_stderr=stderr, provider_failure_text="failed")
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    debt = state["debt"]
+    assert debt == audit["claim_audit_debt"]
+    attempt = audit["attempt_ledger"][-1]
+    assert attempt["role"] == "claim-attestation-validation-retry" and attempt["returncode"] == 73
+    assert debt["failure_kind"] == "execution"
+    values = dict(raw=json.dumps({"type": "error", "message": detail}), failure_detail=detail, stderr=stderr)
+    for channel, value in values.items():
+        key = channel + "_sha256"
+        assert debt[key] == attempt[key] == hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
+    assert debt["failure_detail"] == detail
+    assert debt["failure_detail_sha256"] != hashlib.sha256(b"provider ? diagnostic").hexdigest()
+    report.encode("utf-8", errors="strict")
 
 
 def test_claim_audit_marker_inside_quote_is_data_but_second_envelope_is_invalid():

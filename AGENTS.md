@@ -16,6 +16,8 @@ preserving original lineage fields and historical audits.
 Escape provider diagnostics before copying them into source packets. Keep the
 attempt channels and their digests bound to the original data. Treat marker text
 inside decoded claim and binding JSON as data. Use a server reason for blank diagnostics.
+Render indexed source failures alongside the retained passages. Newly recorded
+terminal claim debt hashes each output channel with the ledger's lossless encoding.
 Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
 versus provider code provenance. Shared capture/packing expiry is retrieval failure.
 Retain source-local prompt-limit provenance as a closed server-assigned record with

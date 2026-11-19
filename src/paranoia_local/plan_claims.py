@@ -86,13 +86,14 @@ class AuditError(ValueError):
         } else None
         self.attempts = deepcopy(list(attempts))
         self.completed_captures = deepcopy(list(completed_captures))
-        self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
+        # Match the attempt ledger's lossless encoding for every decoded Python string.
+        self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "surrogatepass")).hexdigest()
         self.excerpt = _excerpt(raw)
         self.failure_detail_sha256 = hashlib.sha256(
-            failure_detail.encode("utf-8", "replace")
+            failure_detail.encode("utf-8", "surrogatepass")
         ).hexdigest()
         self.failure_detail = _excerpt(failure_detail)
-        self.stderr_sha256 = hashlib.sha256(stderr.encode("utf-8", "replace")).hexdigest()
+        self.stderr_sha256 = hashlib.sha256(stderr.encode("utf-8", "surrogatepass")).hexdigest()
         self.stderr = _excerpt(stderr)
         super().__init__(reason)
 
@@ -1470,6 +1471,10 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
     if claim.get("rationale"):
         lines.append(f"  Assessment: {claim['rationale']}")
+    source_errors = {
+        row["evidence_index"]: row["error"] for row in claim.get("capture_provenance", [])
+        if type(row.get("evidence_index")) is int and row.get("error")
+    }
     for index, evidence in enumerate(claim.get("evidence", []), 1):
         lines.extend([
             f"  Source {index}: [{evidence.get('source_kind')}/{evidence.get('relation')}] "
@@ -1478,6 +1483,9 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
             f"    Location: {evidence.get('url')} ({evidence.get('location')})",
             f"    Exact passage: {evidence.get('quote')}",
         ])
+        if error := source_errors.get(index - 1):
+            detail = sources._bounded_error(_utf8_projection(str(error)))
+            lines.append(f"    Source {index} failure: {detail}")
     return lines
 
 
