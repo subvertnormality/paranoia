@@ -7,6 +7,8 @@ timeouts. Other current guidance is explanatory. Preserve global role rejection
 before dispatch, exact complete-source bounds, cold attestation and frozen-packet
 qualification. Captured roles own their single corrections; final local captured
 audit rejection is terminal, never another outer binding/attestation graph.
+Every resumed claim reply must return the requested provider session before its
+contents can be used. Keep mismatches in the actual attempt ledger.
 Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
 versus provider code provenance. Shared capture/packing expiry is retrieval failure.
 Retain source-local prompt-limit provenance as a closed server-assigned record with

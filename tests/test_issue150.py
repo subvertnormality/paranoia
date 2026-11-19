@@ -86,6 +86,8 @@ class Provider:
         session = "fixture-session"
         if self.role == "evidence-binding" and s.get("binding_sessionless") == attempt:
             session = None
+        if s.get("mismatched_session") == attempt:
+            session = "different-provider-session"
         raw = f"stdout {attempt}" if s.get("terminal_channels") else text
         return Review(text=text, raw=raw, session_ref=session, returncode=0,
                       failure_detail=f"detail {attempt}", stderr=f"stderr {attempt}", duration_ms=0)
@@ -94,6 +96,7 @@ class Provider:
         return self.answer(prompt, **kwargs)
 
     def resume(self, session, prompt, *args, **kwargs):
+        self.shared.setdefault("resumed", []).append((self.role, session))
         return self.answer(prompt, **kwargs)
 
 
@@ -521,6 +524,50 @@ def test_captured_discovery_cannot_assign_server_prompt_limit(repo, tmp_path, mo
         assert not state["claims"]
 
 
+@pytest.mark.parametrize("role,attempt,repair", [
+    ("claim-discovery-validation-retry", 2, True),
+    ("claim-binding", 2, False),
+    ("claim-binding-validation-retry", 4, True),
+    ("claim-attestation-validation-retry", 6, True),
+])
+def test_captured_resume_rejects_valid_output_from_another_session(
+    repo, tmp_path, monkeypatch, role, attempt, repair,
+):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    capture_fixture(monkeypatch, texts)
+    shared = dict(plan=plan, claims=claims, repair=repair, mismatched_session=attempt)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    phase = role.removeprefix("claim-").removesuffix("-validation-retry")
+    debt = state["debt"]
+    assert debt["failure_phase"] == phase and debt["failure_kind"] == "validation"
+    assert "different session from the requested continuation" in report
+    assert not state["claims"]
+    assert len(shared["calls"]) == len(audit["attempt_ledger"]) == attempt
+    observed = audit["attempt_ledger"][-1]
+    assert observed["role"] == role and observed["outcome"] == "validation-invalid"
+    assert observed["validation_pointer"] == "/session_ref"
+    assert observed["session_ref"] == "different-provider-session" and observed["returncode"] == 0
+    assert observed["raw_sha256"] == hashlib.sha256(observed["raw_excerpt"].encode()).hexdigest()
+    assert debt["attempts"][-1] == observed
+    assert all(session == "fixture-session" for _, session in shared["resumed"])
+
+
+def test_expanded_binding_session_mismatch_preserves_other_batch_custody(repo, tmp_path, monkeypatch):
+    plan, claims, texts = fixture(count=2, expanded=1)
+    capture_fixture(monkeypatch, texts)
+    shared = dict(plan=plan, claims=claims, mismatched_session=2)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    results = {claim["anchor"]: claim for claim in state["claims"].values()}
+    assert results[claims[0]["anchor"]]["verdict"] == "unverified"
+    assert results[claims[1]["anchor"]]["verdict"] == "supported"
+    error = results[claims[0]["anchor"]]["capture_provenance"][0]["error"]
+    assert "different session from the requested continuation" in error
+    assert "BINDING-FAILED" in report
+    bindings = [row for row in audit["attempt_ledger"] if row["role"] == "claim-binding"]
+    assert [row["session_ref"] for row in bindings] == ["different-provider-session", "fixture-session"]
+    assert all(session == "fixture-session" for _, session in shared["resumed"])
+
+
 @pytest.mark.parametrize("phase", ["binding","attestation"])
 @pytest.mark.parametrize("correction", [False,True])
 def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, monkeypatch, phase, correction):
@@ -559,6 +606,7 @@ def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, m
 
 def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_path, monkeypatch):
     import sys
+    from types import SimpleNamespace
     from paranoia_local import server
     from scripts import run_claim_binding_150_acceptance as native
 
@@ -581,8 +629,11 @@ def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_pat
     assert pc.frozen_supported_ids(claim_state, native.PLAN)
     state_path = tmp_path / "state/lineages" / (native.LINEAGE + ".json")
     calls = []
+    measured = [10.0]
+    monkeypatch.setattr(native, "time", SimpleNamespace(monotonic=lambda: measured[0]))
 
     def dispatch(tool, request, *, log_dir, **kwargs):
+        measured[0] += 3.5
         assert tool == "critique_plan"
         calls.append(dict(request))
         log_dir.mkdir()
@@ -596,6 +647,7 @@ def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_pat
         return "fixture report"
 
     def validate(record, *args, **kwargs):
+        measured[0] += 29.0
         if len(calls) == 1:
             raise ValueError("fixture receipt rejected after support persisted")
         assert record["predecessor_text"] == predecessor
@@ -607,10 +659,12 @@ def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_pat
     first = next((tmp_path / "trials").glob("round-001-*/receipt.json"))
     original = first.read_bytes()
     assert json.loads(original)["outcome"] == "failed"
+    assert json.loads(original)["elapsed_seconds"] == 3.5
     native.main()
     second = next((tmp_path / "trials").glob("round-002-*/receipt.json"))
     receipt = json.loads(second.read_bytes())
     assert receipt["outcome"] == "passed"
+    assert receipt["elapsed_seconds"] == 3.5
     assert [request["round"] for request in calls] == [1, 2]
     assert calls[0]["repo_path"] == calls[1]["repo_path"]
     assert calls[0]["lineage"] == calls[1]["lineage"] == native.LINEAGE
@@ -622,6 +676,7 @@ def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_pat
 
 @pytest.mark.parametrize("mutation", [
     None, "valid-repair", "timeout", "orphan", "native-error", "review-error",
+    "different-initial-binding-session",
     "missing-raw", "missing-stderr", "missing-failure_detail", "missing-returncode",
     "missing-error", "missing-duration_ms",
 ])
@@ -642,6 +697,8 @@ def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_r
     for index, (phase, role, timeout, resumed, session) in enumerate(profiles):
         if mutation == "orphan" and index == 1:
             phase += "-validation-retry"
+        if mutation == "different-initial-binding-session" and phase == "claim-binding":
+            session = "unrelated-binding-session"
         events = [
             {"type": "thread.started", "thread_id": session},
             {"type": "item.completed", "item": {"type": "agent_message", "text": "output"}},

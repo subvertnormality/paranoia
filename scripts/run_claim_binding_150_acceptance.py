@@ -225,7 +225,7 @@ def validate_attempts(record, handlers):
             )
             if (actual["role"] != provider_role or actual["timeout"] != timeout
                     or actual["resumed_session"] != prior_session
-                    or (retry and review.session_ref != initial_session)):
+                    or (prior_session is not None and review.session_ref != prior_session)):
                 raise ValueError("native role, engine timeout, or session mismatch")
             projection = handlers._attempt(
                 role, CodexEngine(), review, requested_timeout_sec=actual["timeout"],
@@ -451,7 +451,8 @@ def validate(record, handlers, pc, *, identity, root):
         qualifying = True
     if not qualifying:
         raise ValueError("official captured date passage and matching cold decision missing")
-    if record["elapsed_seconds"] <= 0:
+    elapsed = record["elapsed_seconds"]
+    if type(elapsed) not in (int, float) or not 0 < elapsed < float("inf"):
         raise ValueError("missing measured wall time")
 
 
@@ -481,7 +482,7 @@ def main():
     directory, fixture = prepare_trial(root)
     request = fixture["request"]
     record = dict(kind="issue150-native-claim-qualification", source=identity,
-                  **fixture, captures=[], reviews=[], outcome="failed")
+                  **fixture, captures=[], reviews=[], outcome="failed", elapsed_seconds=None)
     original_capture = es.capture_all
     def capture(*a, **k):
         captures = original_capture(*a, **k)
@@ -489,12 +490,15 @@ def main():
         return captures
     es.capture_all = capture
     observe_evidence_calls(CodexEngine, record)
-    started = time.monotonic()
     try:
         if read_predecessor(root) != fixture["predecessor_text"]:
             raise ValueError("durable predecessor changed before dispatch")
-        record["report"] = server.dispatch("critique_plan", request,
-            default_engine_name="codex", log_dir=directory / "logs", on_progress=lambda s: print(s, flush=True))
+        started = time.monotonic()
+        try:
+            record["report"] = server.dispatch("critique_plan", request,
+                default_engine_name="codex", log_dir=directory / "logs", on_progress=lambda s: print(s, flush=True))
+        finally:
+            record["elapsed_seconds"] = time.monotonic() - started
         (directory / "report.txt").write_text(record["report"])
         audits = list((directory / "logs").glob("*-critique_plan-*.json"))
         if len(audits) != 1:
@@ -505,7 +509,7 @@ def main():
                       audit_text=audit_bytes.decode(), state_text=state_bytes.decode(),
                       state_relative_path="state/lineages/"+request["lineage"]+".json",
                       audit_sha256=sha(audit_bytes), state_sha256=sha(state_bytes),
-                      report_sha256=sha(record["report"].encode()), elapsed_seconds=time.monotonic()-started)
+                      report_sha256=sha(record["report"].encode()))
         if source_identity() != identity:
             raise ValueError("source changed during qualification")
         for name, module in tuple(sys.modules.items()):
@@ -518,7 +522,6 @@ def main():
         record["error"] = f"{type(error).__name__}: {error}"
         raise
     finally:
-        record["elapsed_seconds"] = time.monotonic()-started
         (directory / "receipt.json").write_text(json.dumps(record, indent=2, ensure_ascii=True)+"\n")
         print(json.dumps({k: record[k] for k in ["outcome","elapsed_seconds"]}), flush=True)
 

@@ -4857,7 +4857,9 @@ class _CapturedClaimEngine:
                 requested_timeout_sec=discovery_kwargs["timeout"],
             )
             raw_parts.append(corrected.raw)
-            session_issue = self._required_session_issue(corrected, "discovery")
+            session_issue = self._required_session_issue(
+                corrected, "discovery", resumed_session=first.session_ref,
+            )
             if corrected.error or session_issue:
                 return replace(
                     _evidence_phase_review(corrected, "discovery"),
@@ -5010,11 +5012,18 @@ class _CapturedClaimEngine:
             failure_kind="admission", phase_attempts=self._phase_attempts(),
         )
 
-    def _required_session_issue(self, review: Review, phase: str) -> str | None:
+    def _required_session_issue(
+        self, review: Review, phase: str, *, resumed_session: str | None = None,
+    ) -> str | None:
         """Mark a successful provider reply with unusable continuation metadata."""
-        if review.error or review.session_ref:
+        if review.error:
             return None
-        reason = f"claim {phase} returned no resumable session"
+        if not review.session_ref:
+            reason = f"claim {phase} returned no resumable session"
+        elif resumed_session is not None and review.session_ref != resumed_session:
+            reason = f"claim {phase} returned a different session from the requested continuation"
+        else:
+            return None
         self._mark_last_validation_invalid(reason, review, "/session_ref")
         return reason
 
@@ -5343,7 +5352,6 @@ class _CapturedClaimEngine:
             tuple[int, int], tuple[str, str] | None | _OmittedBinding
         ] = {}
         reviews: list[Review] = []
-        current_session = session_ref
         self._begin_phase_batch()
         batches = self._binding_batches(discovery, captures)
         self._check_non_model_deadline()
@@ -5369,7 +5377,7 @@ class _CapturedClaimEngine:
                 reserve_calls=1 + PLAN_EVIDENCE_VALIDATION_CORRECTIONS,
             )
             review = self.binding_engine.resume(
-                current_session, instruction, self.launch, model, effort, False,
+                session_ref, instruction, self.launch, model, effort, False,
                 **call_kwargs,
             )
             self._record(
@@ -5377,7 +5385,9 @@ class _CapturedClaimEngine:
                 requested_timeout_sec=call_kwargs["timeout"],
             )
             reviews.append(review)
-            session_issue = self._required_session_issue(review, "binding")
+            session_issue = self._required_session_issue(
+                review, "binding", resumed_session=session_ref,
+            )
             if review.error or session_issue:
                 if expanded:
                     source_local_failure(
@@ -5398,7 +5408,7 @@ class _CapturedClaimEngine:
                 call_kwargs["timeout"] = self._next_model_timeout()
                 issue = pc.bounded_diagnostic(str(first))[:MAX_BINDING_DIAGNOSTIC_CHARS]
                 correction = self.binding_engine.resume(
-                    review.session_ref,
+                    session_ref,
                     self._binding_prompt(rendered, issue),
                     self.launch, model, effort, False, **call_kwargs,
                 )
@@ -5407,7 +5417,9 @@ class _CapturedClaimEngine:
                     requested_timeout_sec=call_kwargs["timeout"],
                 )
                 reviews.append(correction)
-                session_issue = self._required_session_issue(correction, "binding")
+                session_issue = self._required_session_issue(
+                    correction, "binding", resumed_session=session_ref,
+                )
                 if correction.error or session_issue:
                     if expanded:
                         source_local_failure(
@@ -5441,9 +5453,7 @@ class _CapturedClaimEngine:
                         stderr=correction.stderr or "", returncode=correction.returncode,
                         failure_kind="validation",
                     ) from second
-                review = correction
             decisions.update(parsed)
-            current_session = review.session_ref
 
         self._begin_phase_batch()
         claims = [deepcopy(claim) for claim in discovery.claims]
@@ -5812,7 +5822,10 @@ class _CapturedClaimEngine:
                     "claim-attestation-validation-retry", attester, correction,
                     requested_timeout_sec=timeout,
                 )
-                if correction.error:
+                session_issue = self._required_session_issue(
+                    correction, "attestation", resumed_session=review.session_ref,
+                )
+                if correction.error or session_issue:
                     if len(attestation_batch) == 1 and (
                         attestation_batch[0]["claim_index"],
                         attestation_batch[0]["evidence_index"],
@@ -5822,13 +5835,20 @@ class _CapturedClaimEngine:
                             attestation_batch[0]["evidence_index"],
                         )
                         local_failures[key] = pc.bounded_diagnostic(
-                            claude_provider_guidance(correction, attester.name) or correction.failure_detail or correction.stderr
+                            session_issue or claude_provider_guidance(correction, attester.name)
+                            or correction.failure_detail or correction.stderr
                             or correction.text
                             or "dedicated expanded attestation correction failed"
                         )
                         continue
-                    return replace(_evidence_phase_review(correction, "attestation"),
-                                   phase_attempts=self._phase_attempts())
+                    return replace(
+                        _evidence_phase_review(correction, "attestation"),
+                        evidence_reason=pc.bounded_diagnostic(
+                            f"initial attestation invalid ({exc}); {session_issue}",
+                        ) if session_issue else "",
+                        failure_kind="validation" if session_issue else None,
+                        phase_attempts=self._phase_attempts(),
+                    )
                 try:
                     parsed = parse_attestation(correction, attestation_batch)
                 except (

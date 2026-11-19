@@ -4583,10 +4583,10 @@ def test_outer_claim_verification_persists_binding_failure_channels(
         handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
     )
     failed = Review(
-        text="", session_ref="binding-session" if correction else None, raw="",
+        text="", session_ref="discovery-session" if correction else None, raw="",
         returncode=returncode, error=True, failure_detail=diagnostic, stderr=diagnostic,
     )
-    binding = ([Review("invalid", "binding-session", "invalid binding"), failed]
+    binding = ([Review("invalid", "discovery-session", "invalid binding"), failed]
                if correction else [failed])
 
     class FailureEngine:
