@@ -245,32 +245,41 @@ def validate_attempts(record, handlers):
         raise ValueError("unexpected native evidence role after complete graph")
 
 
-def audit_projection(audit):
-    """The run ID, clock readings and parallel lane start order vary on replay."""
-    result = {key: value for key, value in audit.items()
-              if key not in {"timestamp", "run_id", "claim_duration_ms"}}
-    rows = result["attempt_ledger"]
-    structural = {row["role"]: row["sequence"] for row in rows if not row["role"].startswith("claim-")}
-    if (not structural or any(type(seq) is not int for seq in structural.values())
-            or sorted(structural.values()) != list(range(1, len(structural) + 1))):
+def structural_sequences(audit):
+    rows = [row for row in audit["attempt_ledger"] if not row["role"].startswith("claim-")]
+    structural = {row["role"]: row for row in rows}
+    sequences = {role: row["sequence"] for role, row in structural.items()}
+    if (not rows or len(structural) != len(rows) or any(type(seq) is not int for seq in sequences.values())
+            or sorted(sequences.values()) != list(range(1, len(rows) + 1))):
         raise ValueError("invalid tracked structural attempt sequence")
-    if any(seq <= structural.get(role.removesuffix("-validation-retry"), seq)
-           for role, seq in structural.items() if role.endswith("-validation-retry")):
-        raise ValueError("structural correction precedes its initial response")
-    if "consolidation" in structural and any(
-        seq >= structural["consolidation"] for role, seq in structural.items() if role.startswith("census-")
+    for role, row in structural.items():
+        if role.endswith("-validation-retry"):
+            initial = structural.get(role.removesuffix("-validation-retry"))
+            if (not initial or initial["sequence"] >= row["sequence"]
+                    or initial["outcome"] != "validation-invalid" or row["outcome"] != "completed"
+                    or initial["session_ref"] != row["session_ref"]):
+                raise ValueError("structural correction lacks an invalid attempt in the same session")
+        elif row["outcome"] != "completed" and (
+            row["outcome"] != "validation-invalid" or role + "-validation-retry" not in structural
+        ):
+            raise ValueError("native structural attempt did not complete or receive a repair")
+    if "consolidation" in sequences and any(
+        seq >= sequences["consolidation"] for role, seq in sequences.items() if role.startswith("census-")
     ):
         raise ValueError("structural consolidation precedes lane completion")
-    result["attempt_ledger"] = [
-        {key: value for key, value in row.items() if key != "sequence"}
-        if row["role"] in structural else row for row in rows
+    expected_rejections = [
+        (row["role"], row["sequence"], row["response_sha256"], row["validation_issue"])
+        for row in sorted(rows, key=lambda row: row["sequence"]) if row["outcome"] == "validation-invalid"
     ]
-    if result.get("rejected_payloads"):
-        result["rejected_payloads"] = [
-            {key: value for key, value in row.items() if key != "sequence"}
-            for row in sorted(result["rejected_payloads"], key=lambda row: row["role"])
-        ]
-    return result
+    rejections = [(row["role"], row["sequence"], row["sha256"], row["validation_issue"])
+                  for row in (audit.get("rejected_payloads") or [])]
+    if rejections != expected_rejections:
+        raise ValueError("structural rejected replies differ from their invalid attempts")
+    return sequences
+
+
+def audit_projection(audit):
+    return {key: value for key, value in audit.items() if key not in {"timestamp", "run_id", "claim_duration_ms"}}
 
 
 def replay_review(record, handlers, pc):
@@ -278,6 +287,8 @@ def replay_review(record, handlers, pc):
     from paranoia_local.engines import CodexEngine
 
     request = record["request"]
+    sequences = structural_sequences(record["audit"])
+    run_staged = handlers._staged_call
     def call_key(call):
         return call["role"], call["resumed_session"], call["prompt"]
 
@@ -301,6 +312,8 @@ def replay_review(record, handlers, pc):
                 expected, review = pending.pop(call_key(observed), ({}, None))
             if {k: v for k, v in expected.items() if k != "review"} != observed:
                 raise ValueError(f"observed native {engine.role} invocation differs from production replay")
+            if resume and engine.role == STRUCTURAL_ROLE and review.session_ref != observed["resumed_session"]:
+                raise ValueError("native structural correction returned a different session")
             return review
         return respond_to_call
 
@@ -308,6 +321,19 @@ def replay_review(record, handlers, pc):
         if not pending_captures or candidates != [row.candidate for row in captures]:
             raise ValueError("native capture inventory differs from production replay")
         return pending_captures.pop()
+
+    def staged_call(*, role, next_sequence, **kwargs):
+        # Give the production validators their recorded sequence labels. The
+        # physical order in which the replay threads start need not match.
+        labels = iter((role, role + "-validation-retry"))
+
+        def recorded_sequence():
+            sequence = sequences.get(next(labels, None))
+            if sequence is None:
+                raise ValueError("unexpected structural attempt during production replay")
+            return sequence
+
+        return run_staged(role=role, next_sequence=recorded_sequence, **kwargs)
 
     with tempfile.TemporaryDirectory(prefix="paranoia-150-replay-") as scratch:
         scratch = Path(scratch)
@@ -319,7 +345,8 @@ def replay_review(record, handlers, pc):
         with (patch.dict(os.environ, {"PARANOIA_STATE_ROOT": str(state_root)}),
               patch.object(CodexEngine, "run", respond(resume=False)),
               patch.object(CodexEngine, "resume", respond(resume=True)),
-              patch.object(pc.sources, "capture_all", capture)):
+              patch.object(pc.sources, "capture_all", capture),
+              patch.object(handlers, "_staged_call", staged_call)):
             report = handlers.critique_plan(request, engine=CodexEngine(), log_dir=scratch / "logs")
         audits = list((scratch / "logs").glob("*-critique_plan-*.json"))
         if (pending_captures or pending or len(audits) != 1 or not state_file.is_file()

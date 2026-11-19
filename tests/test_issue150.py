@@ -677,6 +677,29 @@ def native_review(text, session):
     return Review(text, session, raw, duration_ms=1, failure_detail="", stderr="")
 
 
+def schedule_native_lanes(monkeypatch, order, starts):
+    from concurrent.futures import Future
+
+    pending = {}
+
+    def submit(pool, run_lane, lane):
+        future = Future()
+        pending[lane] = (run_lane, future)
+        if len(pending) == len(order):
+            calls = pending.copy()
+            pending.clear()
+            for scheduled in order:
+                run, response = calls[scheduled]
+                starts.append(scheduled)
+                try:
+                    response.set_result(run(scheduled))
+                except BaseException as error:
+                    response.set_exception(error)
+        return future
+
+    monkeypatch.setattr(h.census.telemetry, "submit", submit)
+
+
 @pytest.fixture
 def native_replay_receipt(tmp_path, monkeypatch, request):
     from dataclasses import asdict
@@ -686,6 +709,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
     monkeypatch.setattr(h.inert_git, "require_supported_version", lambda: (2, 50, 1))
     monkeypatch.setattr(h.eng, "require_evidence_profile", lambda _: "test")
     monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    variant = getattr(request, "param", None)
     directory, fixture = native.prepare_trial(tmp_path)
     record = dict(**fixture, source={"revision": "fixture"}, reviews=[], captures=[], elapsed_seconds=1)
     quote = "Python 3.11.0, released on 24 October 2022"
@@ -719,6 +743,8 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
                      if line.startswith("ROLE: census lane ")), None)
         if lane == "domain":
             return native_review("invalid initial domain reply", "staged-domain")
+        if lane == "execution":
+            return native_review(staged_reply("domain"), "staged-execution")
         if lane:
             return native_review(staged_reply(lane), "staged-" + lane)
         return native_review(json.dumps({
@@ -730,8 +756,11 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
         if engine.role == "evidence-binding":
             return native_review(bound if "rejected" in args[0] else "invalid initial binding", session)
         if engine.role == native.STRUCTURAL_ROLE:
-            assert session == "staged-domain"
-            return native_review(staged_reply("domain"), session)
+            lane = session.removeprefix("staged-")
+            assert lane in {"domain", "execution"}
+            if lane == "domain" and variant == "wrong-session":
+                return native_review(staged_reply(lane), "unrelated-session")
+            return native_review(staged_reply(lane), session)
         assert engine.role == "evidence-text"
         return native_review(cold, session)
 
@@ -749,6 +778,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
             scope.setattr(CodexEngine, "resume", resume)
             scope.setattr(es, "capture_all", capture)
             native.observe_evidence_calls(CodexEngine, record)
+            schedule_native_lanes(scope, ("domain", "execution", "integrity"), [])
             if interrupt:
                 def stop(**kwargs):
                     raise RuntimeError("stop after durable claim settlement")
@@ -757,7 +787,7 @@ def native_replay_receipt(tmp_path, monkeypatch, request):
                 fixture["request"], engine=CodexEngine(), log_dir=directory / "logs",
             )
 
-    if getattr(request, "param", False):
+    if variant is True:
         with pytest.raises(RuntimeError, match="stop after durable claim settlement"):
             tracked_call(interrupt=True)
         (directory / "receipt.json").write_text(json.dumps({"request": fixture["request"], "outcome": "failed"}))
@@ -840,6 +870,23 @@ def test_complete_native_receipt_resumes_after_claims_saved_before_structural_se
     validate_native_receipt(native_replay_receipt, tmp_path)
 
 
+def test_complete_native_receipt_preserves_diagnostics_under_different_lane_schedule(
+    native_replay_receipt, monkeypatch, tmp_path,
+):
+    record = native_replay_receipt
+    assert [row["role"] for row in record["audit"]["rejected_payloads"]] == ["census-domain", "census-execution"]
+    starts = []
+    schedule_native_lanes(monkeypatch, ("execution", "integrity", "domain"), starts)
+    validate_native_receipt(record, tmp_path)
+    assert starts == ["execution", "integrity", "domain"]
+
+
+@pytest.mark.parametrize("native_replay_receipt", ["wrong-session"], indirect=True)
+def test_complete_native_receipt_rejects_structural_repair_from_different_session(native_replay_receipt, tmp_path):
+    with pytest.raises(ValueError, match="same session"):
+        validate_native_receipt(native_replay_receipt, tmp_path)
+
+
 @pytest.mark.parametrize("line", [
     "LINEAGE: other (rounds recorded: 1)",
     "CLAIM-CLOSURE: 0 supported, 0 refuted, 1 unverified",
@@ -856,7 +903,10 @@ def test_complete_native_receipt_rejects_contradictory_trailer(native_replay_rec
         validate_native_receipt(record, tmp_path)
 
 
-@pytest.mark.parametrize("mutation", ["missing-settlement", "nonzero", "fake-outcome", "fake-duration", "fake-channel"])
+@pytest.mark.parametrize("mutation", [
+    "missing-settlement", "nonzero", "fake-outcome", "fake-duration", "fake-channel",
+    "wrong-rejected-sequence", "wrong-requested-session",
+])
 def test_complete_native_receipt_binds_tracked_structural_result(native_replay_receipt, tmp_path, mutation):
     record = native_replay_receipt
     validate_native_receipt(record, tmp_path)
@@ -865,6 +915,12 @@ def test_complete_native_receipt_binds_tracked_structural_result(native_replay_r
     elif mutation == "nonzero":
         call = next(row for row in record["reviews"] if row["role"] == "evidence-repository")
         call["review"]["returncode"] = 3
+    elif mutation == "wrong-rejected-sequence":
+        rejected = record["audit"]["rejected_payloads"]
+        rejected[0]["sequence"] = rejected[1]["sequence"]
+    elif mutation == "wrong-requested-session":
+        retry = next(row for row in record["reviews"] if row["resumed_session"] == "staged-domain")
+        retry["resumed_session"] = "unrelated-session"
     else:
         attempt = next(row for row in record["audit"]["attempt_ledger"] if row["role"] == "census-domain")
         field, value = {
@@ -872,7 +928,7 @@ def test_complete_native_receipt_binds_tracked_structural_result(native_replay_r
             "fake-channel": ("raw_sha256", "f" * 64),
         }[mutation]
         attempt[field] = value
-    with pytest.raises(ValueError, match="misbound native|native execution|production replay"):
+    with pytest.raises(ValueError, match="misbound native|native execution|production replay|rejected replies|lacks an invalid attempt"):
         validate_native_receipt(record, tmp_path)
 
 
