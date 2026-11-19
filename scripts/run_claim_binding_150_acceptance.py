@@ -234,15 +234,30 @@ def validate_attempts(record, handlers):
         raise ValueError("unexpected native evidence role after complete graph")
 
 
-def validate_report_claims(report, audit, claims, pc):
+def validate_report_claims(report, audit, state, handlers, pc):
     trailer = audit.get("rendered_trailer")
     claim_block = trailer.split("\n", 1)[1] if (
         isinstance(trailer, str) and trailer.startswith("REVIEW-ROUTING:") and "\n" in trailer
     ) else trailer
+    expected_claims = pc.render_trailer(state["claim_state"]) + "\n"
     if (not isinstance(claim_block, str) or not report.endswith("\n\n" + trailer)
-            or not claim_block.startswith(pc.render_trailer(claims) + "\nLINEAGE:")
-            or audit.get("claim_counts") != {"supported": 1, "refuted": 0, "unverified": 0}):
+            or not claim_block.startswith(expected_claims)):
         raise ValueError("audited trailer and returned report disagree with durable claims")
+    suffix = claim_block[len(expected_claims):].splitlines()
+    attempts = audit["attempt_ledger"]
+    structural = [row for row in attempts if not row["role"].startswith("claim-")]
+    expected = {
+        "LINEAGE:": f"LINEAGE: {audit['lineage']} (rounds recorded: {state['rounds']})",
+        "STAGED-ATTEMPTS:": handlers.rc.attempt_trailer(structural),
+        "REVIEW-ATTEMPTS:": handlers.rc.attempt_trailer(attempts).replace("STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1),
+    }
+    if (not suffix or suffix[0] != expected["LINEAGE:"]
+            or any([line for line in suffix if line.startswith(marker)] != [value]
+                   for marker, value in expected.items())
+            or any(line.startswith(("CLAIM-", "ACTIONABLE SOURCE PACKETS:")) for line in suffix)
+            or audit.get("claim_model_calls") != len(attempts) - len(structural)
+            or audit.get("claim_counts") != {"supported": 1, "refuted": 0, "unverified": 0}):
+        raise ValueError("audited trailer contradicts durable claims, lineage or attempts")
 
 
 def replay_claims(record, handlers, pc, repo):
@@ -250,7 +265,11 @@ def replay_claims(record, handlers, pc, repo):
     from paranoia_local.engines import CodexEngine, Review, default_effort
 
     request = record["request"]
-    predecessor = json.loads(record["predecessor_text"]) if record["predecessor_text"] else {}
+    predecessor = (
+        handlers.cc._from_json(request["lineage"], json.loads(record["predecessor_text"]),
+                               migrate_legacy_members=True)
+        if record["predecessor_text"] else handlers.cc.Lineage(request["lineage"], mode=handlers.cc.PLAN_MODE)
+    )
     calls = iter(record["reviews"])
     captures = [
         pc.sources.Capture(**{**row, "candidate": pc.sources.CandidateSource(**row["candidate"])})
@@ -279,11 +298,12 @@ def replay_claims(record, handlers, pc, repo):
           patch.object(CodexEngine, "resume", respond(resume=True)),
           patch.object(pc.sources, "capture_all", capture)):
         claims, status = handlers._verify_plan_claims(
-            request["plan_text"], predecessor.get("claim_state", {}),
+            request["plan_text"], predecessor.claim_state,
             lineage_id=request["lineage"], round_no=request["round"], stakes=request["stakes"],
             engine=engine, repo=repo, model=model, effort=default_effort(model, fallback="high"),
             plan_repo_path=None, on_progress=None, attempt_ledger=ledger,
-            force_exhaustive=bool(predecessor.get("claim_reverify_required")),
+            force_exhaustive=(predecessor.claim_reverify_required
+                              or handlers._plan_stakes_need_recalibration(predecessor, request["stakes"])),
         )
     recorded = [row for row in record["audit"]["attempt_ledger"] if row["role"].startswith("claim-")]
     if (pending_captures or next(calls, None) is not None or ledger != recorded
@@ -337,9 +357,9 @@ def validate(record, handlers, pc, *, identity, root):
     if (claim["anchor"] != PROPOSITION or claim["proposition"] != PROPOSITION
             or claim["verdict"] != "supported" or not pc._captured_support(claim)):
         raise ValueError("expected release claim or captured cold support missing")
-    validate_report_claims(report, audit, claims, pc)
     validate_attempts(record, handlers)
     replay_claims(record, handlers, pc, root / "repository")
+    validate_report_claims(report, audit, state, handlers, pc)
     qualifying = False
     for index, (item, capture) in enumerate(zip(claim["evidence"], record["captures"], strict=True)):
         if item["url"] != URL or item["relation"] != "supports_claim":

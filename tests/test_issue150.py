@@ -678,15 +678,14 @@ def native_review(text, session):
 
 
 @pytest.fixture
-def native_replay_receipt(tmp_path, monkeypatch):
+def native_replay_receipt(tmp_path, monkeypatch, request):
     from dataclasses import asdict
     from paranoia_local.engines import CodexEngine, default_effort
     from scripts import run_claim_binding_150_acceptance as native
 
     monkeypatch.setattr(h.inert_git, "require_supported_version", lambda: (2, 50, 1))
-    _, fixture = native.prepare_trial(tmp_path)
+    directory, fixture = native.prepare_trial(tmp_path)
     repo = tmp_path / "repository"
-    request = fixture["request"]
     record = dict(**fixture, source={"revision": "fixture"}, reviews=[], captures=[], elapsed_seconds=1)
     quote = "Python 3.11.0, released on 24 October 2022"
     source = _source(url=native.URL, quote=quote)
@@ -720,20 +719,35 @@ def native_replay_receipt(tmp_path, monkeypatch):
         record["captures"].extend(map(asdict, rows))
         return rows
 
-    ledger = []
     engine = CodexEngine()
-    with monkeypatch.context() as scope:
-        # Restore the observed methods even though the harness installs wrappers.
-        scope.setattr(CodexEngine, "run", run)
-        scope.setattr(CodexEngine, "resume", resume)
-        scope.setattr(es, "capture_all", capture)
-        native.observe_evidence_calls(CodexEngine, record)
-        claims, status = h._verify_plan_claims(
-            request["plan_text"], {}, lineage_id=native.LINEAGE, round_no=1, stakes=native.STAKES,
-            engine=engine, repo=repo, model=engine.default_model,
-            effort=default_effort(engine.default_model, fallback="high"), plan_repo_path=None,
-            on_progress=None, attempt_ledger=ledger,
-        )
+    ledger = []
+
+    def verify(prior, *, force_exhaustive=False):
+        with monkeypatch.context() as scope:
+            # Restore the observed methods even though the harness installs wrappers.
+            scope.setattr(CodexEngine, "run", run)
+            scope.setattr(CodexEngine, "resume", resume)
+            scope.setattr(es, "capture_all", capture)
+            native.observe_evidence_calls(CodexEngine, record)
+            return h._verify_plan_claims(
+                fixture["request"]["plan_text"], prior, lineage_id=native.LINEAGE,
+                round_no=fixture["request"]["round"], stakes=native.STAKES, engine=engine,
+                repo=repo, model=engine.default_model, effort=default_effort(engine.default_model, fallback="high"),
+                plan_repo_path=None, on_progress=None, attempt_ledger=ledger, force_exhaustive=force_exhaustive,
+            )
+
+    claims, status = verify({})
+    if getattr(request, "param", False):
+        # The first trial saved claims, then stopped before structural settlement.
+        cc.save_lineage(tmp_path / "state", cc.Lineage(native.LINEAGE, mode=cc.PLAN_MODE, claim_state=claims))
+        (directory / "receipt.json").write_text(json.dumps({"request": fixture["request"], "outcome": "failed"}))
+        _, fixture = native.prepare_trial(tmp_path)
+        assert fixture["request"]["round"] == 2
+        assert json.loads(fixture["predecessor_text"])["review_state"] == {}
+        record.update(**fixture, reviews=[], captures=[])
+        ledger.clear()
+        claims, status = verify(claims, force_exhaustive=True)
+        assert record["reviews"][0]["prompt"].startswith("You are the authoritative external-claim phase")
     assert [row["outcome"] for row in ledger] == [
         "completed", "validation-invalid", "completed", "validation-invalid", "completed",
     ]
@@ -741,14 +755,19 @@ def native_replay_receipt(tmp_path, monkeypatch):
     revision = fixture["fixture_revision"]
     tree = h.orientation.snapshot_tree(repo, revision)
     snapshot = h.orientation.wrap_commit(repo, tree, revision)
-    structural = {"last_round": 1, "snapshot_digest": rc.digest(f"{native.PLAN}\0{snapshot}")}
-    trailer = pc.render_trailer(claims) + "\nLINEAGE: issue150-native (rounds recorded: 1)"
+    plan, round_no = fixture["request"]["plan_text"], fixture["request"]["round"]
+    structural = {"last_round": round_no, "snapshot_digest": rc.digest(f"{plan}\0{snapshot}")}
+    trailer = "\n".join((
+        pc.render_trailer(claims), "LINEAGE: issue150-native (rounds recorded: 1)",
+        rc.attempt_trailer([]), rc.attempt_trailer(ledger).replace("STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1),
+    ))
     record.update(
-        state=dict(review_state=structural, claim_state=claims),
+        state=dict(review_state=structural, claim_state=claims, rounds=1),
         state_relative_path="state/lineages/" + native.LINEAGE + ".json",
         audit=dict(error=False, returncode=0, claim_audit_failed=False, tool="critique_plan",
-                   engine="codex", grounded=True, plan_digest=native.sha(native.PLAN.encode())[:16],
-                   lineage=native.LINEAGE, round=1, claim_status=status, rendered_trailer=trailer,
+                   engine="codex", grounded=True, plan_digest=native.sha(plan.encode())[:16],
+                   lineage=native.LINEAGE, round=round_no, claim_status=status, rendered_trailer=trailer,
+                   claim_model_calls=len(ledger),
                    attempt_ledger=ledger, claim_counts={"supported": 1, "refuted": 0, "unverified": 0}),
         report="review body\n\n" + trailer,
     )
@@ -792,19 +811,40 @@ def test_complete_native_receipt_replays_production_inputs_and_outputs(native_re
         record["audit"]["attempt_ledger"][index] = h._attempt(
             role, CodexEngine(), review, requested_timeout_sec=call["timeout"],
         ).json()
+    if mutation is None:
+        validate_native_receipt(record, tmp_path)
+    else:
+        with pytest.raises(ValueError, match="production replay"):
+            validate_native_receipt(record, tmp_path)
+
+
+def validate_native_receipt(record, root):
+    from scripts import run_claim_binding_150_acceptance as native
     for key in ("state", "audit"):
         record[key + "_text"] = json.dumps(record[key])
         record[key + "_sha256"] = native.sha(record[key + "_text"].encode())
     record["report_sha256"] = native.sha(record["report"].encode())
+    native.validate(record, h, pc, identity=record["source"], root=root)
 
-    def check():
-        native.validate(record, h, pc, identity=record["source"], root=tmp_path)
 
-    if mutation is None:
-        check()
-    else:
-        with pytest.raises(ValueError, match="production replay"):
-            check()
+@pytest.mark.parametrize("native_replay_receipt", [True], indirect=True)
+def test_complete_native_receipt_resumes_after_claims_saved_before_structural_settlement(native_replay_receipt, tmp_path):
+    validate_native_receipt(native_replay_receipt, tmp_path)
+
+
+@pytest.mark.parametrize("line", [
+    "LINEAGE: other (rounds recorded: 1)",
+    "CLAIM-CLOSURE: 0 supported, 0 refuted, 1 unverified",
+    "REVIEW-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
+    "STAGED-ATTEMPTS: total=0 validation-retries=0 validation-invalid=0 execution-failed=0",
+])
+def test_complete_native_receipt_rejects_contradictory_trailer(native_replay_receipt, tmp_path, line):
+    record = native_replay_receipt
+    validate_native_receipt(record, tmp_path)
+    record["audit"]["rendered_trailer"] += "\n" + line
+    record["report"] += "\n" + line
+    with pytest.raises(ValueError, match="audited trailer contradicts"):
+        validate_native_receipt(record, tmp_path)
 
 
 @pytest.mark.parametrize("change", ["readme", "untracked", "snapshot"])
@@ -836,11 +876,16 @@ def test_native_report_replay_requires_full_claim_block():
     claim["capture_provenance"] = [{"evidence_index": 0, "error": "server returned HTTP 503"}]
     full_claim_block = pc.render_trailer(claims)
     assert "ACTIONABLE SOURCE PACKETS:" in full_claim_block
-    structural = "LINEAGE: issue150-native (rounds recorded: 1)\nSTRUCTURAL-PHASE: final"
+    structural = "\n".join((
+        "LINEAGE: issue150-native (rounds recorded: 1)", rc.attempt_trailer([]),
+        rc.attempt_trailer([]).replace("STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1),
+    ))
     trailer = full_claim_block + "\n" + structural
-    audit = {"rendered_trailer": trailer, "claim_counts": {"supported": 1, "refuted": 0, "unverified": 0}}
-    native.validate_report_claims("review body\n\n" + trailer, audit, claims, pc)
+    audit = dict(rendered_trailer=trailer, lineage=native.LINEAGE, attempt_ledger=[], claim_model_calls=0,
+                 claim_counts={"supported": 1, "refuted": 0, "unverified": 0})
+    state = {"claim_state": claims, "rounds": 1}
+    native.validate_report_claims("review body\n\n" + trailer, audit, state, h, pc)
     for invalid in (structural, full_claim_block.split("\nACTIONABLE SOURCE PACKETS:", 1)[0] + "\n" + structural):
         audit["rendered_trailer"] = invalid
         with pytest.raises(ValueError, match="audited trailer"):
-            native.validate_report_claims(trailer + "\n\n" + invalid, audit, claims, pc)
+            native.validate_report_claims(trailer + "\n\n" + invalid, audit, state, h, pc)

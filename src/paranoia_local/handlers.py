@@ -2255,6 +2255,18 @@ def _reopen_unmechanized_for_stakes(lineage: cc.Lineage) -> tuple[str, ...]:
     return reopened
 
 
+def _plan_stakes_need_recalibration(lineage: cc.Lineage, stakes: str | None) -> bool:
+    prior_review = lineage.review_state
+    if (isinstance(prior_review, dict) and prior_review.get("version") == 1
+            and prior_review.get("stakes_digest") == rc.digest(stakes or "")):
+        return False
+    claim_history = pc.normalize_state(lineage.claim_state)
+    return bool(
+        lineage.rounds or lineage.classes or claim_history["claims"]
+        or claim_history.get("debt") or claim_history.get("plan_snapshot")
+    )
+
+
 def _is_legacy_claim_only_phase(
     lineage: cc.Lineage, state: dict[str, Any], *, snapshot: str,
 ) -> bool:
@@ -4020,10 +4032,6 @@ def critique_plan(
             closure.release()
             raise
 
-    claim_history = pc.normalize_state(
-        closure.lineage.claim_state
-        if closure and closure.lineage is not None else None
-    )
     claim_state: dict[str, Any] = (
         closure.lineage.claim_state
         if closure and closure.lineage is not None
@@ -4115,31 +4123,19 @@ def critique_plan(
                 )
                 attempt_ledger.extend(structural_attempts)
                 staged_preflight_failed = True
-    if closure and closure.lineage is not None and not staged_preflight_failed:
-        prior_review = closure.lineage.review_state
-        current_stakes_digest = rc.digest(stakes or "")
-        unknown_calibration = (
-            not isinstance(prior_review, dict)
-            or prior_review.get("version") != 1
-            or prior_review.get("stakes_digest") != current_stakes_digest
-        )
-        has_prior_state = bool(
-            closure.lineage.rounds or closure.lineage.classes
-            or claim_history["claims"] or claim_history.get("debt")
-            or claim_history.get("plan_snapshot")
-        )
-        if (
-            type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
-            and unknown_calibration and has_prior_state
-        ):
-            # Do not mutate the active class view until the complete durable structural
-            # register has passed its raw concession/debt preflight above.
-            closure.lineage.claim_reverify_required = True
-            stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
-            closure.reopened_class_ids = tuple(dict.fromkeys(
-                (*closure.reopened_class_ids, *stakes_reopened)
-            ))
-            blocks = closure._blocks()
+    if (
+        closure and closure.lineage is not None and not staged_preflight_failed
+        and type(engine) in (eng.CodexEngine, eng.ClaudeEngine)
+        and _plan_stakes_need_recalibration(closure.lineage, stakes)
+    ):
+        # Do not mutate the active class view until the complete durable structural
+        # register has passed its raw concession/debt preflight above.
+        closure.lineage.claim_reverify_required = True
+        stakes_reopened = _reopen_unmechanized_for_stakes(closure.lineage)
+        closure.reopened_class_ids = tuple(dict.fromkeys(
+            (*closure.reopened_class_ids, *stakes_reopened)
+        ))
+        blocks = closure._blocks()
     if claim_verification and not staged_preflight_failed:
         claim_started = time.monotonic()
         if closure and closure.unavailable:

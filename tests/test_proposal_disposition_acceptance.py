@@ -18,6 +18,7 @@ _PLAN_CLAIM_NODES = {
     "critique_plan", "_verify_plan_claims", "_CapturedClaimEngine", "_EvidencePhaseReview",
     "_ValidationReview",
     "_plan_evidence_batch_limit", "_plan_capture_reserve",
+    "_plan_stakes_need_recalibration",
     "PLAN_SOURCES_PER_CAPTURE_RESERVE", "MIN_PLAN_EVIDENCE_BATCHES",
     "PLAN_CLAIMS_PER_EVIDENCE_BATCH", "PLAN_EVIDENCE_VALIDATION_CORRECTIONS",
     "MAX_PLAN_CAPTURE_SOURCES", "MAX_PLAN_BINDING_BATCHES", "MAX_PLAN_ATTESTATION_BATCHES",
