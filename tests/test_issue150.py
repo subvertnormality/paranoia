@@ -121,8 +121,9 @@ def public(monkeypatch, repo, tmp_path, shared, *, lineage="issue150", round_no=
          "propose_patch": False},
         engine=Provider(shared), log_dir=tmp_path / "logs",
     )
-    assert "CLAIM-AUDIT-LOG:" in report
     state = cc.load_lineage(cc.default_state_root(), lineage, stamp="T", mode=cc.PLAN_MODE).claim_state
+    if isinstance(state["debt"], dict) and state["debt"].get("audit_failed"):
+        assert "CLAIM-AUDIT-LOG:" in report
     audit = json.loads(max((tmp_path / "logs").glob("*.json"), key=lambda p: p.stat().st_mtime_ns).read_text())
     return report, state, audit
 

@@ -4359,7 +4359,8 @@ def critique_plan(
                             if str(item.get("role", "")).startswith("claim-")
                         ),
                         "claim_audit_failed": claim_failed_for_log if claim_verification else None,
-                        "claim_audit_debt": deepcopy(normalized_for_log.get("debt")) if claim_verification else None,
+                        **({"claim_audit_debt": normalized_for_log["debt"]}
+                           if claim_failed_for_log else {}),
                         "claim_counts": (
                             None if claim_failed_for_log else claim_counts_for_log
                         ),
@@ -4490,7 +4491,7 @@ def critique_plan(
             and normalized_claim_log_state["claims"] else None
         ),
         "claim_audit_failed": claim_audit_failed if claim_verification else None,
-        "claim_audit_debt": deepcopy(normalized_claim_log_state.get("debt")) if claim_verification else None,
+        **({"claim_audit_debt": normalized_claim_log_state["debt"]} if claim_audit_failed else {}),
         # The retry's register is what actually changed durable state, so the original
         # (rejected) block alone would misreport the round.
         "retry_register": closure.retry_register if closure else None,
@@ -4512,7 +4513,7 @@ def critique_plan(
     if proposal_text:
         body_text += "\n\n" + proposal_text
     body_text += _inert_proposal(proposal_inert)
-    if claim_verification and claim_audit_path is not None:
+    if claim_audit_failed and claim_audit_path is not None:
         body_text += "\n\nCLAIM-AUDIT-LOG: " + rc.trailer_diagnostic(str(claim_audit_path))
     if trailer:
         return f"{body_text}\n\n{trailer}"
