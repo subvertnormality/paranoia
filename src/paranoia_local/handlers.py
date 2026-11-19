@@ -5334,13 +5334,12 @@ class _CapturedClaimEngine:
                     prompt_limit = self._source_prompt_limit("binding", size, allowance)
                 if prompt_limit is not None:
                     self.source_prompt_limits[key] = prompt_limit
-                    prefix = (
-                        pc.BINDING_FAILURE_PREFIX if prompt_limit["phase"] == "binding"
-                        else pc.ATTESTATION_FAILURE_PREFIX
+                    error = (
+                        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+                        if prompt_limit["phase"] == "binding"
+                        else pc.ATTESTATION_FAILURE_PREFIX + pc.prompt_limit_detail(prompt_limit)
                     )
-                    captures[key] = replace(
-                        capture, text=None, error=prefix + external_sources.BINDING_BUDGET_ERROR,
-                    )
+                    captures[key] = replace(capture, text=None, error=error)
                     continue
             if starts_batch:
                 batches.append(current)
@@ -5649,12 +5648,11 @@ class _CapturedClaimEngine:
 
         def prompt_limit(rows: list[dict[str, Any]], limit: int) -> str:
             characters = self._attestation_prompt_size(rows)
+            failure = self._source_prompt_limit("attestation", characters, limit)
             for row in rows:
                 key = (row["claim_index"], row["evidence_index"])
-                self.source_prompt_limits[key] = self._source_prompt_limit(
-                    "attestation", characters, limit,
-                )
-            return "complete attestation prompt exceeds the source allowance"
+                self.source_prompt_limits[key] = failure
+            return pc.prompt_limit_detail(failure)
         ordinary_items = [
             row for row in items
             if (row["claim_index"], row["evidence_index"]) not in self.expanded_captures
@@ -5750,6 +5748,8 @@ class _CapturedClaimEngine:
                         "attestation reason exceeds "
                         f"{MAX_ATTESTATION_REASON_CHARS} characters"
                     )
+                for field in ("authority_reason", "entailment_reason"):
+                    pc._require_utf8(row[field], f"attestation.{field}")
                 parsed[key] = row
             return parsed
 

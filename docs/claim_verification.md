@@ -173,7 +173,8 @@ correction and repeat attestation.
 Each resumed claim reply must return the requested provider session. A different or missing
 handle fails validation before the reply can govern a claim or supply a continuation.
 Discovery treats incorrectly typed claim fields as validation failures and uses its
-existing correction window.
+existing correction window. Claim roles also validate decoded text for strict UTF-8
+before passing it to a later prompt or persisting it as governing evidence.
 If a row is ineligible for expansion or its complete expanded prompt cannot fit, only that capture
 becomes unusable with the bounded server-owned binding-budget reason; it cannot abort unrelated
 claim captures. Unavailable captures bypass model binding and retain their known server-owned

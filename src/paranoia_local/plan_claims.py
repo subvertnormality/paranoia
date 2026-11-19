@@ -410,6 +410,10 @@ def parse_audit(
     fatal = ["unexpected text after claim audit JSON"] if remainder else []
     if not isinstance(value, dict) or set(value) != {"claims", "coverage"}:
         raise AuditError("audit must be an object with exactly claims and coverage", text)
+    try:
+        _require_utf8(json.dumps(value, ensure_ascii=False), "claim audit JSON")
+    except ValueError as exc:
+        raise AuditError(str(exc), text) from exc
     claims, coverage = value["claims"], value["coverage"]
     if not isinstance(claims, list):
         raise AuditError("claims must be an array", text)
@@ -1417,6 +1421,13 @@ def render_trailer(state_raw: Any) -> str:
     return "\n".join(lines)
 
 
+def prompt_limit_detail(limit: dict[str, Any]) -> str:
+    return (
+        f"{limit['phase']} prompt needs {limit['characters']} characters "
+        f"against a {limit['allowance']}-character allowance"
+    )
+
+
 def _packet_lines(claim: dict[str, Any]) -> list[str]:
     lines = [
         f"- CLAIM {claim.get('claim_id')} — {str(claim.get('verdict', '')).upper()}",
@@ -1444,10 +1455,7 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
         lines.append(f"  Evidence status: {name}-FAILED ({detail})")
         for row in limits:
             limit = row["prompt_limit"]
-            lines.append(
-                f"  Evidence limit for source {row['evidence_index'] + 1}: {phase} prompt needs "
-                f"{limit['characters']} characters against a {limit['allowance']}-character allowance"
-            )
+            lines.append(f"  Evidence limit for source {row['evidence_index'] + 1}: {prompt_limit_detail(limit)}")
         lines.append("  Next action: " + evidence_recovery(
             "limit" if limits else None, phase=phase, frozen=verdict == "supported",
         ))
@@ -1718,9 +1726,17 @@ PRIOR EVIDENCE PACKETS (JSON):
 {scope_text}"""
 
 
+def _require_utf8(value: str, name: str) -> None:
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ValueError(f"{name} must encode as strict UTF-8") from exc
+
+
 def _one_line(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
+    _require_utf8(value, name)
     return " ".join(value.split())
 
 

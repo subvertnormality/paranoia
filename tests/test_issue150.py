@@ -61,14 +61,16 @@ class Provider:
         else:
             rows = json.loads(prompt.rsplit("\n\n", 1)[1])
             keys = tuple((r["claim_index"], r["evidence_index"]) for r in rows)
+            attempts = sum(role == self.role for role, _, _ in s["calls"])
+            surrogate = s.get("surrogate_replies", {}).get(self.role, 0) >= attempts
             if self.role == "evidence-binding":
                 text = h.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [
                     {"claim_index": i, "evidence_index": j, "usable": True,
-                     "location": f"record {i}", "passage": s["claims"][i]["evidence"][j]["quote"]}
+                     "location": "\ud800" if surrogate else f"record {i}",
+                     "passage": s["claims"][i]["evidence"][j]["quote"]}
                     for i, j in keys
                 ]})
             else:
-                attempts = sum(role == self.role for role, _, _ in s["calls"])
                 if s.get("attestation_execution_failure") == attempts:
                     return Review(
                         "provider failed", "fixture-session", "actual attestation stdout",
@@ -77,7 +79,8 @@ class Provider:
                     )
                 text = "=== EVIDENCE ATTESTATION JSON ===\n" + json.dumps({"attestations": [
                     {"claim_index": i, "evidence_index": j, "publisher_authority": True,
-                     "authority_reason": f"official publisher {i}", "passage_entailment": True,
+                     "authority_reason": "\ud800" if surrogate else f"official publisher {i}",
+                     "passage_entailment": True,
                      "entailment_reason": f"exact record {i}"}
                     for i, j in keys
                 ]})
@@ -416,12 +419,19 @@ def test_oversized_source_recovery_names_complete_bound(repo, tmp_path, monkeypa
     texts[url] = "x" * enlarged + "\n" + claims[0]["anchor"]
     capture_fixture(monkeypatch, texts)
     report, state, _ = public(monkeypatch, repo, tmp_path, dict(plan=plan, claims=claims))
-    provenance = next(iter(state["claims"].values()))["capture_provenance"][0]
+    claim = next(iter(state["claims"].values()))
+    provenance = claim["capture_provenance"][0]
     limit = provenance["prompt_limit"]
     assert limit["kind"] == "limit" and limit["phase"] == phase
     assert limit["characters"] > limit["allowance"] == allowance
     assert f"{phase} prompt needs {limit['characters']} characters" in report
     assert "smaller complete authoritative source" in report
+    if phase == "attestation":
+        detail = f"attestation prompt needs {limit['characters']} characters against a {allowance}-character allowance"
+        error = pc.ATTESTATION_FAILURE_PREFIX + detail
+        assert provenance["error"] == error
+        assert claim["evidence"][0]["quote"] == "Server capture unavailable: " + error
+        assert error in report and es.BINDING_BUDGET_ERROR not in report
 
 
 def test_prompt_limit_guidance_requires_typed_provenance_and_preserves_frozen_sibling():
@@ -559,6 +569,40 @@ def test_wrong_claim_field_types_use_captured_discovery_correction(repo, tmp_pat
         assert debt["failure_phase"] == "discovery" and debt["failure_kind"] == "validation"
         assert debt["attempts"] == [initial_attempt, correction]
         assert debt["reason"] in report and not state["claims"]
+
+
+@pytest.mark.parametrize("phase,provider_role", [
+    ("discovery", "evidence-discovery"), ("binding", "evidence-binding"), ("attestation", "evidence-text"),
+])
+@pytest.mark.parametrize("repair", [False, True])
+def test_unpaired_surrogate_stays_in_its_producing_role(repo, tmp_path, monkeypatch, phase, provider_role, repair):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    malformed = dict(claims[0], evidence=[dict(claims[0]["evidence"][0], title="broken \ud800 title")])
+    shared = dict(plan=plan, claims=claims, surrogate_replies={provider_role: 1 if repair else 2})
+    if phase == "discovery":
+        shared["discovery_claims"] = {1: [malformed], 2: claims if repair else [malformed]}
+    if phase == "discovery" and not repair:
+        monkeypatch.setattr(es, "capture_all", lambda *a, **k: pytest.fail("invalid discovery reached capture"))
+    else:
+        capture_fixture(monkeypatch, texts)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    attempts = [row for row in audit["attempt_ledger"] if row["role"].startswith("claim-" + phase)]
+    assert [row["outcome"] for row in attempts] == ["validation-invalid", "completed" if repair else "validation-invalid"]
+    rejected = attempts[0]
+    assert "strict UTF-8" in rejected["validation_issue"]
+    assert "\\ud800" in rejected["raw_excerpt"]
+    assert attempts[1]["session_ref"] == rejected["session_ref"] == "fixture-session"
+    for _, prompt, _ in shared["calls"]:
+        prompt.encode("utf-8", errors="strict")
+    if repair:
+        assert next(iter(state["claims"].values()))["verdict"] == "supported"
+    else:
+        debt = state["debt"]
+        assert debt == audit["claim_audit_debt"]
+        assert debt["failure_phase"] == phase and debt["failure_kind"] == "validation"
+        assert debt["attempts"] == attempts
+        assert "strict UTF-8" in report and not state["claims"]
+        assert audit["attempt_ledger"][-1] == attempts[-1]
 
 
 @pytest.mark.parametrize("returned", [None, "another-session", "session"])
