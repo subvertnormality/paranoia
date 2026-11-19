@@ -10,6 +10,7 @@ import runpy
 import subprocess
 import sys
 import tempfile
+from threading import Lock
 import time
 from unittest.mock import patch
 
@@ -31,6 +32,7 @@ RELEASE_PASSAGE = re.compile(
     r"(?:24 October 2022|October 24, 2022)\b", re.IGNORECASE,
 )
 HARNESS = ("scripts/run_claim_binding_150_acceptance.py", "scripts/benchmark_bootstrap.py")
+STRUCTURAL_ROLE = "evidence-repository"
 
 
 def sha(data):
@@ -150,12 +152,13 @@ def evidence_call(engine, args, kwargs, *, resume):
     prompt, _, model, effort, web_search = args[1:] if resume else args
     return dict(role=engine.role, prompt=prompt, model=model, effort=effort,
                 web_search=web_search, timeout=kwargs.get("timeout"),
-                resumed_session=args[0] if resume else None)
+                resumed_session=args[0] if resume else None,
+                response_schema=kwargs.get("response_schema"))
 
 
 def observe_evidence_calls(engine_type, record):
     """Record the arguments and reply at the actual engine call boundary."""
-    roles = {"evidence-discovery", "evidence-binding", "evidence-text"}
+    roles = {"evidence-discovery", "evidence-binding", "evidence-text", STRUCTURAL_ROLE}
 
     def wrap(method, *, resume):
         def observed(engine, *args, **kwargs):
@@ -172,11 +175,29 @@ def observe_evidence_calls(engine_type, record):
     engine_type.resume = wrap(engine_type.resume, resume=True)
 
 
-def validate_attempts(record, handlers):
+def read_native_review(actual):
     from paranoia_local.engines import CodexEngine, Review
 
+    required = {"text", "session_ref", "returncode", "error", "duration_ms",
+                "raw", "failure_detail", "stderr"}
+    if not required <= actual["review"].keys():
+        raise ValueError("missing observed Review execution or channel field")
+    review = Review(**actual["review"])
+    extracted = CodexEngine().parse_output(review.raw)
+    if (review.error or extracted.error or type(review.returncode) is not int or review.returncode != 0
+            or type(review.duration_ms) is not int or review.duration_ms < 0):
+        raise ValueError("native execution or duration failure")
+    if (not review.session_ref or extracted.text != review.text
+            or extracted.session_ref != review.session_ref):
+        raise ValueError("returned review differs from native stdout extraction")
+    return review
+
+
+def validate_attempts(record, handlers):
+    from paranoia_local.engines import CodexEngine
+
     rows = [r for r in record["audit"]["attempt_ledger"] if r["role"].startswith("claim-")]
-    actuals = record["reviews"]
+    actuals = [call for call in record["reviews"] if call["role"] != STRUCTURAL_ROLE]
     if len(rows) != len(actuals):
         raise ValueError("native review custody/attempt inventory mismatch")
     expected_roles = (
@@ -198,22 +219,13 @@ def validate_attempts(record, handlers):
             role = phase + "-validation-retry" if retry else phase
             if not {"role", "timeout", "resumed_session", "review", "prompt"} <= actual.keys():
                 raise ValueError("missing observed engine invocation field")
-            required = {"text", "session_ref", "returncode", "error", "duration_ms",
-                        "raw", "failure_detail", "stderr"}
-            if not required <= actual["review"].keys():
-                raise ValueError("missing observed Review execution or channel field")
-            review = Review(**actual["review"])
-            extracted = CodexEngine().parse_output(review.raw)
-            if review.error or extracted.error:
-                raise ValueError("native execution reported an error")
-            if extracted.text != review.text or extracted.session_ref != review.session_ref:
-                raise ValueError("returned review differs from native stdout extraction")
+            review = read_native_review(actual)
             prior_session = initial_session if retry else (
                 discovery_session if phase == "claim-binding" else None
             )
             if (actual["role"] != provider_role or actual["timeout"] != timeout
                     or actual["resumed_session"] != prior_session
-                    or not review.session_ref or (retry and review.session_ref != initial_session)):
+                    or (retry and review.session_ref != initial_session)):
                 raise ValueError("native role, engine timeout, or session mismatch")
             projection = handlers._attempt(
                 role, CodexEngine(), review, requested_timeout_sec=actual["timeout"],
@@ -224,9 +236,8 @@ def validate_attempts(record, handlers):
                 if row.get(key) != projection[key] or row.get(key) is None:
                     raise ValueError(f"native attempt channel/metadata mismatch: {key}")
             expected_outcome = "validation-invalid" if corrected and not retry else "completed"
-            if (row["outcome"] != expected_outcome or row["returncode"] != 0
-                    or type(row["duration_ms"]) is not int or row["duration_ms"] < 0):
-                raise ValueError("native execution, correction or duration failure")
+            if row["outcome"] != expected_outcome:
+                raise ValueError("native evidence correction did not complete")
             index += 1
         if phase == "claim-discovery":
             discovery_session = review.session_ref
@@ -234,43 +245,49 @@ def validate_attempts(record, handlers):
         raise ValueError("unexpected native evidence role after complete graph")
 
 
-def validate_report_claims(report, audit, state, handlers, pc):
-    trailer = audit.get("rendered_trailer")
-    claim_block = trailer.split("\n", 1)[1] if (
-        isinstance(trailer, str) and trailer.startswith("REVIEW-ROUTING:") and "\n" in trailer
-    ) else trailer
-    expected_claims = pc.render_trailer(state["claim_state"]) + "\n"
-    if (not isinstance(claim_block, str) or not report.endswith("\n\n" + trailer)
-            or not claim_block.startswith(expected_claims)):
-        raise ValueError("audited trailer and returned report disagree with durable claims")
-    suffix = claim_block[len(expected_claims):].splitlines()
-    attempts = audit["attempt_ledger"]
-    structural = [row for row in attempts if not row["role"].startswith("claim-")]
-    expected = {
-        "LINEAGE:": f"LINEAGE: {audit['lineage']} (rounds recorded: {state['rounds']})",
-        "STAGED-ATTEMPTS:": handlers.rc.attempt_trailer(structural),
-        "REVIEW-ATTEMPTS:": handlers.rc.attempt_trailer(attempts).replace("STAGED-ATTEMPTS:", "REVIEW-ATTEMPTS:", 1),
-    }
-    if (not suffix or suffix[0] != expected["LINEAGE:"]
-            or any([line for line in suffix if line.startswith(marker)] != [value]
-                   for marker, value in expected.items())
-            or any(line.startswith(("CLAIM-", "ACTIONABLE SOURCE PACKETS:")) for line in suffix)
-            or audit.get("claim_model_calls") != len(attempts) - len(structural)
-            or audit.get("claim_counts") != {"supported": 1, "refuted": 0, "unverified": 0}):
-        raise ValueError("audited trailer contradicts durable claims, lineage or attempts")
+def audit_projection(audit):
+    """The run ID, clock readings and parallel lane start order vary on replay."""
+    result = {key: value for key, value in audit.items()
+              if key not in {"timestamp", "run_id", "claim_duration_ms"}}
+    rows = result["attempt_ledger"]
+    structural = {row["role"]: row["sequence"] for row in rows if not row["role"].startswith("claim-")}
+    if (not structural or any(type(seq) is not int for seq in structural.values())
+            or sorted(structural.values()) != list(range(1, len(structural) + 1))):
+        raise ValueError("invalid tracked structural attempt sequence")
+    if any(seq <= structural.get(role.removesuffix("-validation-retry"), seq)
+           for role, seq in structural.items() if role.endswith("-validation-retry")):
+        raise ValueError("structural correction precedes its initial response")
+    if "consolidation" in structural and any(
+        seq >= structural["consolidation"] for role, seq in structural.items() if role.startswith("census-")
+    ):
+        raise ValueError("structural consolidation precedes lane completion")
+    result["attempt_ledger"] = [
+        {key: value for key, value in row.items() if key != "sequence"}
+        if row["role"] in structural else row for row in rows
+    ]
+    if result.get("rejected_payloads"):
+        result["rejected_payloads"] = [
+            {key: value for key, value in row.items() if key != "sequence"}
+            for row in sorted(result["rejected_payloads"], key=lambda row: row["role"])
+        ]
+    return result
 
 
-def replay_claims(record, handlers, pc, repo):
-    """Use production prompts, packing, validation and settlement without external I/O."""
-    from paranoia_local.engines import CodexEngine, Review, default_effort
+def replay_review(record, handlers, pc):
+    """Reconstruct tracked critique_plan from observed responses in a private state root."""
+    from paranoia_local.engines import CodexEngine
 
     request = record["request"]
-    predecessor = (
-        handlers.cc._from_json(request["lineage"], json.loads(record["predecessor_text"]),
-                               migrate_legacy_members=True)
-        if record["predecessor_text"] else handlers.cc.Lineage(request["lineage"], mode=handlers.cc.PLAN_MODE)
-    )
-    calls = iter(record["reviews"])
+    def call_key(call):
+        return call["role"], call["resumed_session"], call["prompt"]
+
+    pending = {}
+    for call in record["reviews"]:
+        key = call_key(call)
+        if key in pending:
+            raise ValueError("duplicate observed native invocation")
+        pending[key] = (call, read_native_review(call))
+    calls_lock = Lock()
     captures = [
         pc.sources.Capture(**{**row, "candidate": pc.sources.CandidateSource(**row["candidate"])})
         for row in record["captures"]
@@ -279,11 +296,12 @@ def replay_claims(record, handlers, pc, repo):
 
     def respond(*, resume):
         def respond_to_call(engine, *args, **kwargs):
-            expected = next(calls, None)
             observed = evidence_call(engine, args, kwargs, resume=resume)
-            if expected is None or {k: v for k, v in expected.items() if k != "review"} != observed:
+            with calls_lock:
+                expected, review = pending.pop(call_key(observed), ({}, None))
+            if {k: v for k, v in expected.items() if k != "review"} != observed:
                 raise ValueError(f"observed native {engine.role} invocation differs from production replay")
-            return Review(**expected["review"])
+            return review
         return respond_to_call
 
     def capture(candidates, **kwargs):
@@ -291,25 +309,23 @@ def replay_claims(record, handlers, pc, repo):
             raise ValueError("native capture inventory differs from production replay")
         return pending_captures.pop()
 
-    ledger = []
-    engine = CodexEngine()
-    model = engine.default_model
-    with (patch.object(CodexEngine, "run", respond(resume=False)),
-          patch.object(CodexEngine, "resume", respond(resume=True)),
-          patch.object(pc.sources, "capture_all", capture)):
-        claims, status = handlers._verify_plan_claims(
-            request["plan_text"], predecessor.claim_state,
-            lineage_id=request["lineage"], round_no=request["round"], stakes=request["stakes"],
-            engine=engine, repo=repo, model=model, effort=default_effort(model, fallback="high"),
-            plan_repo_path=None, on_progress=None, attempt_ledger=ledger,
-            force_exhaustive=(predecessor.claim_reverify_required
-                              or handlers._plan_stakes_need_recalibration(predecessor, request["stakes"])),
-        )
-    recorded = [row for row in record["audit"]["attempt_ledger"] if row["role"].startswith("claim-")]
-    if (pending_captures or next(calls, None) is not None or ledger != recorded
-            or not status.startswith("parsed") or status != record["audit"]["claim_status"]
-            or claims != record["state"]["claim_state"]):
-        raise ValueError("native attempts or durable claims differ from production replay")
+    with tempfile.TemporaryDirectory(prefix="paranoia-150-replay-") as scratch:
+        scratch = Path(scratch)
+        state_root = scratch / "state"
+        state_file = scratch / record["state_relative_path"]
+        if record["predecessor_text"] is not None:
+            state_file.parent.mkdir(parents=True)
+            state_file.write_bytes(record["predecessor_text"].encode())
+        with (patch.dict(os.environ, {"PARANOIA_STATE_ROOT": str(state_root)}),
+              patch.object(CodexEngine, "run", respond(resume=False)),
+              patch.object(CodexEngine, "resume", respond(resume=True)),
+              patch.object(pc.sources, "capture_all", capture)):
+            report = handlers.critique_plan(request, engine=CodexEngine(), log_dir=scratch / "logs")
+        audits = list((scratch / "logs").glob("*-critique_plan-*.json"))
+        if (pending_captures or pending or len(audits) != 1 or not state_file.is_file()
+                or report != record["report"] or json.loads(state_file.read_bytes()) != record["state"]
+                or audit_projection(json.loads(audits[0].read_bytes())) != audit_projection(record["audit"])):
+            raise ValueError("native report, attempts or durable state differ from production replay")
 
 
 def validate_fixture_snapshot(root, revision, plan, state, handlers):
@@ -344,6 +360,7 @@ def validate(record, handlers, pc, *, identity, root):
     if (audit["error"] or audit["returncode"] != 0 or audit["claim_audit_failed"]
             or audit["tool"] != "critique_plan" or audit["engine"] != record["request"]["engine"]
             or audit["grounded"] is not True or audit["plan_digest"] != sha(plan.encode())[:16]
+            or not audit.get("class_closure") or not isinstance(audit.get("staged_settlement"), dict)
             or audit["lineage"] != record["request"]["lineage"]
             or audit["round"] != record["request"]["round"]
             or state["review_state"]["last_round"] != record["request"]["round"]
@@ -358,8 +375,7 @@ def validate(record, handlers, pc, *, identity, root):
             or claim["verdict"] != "supported" or not pc._captured_support(claim)):
         raise ValueError("expected release claim or captured cold support missing")
     validate_attempts(record, handlers)
-    replay_claims(record, handlers, pc, root / "repository")
-    validate_report_claims(report, audit, state, handlers, pc)
+    replay_review(record, handlers, pc)
     qualifying = False
     for index, (item, capture) in enumerate(zip(claim["evidence"], record["captures"], strict=True)):
         if item["url"] != URL or item["relation"] != "supports_claim":
