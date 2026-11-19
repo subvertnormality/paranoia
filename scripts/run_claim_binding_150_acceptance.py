@@ -61,14 +61,24 @@ def read_predecessor(root):
     return path.read_bytes().decode("utf-8")
 
 
-def request_for(root, predecessor):
-    round_no = 1
+def request_for(root, predecessor, *, attempted_round=0):
+    last_round = 0
+    supported = False
     if predecessor is not None:
-        last_round = json.loads(predecessor)["review_state"].get("last_round", 0)
+        state = json.loads(predecessor)
+        last_round = state["review_state"].get("last_round", 0)
         if type(last_round) is not int or last_round < 0:
             raise ValueError("invalid durable predecessor round")
-        round_no = last_round + 1
-    return dict(repo_path=str(root / "repository"), plan_text=PLAN, engine="codex",
+        supported = any(row.get("verdict") == "supported"
+                        for row in state.get("claim_state", {}).get("claims", {}).values())
+    round_no = max(last_round, attempted_round) + 1
+    # Moving the same assertion under a new heading reopens it through the
+    # ordinary edit-cone rules. A rejected fixture receipt cannot qualify from
+    # frozen support and does not need to rewrite its durable predecessor.
+    plan = PLAN
+    if supported:
+        plan = plan.replace("# Release premise\n", f"# Release premise (qualification round {round_no})\n", 1)
+    return dict(repo_path=str(root / "repository"), plan_text=plan, engine="codex",
                 round=round_no, lineage=LINEAGE, propose_patch=False, stakes=STAKES)
 
 
@@ -97,17 +107,36 @@ def prepare_trial(root):
         )
     revision = fixture_revision(root)
     predecessor = read_predecessor(root)
-    request = request_for(root, predecessor)
     trials = root / "trials"
     trials.mkdir(exist_ok=True)
     previous = {path.relative_to(trials).as_posix(): sha(path.read_bytes())
                 for path in sorted(trials.glob("round-*/receipt.json"))}
+    request = request_for(root, predecessor, attempted_round=previous_round(root, previous))
     directory = Path(tempfile.mkdtemp(prefix=f"round-{request['round']:03d}-", dir=trials))
     return directory, dict(
         request=request, fixture_revision=revision, prior_receipts=previous,
         predecessor_text=predecessor,
         predecessor_sha256=sha(predecessor.encode()) if predecessor else None,
     )
+
+
+def previous_round(root, receipts):
+    latest = 0
+    for relative, digest in receipts.items():
+        path = Path(relative)
+        if (len(path.parts) != 2 or not path.parts[0].startswith("round-")
+                or path.name != "receipt.json"):
+            raise ValueError("invalid predecessor trial path")
+        raw = (root / "trials" / path).read_bytes()
+        if sha(raw) != digest:
+            raise ValueError("retained predecessor trial bytes changed")
+        request = json.loads(raw)["request"]
+        label = request["round"]
+        if (type(label) is not int or label < 1 or request["lineage"] != LINEAGE
+                or not path.parts[0].startswith(f"round-{label:03d}-")):
+            raise ValueError("invalid predecessor trial round or lineage")
+        latest = max(latest, label)
+    return latest
 
 
 def observe_evidence_calls(engine_type, record):
@@ -157,6 +186,12 @@ def validate_attempts(record, handlers):
                 raise ValueError("invalid initial reply lacks successful same-session repair")
             row, actual = rows[index], actuals[index]
             role = phase + "-validation-retry" if retry else phase
+            if not {"role", "timeout", "resumed_session", "review", "prompt"} <= actual.keys():
+                raise ValueError("missing observed engine invocation field")
+            required = {"text", "session_ref", "returncode", "error", "duration_ms",
+                        "raw", "failure_detail", "stderr"}
+            if not required <= actual["review"].keys():
+                raise ValueError("missing observed Review execution or channel field")
             review = Review(**actual["review"])
             extracted = CodexEngine().parse_output(review.raw)
             if review.error or extracted.error:
@@ -193,14 +228,40 @@ def indexed_row(text, marker, key, index):
     prefix, separator, body = text.partition(marker)
     if prefix.strip() or not separator:
         raise ValueError("missing native evidence envelope")
+    return packet_row(json.loads(body)[key], index)
+
+
+def packet_row(rows, index):
     matches = [
-        row for row in json.loads(body)[key]
+        row for row in rows
         if type(row["claim_index"]) is int and row["claim_index"] == 0
         and type(row["evidence_index"]) is int and row["evidence_index"] == index
     ]
     if len(matches) != 1:
         raise ValueError("native evidence response omitted or repeated the governing index")
     return matches[0]
+
+
+def validate_report_claims(report, audit, claims, pc):
+    trailer = audit.get("rendered_trailer")
+    expected = [line for line in pc.render_trailer(claims).splitlines() if line.startswith("CLAIM-")]
+    if (not isinstance(trailer, str) or not report.endswith("\n\n" + trailer)
+            or [line for line in trailer.splitlines() if line.startswith("CLAIM-")] != expected
+            or audit.get("claim_counts") != {"supported": 1, "refuted": 0, "unverified": 0}):
+        raise ValueError("audited trailer and returned report disagree with durable claims")
+
+
+def validate_binding_input(prompt, index, candidate, capture, pc):
+    row = packet_row(json.loads(prompt.rsplit("\n\n", 1)[1]), index)
+    source = row["capture"]
+    if (row["proposition"] != PROPOSITION or row["binding_target"] != PROPOSITION
+            or row["candidate"] != capture["candidate"]
+            or any(candidate.get(key) != value for key, value in row["candidate"].items())
+            or source["usable"] is not True or source["capture_ref"] is not None
+            or source["line_numbered_text"] != pc.sources.numbered_text(capture["text"])
+            or any(source[key] != capture[key] for key in
+                   ("final_url", "status", "content_type", "content_sha256", "text_sha256"))):
+        raise ValueError("observed binding packet differs from indexed discovery and capture")
 
 
 def validate(record, handlers, pc, *, identity, root):
@@ -215,21 +276,18 @@ def validate(record, handlers, pc, *, identity, root):
             raise ValueError(f"changed retained {key}")
     if sha(record["report"].encode()) != record["report_sha256"]:
         raise ValueError("changed retained report")
-    if record["request"] != request_for(root, predecessor):
+    attempted_round = previous_round(root, record["prior_receipts"])
+    if record["request"] != request_for(root, predecessor, attempted_round=attempted_round):
         raise ValueError("qualification input or provider mismatch")
     if record["fixture_revision"] != fixture_revision(root):
         raise ValueError("qualification repository mismatch")
-    for relative, digest in record["prior_receipts"].items():
-        path = Path(relative)
-        if (len(path.parts) != 2 or not path.parts[0].startswith("round-")
-                or path.name != "receipt.json" or sha((root / "trials" / path).read_bytes()) != digest):
-            raise ValueError("retained predecessor trial bytes changed")
+    plan = record["request"]["plan_text"]
     audit, state, report = record["audit"], record["state"], record["report"]
     if (audit["error"] or audit["returncode"] != 0 or audit["claim_audit_failed"]
             or audit["lineage"] != record["request"]["lineage"]
             or audit["round"] != record["request"]["round"]
             or state["review_state"]["last_round"] != record["request"]["round"]
-            or state["claim_state"]["plan_snapshot"] != PLAN
+            or state["claim_state"]["plan_snapshot"] != plan
             or record["state_relative_path"] != "state/lineages/" + record["request"]["lineage"] + ".json"):
         raise ValueError("failed or misbound native invocation")
     claims = state["claim_state"]
@@ -237,11 +295,11 @@ def validate(record, handlers, pc, *, identity, root):
         raise ValueError("expected exactly one supported, debt-free external claim")
     claim = next(iter(claims["claims"].values()))
     if (claim["anchor"] != PROPOSITION or claim["proposition"] != PROPOSITION
-            or claim["verdict"] != "supported" or not pc._captured_support(claim)
-            or "CLAIM-CLOSURE: 1 supported, 0 refuted, 0 unverified" not in report):
-        raise ValueError("expected release claim/report or captured cold support missing")
+            or claim["verdict"] != "supported" or not pc._captured_support(claim)):
+        raise ValueError("expected release claim or captured cold support missing")
+    validate_report_claims(report, audit, claims, pc)
     accepted = validate_attempts(record, handlers)
-    discovery = pc.parse_audit(accepted["claim-discovery"][0].text, PLAN)
+    discovery = pc.parse_audit(accepted["claim-discovery"][0].text, plan)
     if (len(discovery.claims) != 1 or discovery.claims[0]["anchor"] != PROPOSITION
             or discovery.claims[0]["proposition"] != PROPOSITION
             or discovery.claims[0]["verdict"] != "supported"):
@@ -249,7 +307,7 @@ def validate(record, handlers, pc, *, identity, root):
     candidates = discovery.claims[0]["evidence"]
     if len(candidates) != len(record["captures"]) or len(candidates) != len(claim["evidence"]):
         raise ValueError("discovery, captures and durable evidence have different inventories")
-    binding = accepted["claim-binding"][0].text
+    binding, binding_prompt = accepted["claim-binding"]
     attestation, attestation_prompt = accepted["claim-attestation"]
     cold_packet = json.loads(attestation_prompt.rsplit("\n\n", 1)[1])
     qualifying = False
@@ -274,7 +332,8 @@ def validate(record, handlers, pc, *, identity, root):
                 or not RELEASE_PASSAGE.search(pc.sources.normalize_text(item["quote"]))
                 or not pc.sources.passage_matches(item["quote"], capture["text"])):
             continue
-        bound = indexed_row(binding, handlers.PLAN_BINDING_MARKER, "bindings", index)
+        validate_binding_input(binding_prompt, index, candidate, capture, pc)
+        bound = indexed_row(binding.text, handlers.PLAN_BINDING_MARKER, "bindings", index)
         cold = indexed_row(attestation.text, "=== EVIDENCE ATTESTATION JSON ===", "attestations", index)
         packets = [row for row in cold_packet if row["claim_index"] == 0 and row["evidence_index"] == index]
         if (bound["usable"] is True and bound["location"] == item["location"]

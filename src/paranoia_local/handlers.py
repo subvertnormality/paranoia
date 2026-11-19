@@ -4748,6 +4748,7 @@ class _CapturedClaimEngine:
         self.launch = Path(tempfile.mkdtemp(prefix="paranoia-plan-evidence-"))
         self.binding_engine: Engine | None = None
         self.expanded_captures: set[tuple[int, int]] = set()
+        self.source_prompt_limits: dict[tuple[int, int], dict[str, Any]] = {}
         self.last_session: str | None = None
         self.allow_missing = False
         self.captures: dict[tuple[int, int], external_sources.Capture] = {}
@@ -5086,7 +5087,7 @@ class _CapturedClaimEngine:
             group_error = str(exc)
             error = pc.AuditError(
                 "source capture worker failed: " + pc.bounded_diagnostic(group_error),
-                failure_detail=group_error, completed_captures=completed,
+                completed_captures=completed,
                 failure_kind="execution",
             )
             raise error from exc
@@ -5178,12 +5179,18 @@ class _CapturedClaimEngine:
             )),
         )
 
-    def _expanded_source_fits(
+    @staticmethod
+    def _source_prompt_limit(phase: str, characters: int, allowance: int) -> dict[str, Any]:
+        return dict(kind="limit", phase=phase, characters=characters, allowance=allowance)
+
+    def _expanded_prompt_limit(
         self, row: dict[str, Any], claim: dict[str, Any], item: dict[str, Any],
         capture: external_sources.Capture,
-    ) -> bool:
-        if not self._binding_prompts_fit([row], MAX_PLAN_EXPANDED_PROMPT_CHARS):
-            return False
+    ) -> dict[str, Any] | None:
+        limit = MAX_PLAN_EXPANDED_PROMPT_CHARS
+        characters = self._binding_prompt_size([row])
+        if characters > limit:
+            return self._source_prompt_limit("binding", characters, limit)
         worst = "\x01"
         attestation = {
             "claim_index": row["claim_index"],
@@ -5205,14 +5212,12 @@ class _CapturedClaimEngine:
                 ),
             },
         }
-        return self._attestation_prompts_fit(
-            [attestation], MAX_PLAN_EXPANDED_PROMPT_CHARS,
-        )
+        characters = self._attestation_prompt_size([attestation])
+        if characters > limit:
+            return self._source_prompt_limit("attestation", characters, limit)
+        return None
 
-    def _expanded_source_allowed(
-        self, row: dict[str, Any], claim: dict[str, Any], item: dict[str, Any],
-        capture: external_sources.Capture,
-    ) -> bool:
+    def _expanded_source_eligible(self, capture: external_sources.Capture) -> bool:
         effective = replace(
             capture.candidate,
             url=capture.final_url or capture.candidate.url,
@@ -5223,11 +5228,7 @@ class _CapturedClaimEngine:
                 effective.url, self.repo, self.plan_repo_path,
             )
         )
-        return (
-            external_sources.structurally_governing(effective)
-            and not plan_self
-            and self._expanded_source_fits(row, claim, item, capture)
-        )
+        return external_sources.structurally_governing(effective) and not plan_self
 
     def _binding_batches(
         self, discovery: pc.Audit,
@@ -5284,45 +5285,38 @@ class _CapturedClaimEngine:
             capture_ref = seen_captures.get(identity) if referenceable else None
             row = make_row(capture_ref)
 
-            def reject_oversized(standalone: dict[str, Any]) -> None:
-                captures[(claim_index, evidence_index)] = replace(
-                    capture, text=None,
-                    error=(
-                        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT
-                        + f"{external_sources.BINDING_BUDGET_ERROR} "
-                        f"Complete binding prompt requires {self._binding_prompt_size([standalone])} "
-                        f"characters against the ordinary {MAX_PLAN_BINDING_BATCH_CHARS}-character "
-                        "allowance. No admissible complete expanded packet."
-                    ),
-                )
-
-            if current and not self._binding_prompts_fit(
+            starts_batch = bool(current) and not self._binding_prompts_fit(
                 current + [row], MAX_PLAN_BINDING_BATCH_CHARS,
-            ):
-                standalone = make_row(None)
-                if (
-                    not self._binding_prompts_fit(
-                        [standalone], MAX_PLAN_BINDING_BATCH_CHARS,
+            )
+            if starts_batch:
+                row = make_row(None)
+                capture_ref = None
+            key = (claim_index, evidence_index)
+            size = self._binding_prompt_size([row])
+            allowance = MAX_PLAN_BINDING_BATCH_CHARS
+            expanded = size > allowance
+            if expanded:
+                if self._expanded_source_eligible(capture):
+                    prompt_limit = self._expanded_prompt_limit(row, claim, item, capture)
+                else:
+                    prompt_limit = self._source_prompt_limit("binding", size, allowance)
+                if prompt_limit is not None:
+                    self.source_prompt_limits[key] = prompt_limit
+                    prefix = (
+                        pc.BINDING_FAILURE_PREFIX if prompt_limit["phase"] == "binding"
+                        else pc.ATTESTATION_FAILURE_PREFIX
                     )
-                    and not self._expanded_source_allowed(
-                        standalone, claim, item, capture,
+                    captures[key] = replace(
+                        capture, text=None, error=prefix + external_sources.BINDING_BUDGET_ERROR,
                     )
-                ):
-                    reject_oversized(standalone)
                     continue
+            if starts_batch:
                 batches.append(current)
                 current = []
                 seen_captures = {}
-                capture_ref = None
-                row = standalone
-            if not self._binding_prompts_fit([row], MAX_PLAN_BINDING_BATCH_CHARS):
-                if self._expanded_source_allowed(row, claim, item, capture):
-                    batches.append([row])
-                    self.expanded_captures.add((claim_index, evidence_index))
-                    current = []
-                    seen_captures = {}
-                    continue
-                reject_oversized(row)
+            if expanded:
+                batches.append([row])
+                self.expanded_captures.add(key)
                 continue
             current.append(row)
             if referenceable and capture_ref is None:
@@ -5474,6 +5468,8 @@ class _CapturedClaimEngine:
                         if capture.error else None
                     ),
                 })
+                if prompt_limit := self.source_prompt_limits.get((claim_index, evidence_index)):
+                    claim["capture_provenance"][-1]["prompt_limit"] = prompt_limit
                 binding = decisions[(claim_index, evidence_index)]
                 if binding is _OMITTED_BINDING:
                     claim["capture_provenance"][-1]["error"] = (
@@ -5619,11 +5615,13 @@ class _CapturedClaimEngine:
         attester = self.engine.for_role(eng.ROLE_TEXT)
 
         def prompt_limit(rows: list[dict[str, Any]], limit: int) -> str:
-            return (
-                f"{pc.SOURCE_PROMPT_LIMIT}complete attestation prompt requires "
-                f"{self._attestation_prompt_size(rows)} characters against a "
-                f"{limit}-character allowance"
-            )
+            characters = self._attestation_prompt_size(rows)
+            for row in rows:
+                key = (row["claim_index"], row["evidence_index"])
+                self.source_prompt_limits[key] = self._source_prompt_limit(
+                    "attestation", characters, limit,
+                )
+            return "complete attestation prompt exceeds the source allowance"
         ordinary_items = [
             row for row in items
             if (row["claim_index"], row["evidence_index"]) not in self.expanded_captures
@@ -5920,6 +5918,8 @@ class _CapturedClaimEngine:
                             capture_row["error"] = external_sources._bounded_error(
                                 pc.ATTESTATION_FAILURE_PREFIX + local_failure
                             )
+                            if limit := self.source_prompt_limits.get((index, evidence_index)):
+                                capture_row["prompt_limit"] = limit
                             break
             relation = "supports_claim" if claim["verdict"] == "supported" else "refutes_claim"
             qualifying = any(

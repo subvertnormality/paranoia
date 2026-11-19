@@ -2060,10 +2060,12 @@ def test_public_claim_path_persists_capture_group_failure_as_retrieval(
         "content_sha256": "a" * 64, "text_sha256": "b" * 64,
         "error": None, "error_sha256": None,
     }]
-    assert "RuntimeError: capture worker exploded" in debt["failure_detail"]
+    assert "RuntimeError: capture worker exploded" in debt["reason"]
+    assert debt["failure_detail"] == debt["stderr"] == debt["rejected_excerpt"] == ""
     trailer = pc.render_trailer(state)
     assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
     assert "retry capture or supply another authoritative public URL" in trailer
+    assert "no provider response for this failure" in trailer
 
 
 @pytest.mark.parametrize("verdict", ["supported", "refuted"])
@@ -2811,7 +2813,7 @@ def test_long_capture_redirect_to_reviewed_plan_cannot_expand(
         assert adapter._binding_batches(audit, captures) == []
         assert (0, 0) not in adapter.expanded_captures
         assert captures[(0, 0)].error.startswith(
-            pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
         )
     finally:
         adapter.close()
@@ -2842,7 +2844,7 @@ def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: 
     assert reviews == []
     assert not captures[(0, 0)].usable
     assert captures[(0, 0)].error.startswith(
-        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
     )
     state = pc.reconcile(
         {}, bound, lineage_id="binding-budget", round_no=1, plan_text=PLAN,
@@ -2883,7 +2885,7 @@ def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
     assert len(batches) == 1
     assert len(batches[0]) == 3
     assert captures[(3, 0)].error.startswith(
-        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
+        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
     )
 
 
@@ -2923,7 +2925,7 @@ def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
     assert [row["claim_index"] for row in batches[0]] == [0, 2, 4, 6, 8, 10]
     assert all(
         captures[(index, 0)].error.startswith(
-            pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
+            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
         )
         for index in range(1, 12, 2)
     )
@@ -4751,10 +4753,11 @@ def test_public_plan_handler_reloads_terminal_evidence_diagnostics(
     assert f"EVIDENCE status: {phase.upper() if phase != 'capture' else 'RETRIEVAL'}-FAILED" in result
     if phase == "capture":
         assert len(debt["reason"]) <= pc.DIAGNOSTIC_CHARS + 30
-        assert len(debt["failure_detail"]) <= pc.DIAGNOSTIC_CHARS + 64
-        assert debt["failure_detail_sha256"] == hashlib.sha256(
-            group_error.encode()
-        ).hexdigest()
+        assert "capture worker exploded:" in debt["reason"]
+        assert "no provider response for this failure" in result
+        assert debt["failure_detail"] == debt["stderr"] == debt["rejected_excerpt"] == ""
+        empty = hashlib.sha256(b"").hexdigest()
+        assert [debt[key] for key in ("failure_detail_sha256", "stderr_sha256", "raw_sha256")] == [empty] * 3
         row = debt["completed_captures"][0]
         for key in ("requested_url", "final_url", "content_type", "error"):
             assert len(row[key]) <= pc.DIAGNOSTIC_CHARS + 64

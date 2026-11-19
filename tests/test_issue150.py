@@ -86,7 +86,8 @@ class Provider:
         session = "fixture-session"
         if self.role == "evidence-binding" and s.get("binding_sessionless") == attempt:
             session = None
-        return Review(text=text, raw=text, session_ref=session, returncode=0,
+        raw = f"stdout {attempt}" if s.get("terminal_channels") else text
+        return Review(text=text, raw=raw, session_ref=session, returncode=0,
                       failure_detail=f"detail {attempt}", stderr=f"stderr {attempt}", duration_ms=0)
 
     def run(self, prompt, *args, **kwargs):
@@ -126,9 +127,10 @@ def public(monkeypatch, repo, tmp_path, shared, *, lineage="issue150", round_no=
         engine=Provider(shared), log_dir=tmp_path / "logs",
     )
     state = cc.load_lineage(cc.default_state_root(), lineage, stamp="T", mode=cc.PLAN_MODE).claim_state
+    audit_path = max((tmp_path / "logs").glob("*.json"), key=lambda p: p.stat().st_mtime_ns)
     if isinstance(state["debt"], dict) and state["debt"].get("audit_failed"):
-        assert "CLAIM-AUDIT-LOG:" in report
-    audit = json.loads(max((tmp_path / "logs").glob("*.json"), key=lambda p: p.stat().st_mtime_ns).read_text())
+        assert f"CLAIM-AUDIT-LOG: {rc.trailer_diagnostic(str(audit_path))}" in report.splitlines()
+    audit = json.loads(audit_path.read_text())
     return report, state, audit
 
 
@@ -318,7 +320,7 @@ def test_issue150_public_final_validation_is_terminal(repo, tmp_path, monkeypatc
             return result
         return pc.Audit((), {}, (), ())  # syntactically invalid final rendered coverage
     monkeypatch.setattr(h._CapturedClaimEngine, "_attest", completed)
-    shared = dict(plan=plan, claims=claims, repair=True)
+    shared = dict(plan=plan, claims=claims, repair=True, terminal_channels=True)
     report, state, audit = public(monkeypatch, repo, tmp_path, shared)
     debt = state["debt"]
     assert debt["failure_phase"] == "binding" and debt["failure_kind"] == "validation"
@@ -329,6 +331,15 @@ def test_issue150_public_final_validation_is_terminal(repo, tmp_path, monkeypatc
         "evidence-text", "evidence-text"]
     assert len(audit["attempt_ledger"]) == 6
     assert audit["claim_audit_debt"] == debt
+    parts = [f"stdout {i}" for i in range(1, 7)]
+    stdout = "\n--- phase ---\n".join(parts)
+    assert debt["rejected_excerpt"] == stdout
+    assert debt["raw_sha256"] == hashlib.sha256(stdout.encode()).hexdigest()
+    assert [r["raw_excerpt"] for r in audit["attempt_ledger"]] == parts
+    for row in audit["attempt_ledger"][::2]:
+        assert row["outcome"] == "validation-invalid"
+        assert row["validation_issue"] and row["validation_pointer"]
+        assert row["rejected_reply_excerpt"] == "invalid initial reply"
     for channel in ("failure_detail", "stderr"):
         base = "detail" if channel == "failure_detail" else channel
         parts = [f"{base} {i}" for i in range(1, 7)]
@@ -383,16 +394,40 @@ def test_missing_binding_session_is_owned_validation(repo, tmp_path, monkeypatch
     assert audit["claim_audit_debt"] == debt
 
 
-def test_oversized_source_recovery_names_complete_bound(repo, tmp_path, monkeypatch):
+@pytest.mark.parametrize("enlarged,phase,allowance", [
+    (690_000, "binding", 685_000),
+    (660_000, "attestation", 685_000),
+])
+def test_oversized_source_recovery_names_complete_bound(repo, tmp_path, monkeypatch, enlarged, phase, allowance):
     plan, claims, texts = fixture(count=1, expanded=0)
     url = claims[0]["evidence"][0]["url"]
-    texts[url] = "x" * 690_000 + "\n" + claims[0]["anchor"]
+    texts[url] = "x" * enlarged + "\n" + claims[0]["anchor"]
     capture_fixture(monkeypatch, texts)
     report, state, _ = public(monkeypatch, repo, tmp_path, dict(plan=plan, claims=claims))
-    error = next(iter(state["claims"].values()))["capture_provenance"][0]["error"]
-    assert error.startswith(pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT)
-    assert "requires 69" in error and "400000-character allowance" in error
-    assert "Evidence limit:" in report and "smaller complete authoritative source" in report
+    provenance = next(iter(state["claims"].values()))["capture_provenance"][0]
+    limit = provenance["prompt_limit"]
+    assert limit["kind"] == "limit" and limit["phase"] == phase
+    assert limit["characters"] > limit["allowance"] == allowance
+    assert f"{phase} prompt needs {limit['characters']} characters" in report
+    assert "smaller complete authoritative source" in report
+
+
+def test_prompt_limit_guidance_requires_typed_provenance_and_preserves_frozen_sibling():
+    claim = {
+        "claim_id": "fixture", "verdict": "unverified", "evidence": [{}],
+        "capture_provenance": [{
+            "evidence_index": 0, "error": "binding failure: limit: transient provider request rejected",
+        }],
+    }
+    text = "\n".join(pc._packet_lines(claim))
+    assert "retry captured-text binding" in text and "Evidence limit for source" not in text
+    claim["capture_provenance"][0]["prompt_limit"] = {
+        "kind": "limit", "phase": "binding", "characters": 500_000, "allowance": 400_000,
+    }
+    claim["verdict"] = "supported"
+    text = "\n".join(pc._packet_lines(claim))
+    assert "500000 characters against a 400000-character allowance" in text
+    assert "failed sibling is not retried" in text
 
 
 def test_issue150_recovery_guidance():
@@ -489,30 +524,74 @@ def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, m
     assert len(audit["attempt_ledger"]) > len(debt["attempts"])
 
 
-def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_path):
+def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_path, monkeypatch):
+    import sys
+    from paranoia_local import server
     from scripts import run_claim_binding_150_acceptance as native
 
-    first, initial = native.prepare_trial(tmp_path)
-    failed = first / "receipt.json"
-    original = b'{"outcome":"failed"}\n'
-    failed.write_bytes(original)
-    directory = tmp_path / "state/lineages"
-    directory.mkdir(parents=True)
-    predecessor = '{"rounds":2,"review_state":{"last_round":6},"claim_state":{"debt":{"reason":"binding failed"}}}'
-    (directory / (native.LINEAGE + ".json")).write_text(predecessor)
-    second, resumed = native.prepare_trial(tmp_path)
-    assert failed.read_bytes() == original
-    assert first != second and initial["request"]["round"] == 1
-    assert resumed["request"]["round"] == 7
-    assert resumed["request"]["repo_path"] == initial["request"]["repo_path"]
-    assert resumed["request"]["lineage"] == initial["request"]["lineage"]
-    assert resumed["fixture_revision"] == initial["fixture_revision"]
-    assert resumed["predecessor_text"] == predecessor
-    assert resumed["predecessor_sha256"] == native.sha(predecessor.encode())
-    assert resumed["prior_receipts"] == {f"{first.name}/receipt.json": native.sha(original)}
+    identity = {"revision": "fixture", "sha256": {}}
+    monkeypatch.setattr(native, "source_identity", lambda: identity)
+    monkeypatch.setattr(native.runpy, "run_path", lambda *_: None)
+    monkeypatch.setattr(native, "observe_evidence_calls", lambda *_: None)
+    monkeypatch.setattr(es, "capture_all", es.capture_all)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(sys, "argv", ["qualification", "--output", str(tmp_path)])
+    monkeypatch.setenv("PARANOIA_STATE_ROOT", str(tmp_path / "state"))
+    source = _source(url=native.URL, quote="Python 3.11.0, released on 24 October 2022")
+    claim = _claim(anchor=native.PROPOSITION, proposition=native.PROPOSITION, evidence=[source])
+    claim_state = pc.reconcile(
+        {}, pc.parse_audit(_audit(claim), native.PLAN),
+        lineage_id=native.LINEAGE, round_no=1, plan_text=native.PLAN,
+    )
+    predecessor = json.dumps({"rounds": 0, "review_state": {"last_round": 0},
+                              "claim_state": claim_state})
+    assert pc.frozen_supported_ids(claim_state, native.PLAN)
+    state_path = tmp_path / "state/lineages" / (native.LINEAGE + ".json")
+    calls = []
+
+    def dispatch(tool, request, *, log_dir, **kwargs):
+        assert tool == "critique_plan"
+        calls.append(dict(request))
+        log_dir.mkdir()
+        (log_dir / "fixture-critique_plan-audit.json").write_text("{}")
+        if len(calls) == 1:
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(predecessor)
+        else:
+            assert state_path.read_text() == predecessor
+            assert not pc.frozen_supported_ids(claim_state, request["plan_text"])
+        return "fixture report"
+
+    def validate(record, *args, **kwargs):
+        if len(calls) == 1:
+            raise ValueError("fixture receipt rejected after support persisted")
+        assert record["predecessor_text"] == predecessor
+
+    monkeypatch.setattr(server, "dispatch", dispatch)
+    monkeypatch.setattr(native, "validate", validate)
+    with pytest.raises(ValueError, match="fixture receipt rejected"):
+        native.main()
+    first = next((tmp_path / "trials").glob("round-001-*/receipt.json"))
+    original = first.read_bytes()
+    assert json.loads(original)["outcome"] == "failed"
+    native.main()
+    second = next((tmp_path / "trials").glob("round-002-*/receipt.json"))
+    receipt = json.loads(second.read_bytes())
+    assert receipt["outcome"] == "passed"
+    assert [request["round"] for request in calls] == [1, 2]
+    assert calls[0]["repo_path"] == calls[1]["repo_path"]
+    assert calls[0]["lineage"] == calls[1]["lineage"] == native.LINEAGE
+    assert calls[1]["plan_text"].splitlines()[2] == native.PROPOSITION
+    assert first.read_bytes() == original
+    assert receipt["predecessor_sha256"] == native.sha(predecessor.encode())
+    assert receipt["prior_receipts"] == {f"{first.parent.name}/receipt.json": native.sha(original)}
 
 
-@pytest.mark.parametrize("mutation", [None, "timeout", "orphan", "native-error", "review-error"])
+@pytest.mark.parametrize("mutation", [
+    None, "valid-repair", "timeout", "orphan", "native-error", "review-error",
+    "missing-raw", "missing-stderr", "missing-failure_detail", "missing-returncode",
+    "missing-error", "missing-duration_ms",
+])
 def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_roles(mutation):
     from dataclasses import asdict
     from paranoia_local.engines import CodexEngine
@@ -524,6 +603,9 @@ def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_r
         ("claim-binding", "evidence-binding", 300, "discovery", "discovery"),
         ("claim-attestation", "evidence-text", 300, None, "attestation"),
     ]
+    if mutation == "valid-repair":
+        profiles.insert(2, ("claim-binding-validation-retry", "evidence-binding",
+                            300, "discovery", "discovery"))
     for index, (phase, role, timeout, resumed, session) in enumerate(profiles):
         if mutation == "orphan" and index == 1:
             phase += "-validation-retry"
@@ -538,14 +620,58 @@ def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_r
         review = Review("output", session, raw, duration_ms=1,
                         error=mutation == "review-error" and index == 1)
         row = h._attempt(phase, CodexEngine(), review, requested_timeout_sec=timeout).json()
-        row["outcome"] = "completed"
+        row["outcome"] = "validation-invalid" if mutation == "valid-repair" and index == 1 else "completed"
         record["audit"]["attempt_ledger"].append(row)
         record["reviews"].append({
             "role": role, "timeout": 299 if mutation == "timeout" and index == 1 else timeout,
             "resumed_session": resumed, "review": asdict(review), "prompt": "request",
         })
-    if mutation is None:
-        assert list(native.validate_attempts(record, h)) == [p[0] for p in profiles]
+    if mutation and mutation.startswith("missing-"):
+        record["reviews"][1]["review"].pop(mutation.removeprefix("missing-"))
+    if mutation in (None, "valid-repair"):
+        assert list(native.validate_attempts(record, h)) == ["claim-discovery", "claim-binding", "claim-attestation"]
     else:
         with pytest.raises(ValueError):
             native.validate_attempts(record, h)
+
+
+def test_native_binding_packet_replay_rejects_changed_capture_or_target():
+    from scripts import run_claim_binding_150_acceptance as native
+    source = _source(url=native.URL)
+    capture = {
+        "candidate": {key: source[key] for key in
+                      ("url", "title", "publisher", "source_kind", "authority_basis", "relation")},
+        "text": native.PROPOSITION, "final_url": native.URL, "status": 200,
+        "content_type": "text/html", "content_sha256": "a" * 64, "text_sha256": "b" * 64,
+    }
+    row = {
+        "claim_index": 0, "evidence_index": 0, "proposition": native.PROPOSITION,
+        "binding_target": native.PROPOSITION, "candidate": capture["candidate"],
+        "capture": {
+            **{key: capture[key] for key in
+               ("final_url", "status", "content_type", "content_sha256", "text_sha256")},
+            "usable": True, "capture_ref": None, "line_numbered_text": es.numbered_text(capture["text"]),
+        },
+    }
+    def check():
+        native.validate_binding_input("instruction\n\n" + json.dumps([row]), 0, source, capture, pc)
+    check()
+    row["binding_target"] = "A different release"
+    with pytest.raises(ValueError, match="binding packet"):
+        check()
+    row["binding_target"] = native.PROPOSITION
+    row["capture"]["text_sha256"] = "c" * 64
+    with pytest.raises(ValueError, match="binding packet"):
+        check()
+
+
+def test_native_report_replay_rejects_claim_closure_only_in_body():
+    from scripts import run_claim_binding_150_acceptance as native
+    claims = pc.reconcile({}, pc.parse_audit(_audit(_claim()), PLAN),
+                          lineage_id=native.LINEAGE, round_no=1, plan_text=PLAN)
+    trailer = pc.render_trailer(claims) + "\nSTRUCTURAL-PHASE: final"
+    audit = {"rendered_trailer": trailer, "claim_counts": {"supported": 1, "refuted": 0, "unverified": 0}}
+    native.validate_report_claims("review body\n\n" + trailer, audit, claims, pc)
+    audit["rendered_trailer"] = "STRUCTURAL-PHASE: final"
+    with pytest.raises(ValueError, match="audited trailer"):
+        native.validate_report_claims("review body\n\n" + trailer, audit, claims, pc)

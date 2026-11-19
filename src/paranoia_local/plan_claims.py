@@ -43,7 +43,6 @@ MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
 BINDING_FAILURE_PREFIX = "binding failure: "
-SOURCE_PROMPT_LIMIT = "limit: "
 ATTESTATION_FAILURE_PREFIX = "attestation failure: "
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
@@ -675,7 +674,7 @@ def _validate_capture_provenance(
     rows: list[dict[str, Any]] = []
     seen: set[int] = set()
     for row in value:
-        if not isinstance(row, dict) or set(row) != fields:
+        if not isinstance(row, dict) or set(row) - {"prompt_limit"} != fields:
             raise ValueError("capture_provenance fields are invalid")
         index = row["evidence_index"]
         if type(index) is not int or not 0 <= index < len(evidence) or index in seen:
@@ -720,6 +719,19 @@ def _validate_capture_provenance(
         for field, digest in (("content_sha256", content_sha), ("text_sha256", text_sha)):
             if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise ValueError(f"capture_provenance {field} must be null or lowercase SHA-256")
+        error = optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS)
+        prompt_limit = row.get("prompt_limit")
+        if "prompt_limit" in row and (
+            not isinstance(prompt_limit, dict)
+            or set(prompt_limit) != {"kind", "phase", "characters", "allowance"}
+            or prompt_limit["kind"] != "limit"
+            or prompt_limit["phase"] not in ("binding", "attestation")
+            or type(prompt_limit["characters"]) is not int
+            or type(prompt_limit["allowance"]) is not int
+            or not 0 < prompt_limit["allowance"] < prompt_limit["characters"]
+            or not error
+        ):
+            raise ValueError("capture_provenance prompt_limit is invalid")
         rows.append({
             "evidence_index": index,
             "requested_url": requested_url,
@@ -729,7 +741,8 @@ def _validate_capture_provenance(
             "fallback_attempted": row["fallback_attempted"],
             "content_sha256": content_sha,
             "text_sha256": text_sha,
-            "error": optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS),
+            "error": error,
+            **({"prompt_limit": dict(prompt_limit)} if prompt_limit else {}),
         })
     return rows
 
@@ -746,7 +759,9 @@ def _source_failure_phases(
         if not raw_error:
             continue
         error = str(raw_error)
-        if error.startswith(BINDING_FAILURE_PREFIX):
+        if (limit := row.get("prompt_limit")):
+            phase = limit["phase"]
+        elif error.startswith(BINDING_FAILURE_PREFIX):
             phase = "binding"
         elif error.startswith(ATTESTATION_FAILURE_PREFIX):
             phase = "attestation"
@@ -1349,7 +1364,11 @@ def render_trailer(state_raw: Any) -> str:
         )
     if state.get("debt"):
         debt = state["debt"]
-        if debt.get("failure_kind") in {"limit", "admission", "deadline"} and not debt.get("rejected_excerpt"):
+        failure_phase = debt.get("failure_phase")
+        if not debt.get("rejected_excerpt") and (
+            debt.get("failure_kind") in {"limit", "admission", "deadline"}
+            or (failure_phase == "capture" and debt.get("returncode") is None)
+        ):
             reply = "no provider response for this failure"
         else:
             reply = f"rejected sha256 {debt.get('raw_sha256')}"
@@ -1359,7 +1378,6 @@ def render_trailer(state_raw: Any) -> str:
         )
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
-        failure_phase = debt.get("failure_phase")
         status = {
             "discovery": "DISCOVERY-FAILED (blocking; claim inventory not adjudicated)",
             "capture": "RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
@@ -1410,16 +1428,19 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
                 "binding": "blocking; captured source not adjudicated",
                 "attestation": "blocking; bound passage not adjudicated",
             }[phase]
-        reason = next((
-            error for row in claim.get("capture_provenance", [])
-            if isinstance(error := row.get("error"), str)
-            and error.startswith(phase + " failure: " + SOURCE_PROMPT_LIMIT)
-        ), None)
+        limits = [
+            row for row in claim.get("capture_provenance", [])
+            if (limit := row.get("prompt_limit")) and limit["phase"] == phase
+        ]
         lines.append(f"  Evidence status: {name}-FAILED ({detail})")
-        if reason:
-            lines.append(f"  Evidence limit: {reason}")
+        for row in limits:
+            limit = row["prompt_limit"]
+            lines.append(
+                f"  Evidence limit for source {row['evidence_index'] + 1}: {phase} prompt needs "
+                f"{limit['characters']} characters against a {limit['allowance']}-character allowance"
+            )
         lines.append("  Next action: " + evidence_recovery(
-            "limit" if reason else None, phase=phase, frozen=verdict == "supported",
+            "limit" if limits else None, phase=phase, frozen=verdict == "supported",
         ))
         if verdict in {"supported", "refuted"}:
             lines.append(f"  retain the {verdict} verdict from the independently adjudicated source")

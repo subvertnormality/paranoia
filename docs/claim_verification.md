@@ -186,8 +186,14 @@ The complete verified plan deadline is derived in `handlers.py` from the prepara
 evidence and teardown reserves. The preparation allowance covers repository snapshot
 work before discovery; it does not consume the evidence phase's scheduling slack.
 The deadline still starts before snapshot construction. Setup that exhausts the
-remaining complete-graph reservation blocks before a model call, retaining the local
-admission reason in both claim debt and its bounded, hashed failure-detail channel.
+remaining complete-graph reservation blocks before a model call. The local admission
+reason is recorded in claim debt and the audit. Provider stdout, detail, and stderr
+remain empty because no provider call started. The same separation applies to local
+capture worker failures, which retain their local reason and completed-capture metadata.
+When an individual source exceeds a prompt limit, its capture provenance names the
+rejecting phase, the measured character count, and the applicable allowance. A
+smaller complete authoritative source can resolve the limit. Repeating the same
+packet has the same limit.
 An exit 124 with zero discovery attempts is local admission failure, not a provider
 timeout. Use the MCP client timeout documented in README.md, including its client margin.
 The derived whole-call window is currently 14,880 seconds and the client timeout is
