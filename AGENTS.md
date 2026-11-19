@@ -7,6 +7,8 @@ timeouts. Other current guidance is explanatory. Preserve global role rejection
 before dispatch, exact complete-source bounds, cold attestation and frozen-packet
 qualification. Captured roles own their single corrections; final local captured
 audit rejection is terminal, never another outer binding/attestation graph.
+Malformed claim-role JSON, including repeated keys and decoder limits, stays in
+the producing role's validation window.
 Every resumed claim reply must return the requested provider session before its
 contents can be used. Keep mismatches in the actual attempt ledger.
 Reject model fields that cannot encode as strict UTF-8 within their producing

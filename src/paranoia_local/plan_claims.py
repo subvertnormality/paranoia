@@ -40,6 +40,7 @@ PRIOR_DISPOSITION_INSTRUCTIONS = (
 )
 MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
+MAX_REPLY_JSON_DEPTH = 64
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
 BINDING_FAILURE_PREFIX = "binding failure: "
@@ -384,6 +385,36 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
     ))
 
 
+def _unique_reply_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, child in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key {key[:80]!a}")
+        value[key] = child
+    return value
+
+
+def decode_reply_json(payload: str, reply: str, *, label: str) -> tuple[Any, int]:
+    """Decode one claim-role envelope without collapsing repeated keys."""
+    try:
+        value, end = json.JSONDecoder(object_pairs_hook=_unique_reply_object).raw_decode(payload)
+    except RecursionError as exc:
+        raise AuditError(f"{label} JSON nesting exceeds {MAX_REPLY_JSON_DEPTH}", reply) from exc
+    except ValueError as exc:
+        raise AuditError(f"{label} JSON did not parse: {exc}", reply) from exc
+
+    # Leave room for stronger downstream stack use when copying accepted coverage.
+    pending = [(value, 0)]
+    while pending:
+        node, depth = pending.pop()
+        if isinstance(node, (dict, list)):
+            if depth >= MAX_REPLY_JSON_DEPTH:
+                raise AuditError(f"{label} JSON nesting exceeds {MAX_REPLY_JSON_DEPTH}", reply)
+            children = node.values() if isinstance(node, dict) else node
+            pending.extend((child, depth + 1) for child in children)
+    return value, end
+
+
 def parse_audit(
     text: str, plan_text: str, *, allow_partial: bool = False,
     repo: Path | None = None, plan_repo_path: str | None = None,
@@ -404,10 +435,7 @@ def parse_audit(
         tail = tail[7:].lstrip()
     elif tail.startswith("```"):
         tail = tail[3:].lstrip()
-    try:
-        value, end = json.JSONDecoder().raw_decode(tail)
-    except json.JSONDecodeError as exc:
-        raise AuditError(f"claim audit JSON did not parse: {exc}", text) from exc
+    value, end = decode_reply_json(tail, text, label="claim audit")
     remainder = tail[end:].strip()
     if remainder == "```":
         remainder = ""

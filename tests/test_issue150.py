@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -780,6 +781,86 @@ def test_indexed_binding_accepts_marker_inside_complete_passage(repo, tmp_path, 
         assert all(claim["verdict"] == "supported" and pc._captured_support(claim) for claim in settled.values())
         assert settled[claims[0]["anchor"]]["evidence"][0]["quote"] == passage
         assert not state["debt"] and "CLAIM-CLOSURE: 2 supported" in report
+
+
+@pytest.mark.parametrize("repair", [False, True])
+@pytest.mark.parametrize("phase,provider_role,defect", [
+    ("discovery", "evidence-discovery", "duplicate"),
+    ("binding", "evidence-binding", "duplicate"),
+    ("attestation", "evidence-text", "duplicate"),
+    ("discovery", "evidence-discovery", "depth"),
+    ("binding", "evidence-binding", "depth"),
+    ("attestation", "evidence-text", "depth"),
+    ("discovery", "evidence-discovery", "integer"),
+    ("binding", "evidence-binding", "integer"),
+    ("attestation", "evidence-text", "integer"),
+    ("discovery", "evidence-discovery", "coverage-depth"),
+])
+def test_malformed_reply_uses_producing_roles_correction(
+    repo, tmp_path, monkeypatch, phase, provider_role, defect, repair,
+):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    if phase == "discovery" and not repair:
+        monkeypatch.setattr(es, "capture_all", lambda *a, **k: pytest.fail("invalid discovery reached capture"))
+    else:
+        capture_fixture(monkeypatch, texts)
+    original_answer = Provider.answer
+    rejected = []
+
+    def answer(self, prompt, **kwargs):
+        review = original_answer(self, prompt, **kwargs)
+        if self.role != provider_role or (repair and rejected):
+            return review
+        if defect == "duplicate":
+            if phase == "discovery":
+                # Ordinary last-key-wins JSON would erase the only discovered claim.
+                text = review.text.rstrip()[:-1] + ', "claims": []}'
+            else:
+                # Ordinary last-key-wins JSON would accept the second identity.
+                text = review.text.replace('"evidence_index": 0', '"evidence_index": 99, "evidence_index": 0')
+        elif defect == "coverage-depth":
+            # CPython can decode this, but the wire bound protects consumers.
+            nested = "[" * 80 + "0" + "]" * 80
+            text = review.text.replace('"coverage": {', f'"coverage": {{"nested": {nested}, ')
+        else:
+            value = "[" * 2000 + "0" + "]" * 2000 if defect == "depth" else "9" * 8000
+            text = review.text.split("\n", 1)[0] + "\n" + '{"malformed": ' + value + "}"
+        rejected.append(text)
+        return replace(review, text=text, raw=text)
+
+    monkeypatch.setattr(Provider, "answer", answer)
+    shared = dict(plan=plan, claims=claims)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    role = f"claim-{phase}"
+    attempts = [row for row in audit["attempt_ledger"] if row["role"].startswith(role)]
+    assert [row["role"] for row in attempts] == [role, f"{role}-validation-retry"]
+    assert [row["outcome"] for row in attempts] == [
+        "validation-invalid", "completed" if repair else "validation-invalid",
+    ]
+    assert [row["session_ref"] for row in attempts] == ["fixture-session", "fixture-session"]
+    assert shared["resumed"].count((provider_role, "fixture-session")) == 1 + (phase == "binding")
+    issue = {
+        "duplicate": "duplicate JSON object key",
+        "depth": "JSON nesting exceeds",
+        "coverage-depth": "JSON nesting exceeds",
+        "integer": "integer string conversion",
+    }[defect]
+    assert any(issue in prompt for name, prompt, _ in shared["calls"] if name == provider_role)
+    for row, text in zip(attempts, rejected):
+        assert issue in row["validation_issue"]
+        assert row["returncode"] == 0
+        assert row["raw_sha256"] == hashlib.sha256(text.encode()).hexdigest()
+        assert row["failure_detail_excerpt"] and row["stderr_excerpt"]
+    if repair:
+        assert not state["debt"] and "CLAIM-CLOSURE: 1 supported" in report
+        assert pc._captured_support(next(iter(state["claims"].values())))
+    else:
+        debt = state["debt"]
+        assert debt == audit["claim_audit_debt"]
+        assert debt["attempts"] == attempts
+        assert debt["failure_phase"] == phase and debt["failure_kind"] == "validation"
+        assert issue in report and not state["claims"]
+        assert audit["attempt_ledger"][-1] == attempts[-1]
 
 
 @pytest.mark.parametrize("returned", [None, "another-session", "session"])

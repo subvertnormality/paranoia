@@ -172,8 +172,10 @@ rejection remains blocking validation debt; it cannot dispatch an unreserved out
 correction and repeat attestation.
 Each resumed claim reply must return the requested provider session. A different or missing
 handle fails validation before the reply can govern a claim or supply a continuation.
-Discovery treats incorrectly typed claim fields as validation failures and uses its
-existing correction window. Claim roles also validate decoded text for strict UTF-8
+The producing claim role uses its existing correction window for duplicate JSON keys,
+JSON nesting beyond 64 containers, and numbers the decoder cannot parse. Discovery
+also treats incorrectly typed claim fields as validation failures.
+Claim roles validate decoded text for strict UTF-8
 before passing it to a later prompt or persisting it as governing evidence.
 Prompts and reports escape any unpaired surrogate from an older retained packet.
 The saved packet and any independently supported verdict keep their original identity.

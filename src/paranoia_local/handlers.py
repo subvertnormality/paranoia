@@ -5553,10 +5553,7 @@ class _CapturedClaimEngine:
         if not marker:
             raise pc.AuditError(f"expected exactly one {PLAN_BINDING_MARKER} marker", text)
         tail = tail.strip()
-        try:
-            value, end = json.JSONDecoder().raw_decode(tail)
-        except json.JSONDecodeError as exc:
-            raise pc.AuditError(f"invalid indexed binding JSON: {exc}", text) from exc
+        value, end = pc.decode_reply_json(tail, text, label="indexed binding")
         if tail[end:].strip() or not isinstance(value, dict) or set(value) != {"bindings"}:
             raise pc.AuditError("invalid indexed binding envelope", text)
         raw = value["bindings"]
@@ -5706,14 +5703,9 @@ class _CapturedClaimEngine:
             if prefix.strip() or not marker:
                 raise ValueError("invalid attestation envelope")
 
-            def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-                value = dict(pairs)
-                if len(value) != len(pairs):
-                    raise ValueError("duplicate attestation object key")
-                return value
-
-            value = json.loads(tail.strip(), object_pairs_hook=unique_object)
-            if not isinstance(value, dict) or set(value) != {"attestations"}:
+            payload = tail.strip()
+            value, end = pc.decode_reply_json(payload, review.text, label="attestation")
+            if payload[end:].strip() or not isinstance(value, dict) or set(value) != {"attestations"}:
                 raise ValueError("invalid attestation envelope")
             rows = value["attestations"]
             if not isinstance(rows, list) or len(rows) != len(attestation_batch):
@@ -5813,7 +5805,7 @@ class _CapturedClaimEngine:
                 )
             try:
                 parsed = parse_attestation(review, attestation_batch)
-            except (ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            except (ValueError, KeyError, IndexError, TypeError) as exc:
                 self._mark_last_validation_invalid(
                     str(exc), review, "/attestations",
                 )
@@ -5886,9 +5878,7 @@ class _CapturedClaimEngine:
                     )
                 try:
                     parsed = parse_attestation(correction, attestation_batch)
-                except (
-                    ValueError, KeyError, IndexError, TypeError, json.JSONDecodeError,
-                ) as second:
+                except (ValueError, KeyError, IndexError, TypeError) as second:
                     self._mark_last_validation_invalid(
                         str(second), correction, "/attestations",
                     )
