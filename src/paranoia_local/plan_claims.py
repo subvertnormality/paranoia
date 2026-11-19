@@ -549,11 +549,11 @@ def _validate_claim(
     # Concrete literals make eligibility mechanically enforceable.  An externally
     # published normative principle or promised behavior can be load-bearing even though
     # it is not naturally described as a historical "fact".
-    if item["kind"] not in CLAIM_KINDS:
-        raise ValueError(f"kind must be one of {sorted(CLAIM_KINDS)}")
     kind = item["kind"]
+    if not isinstance(kind, str) or kind not in CLAIM_KINDS:
+        raise ValueError(f"kind must be one of {sorted(CLAIM_KINDS)}")
     scope = item["scope"]
-    if scope not in SCOPES:
+    if not isinstance(scope, str) or scope not in SCOPES:
         raise ValueError(
             "scope must be the literal \"external\"; repository/internal assertions "
             "belong to structural review and tests"
@@ -574,7 +574,7 @@ def _validate_claim(
             f"plan wording: {', '.join(introduced)}"
         )
     verdict = item["verdict"]
-    if verdict not in VERDICTS:
+    if not isinstance(verdict, str) or verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
     evidence = item["evidence"]
     if not isinstance(evidence, list) or len(evidence) > MAX_EVIDENCE_PER_CLAIM:

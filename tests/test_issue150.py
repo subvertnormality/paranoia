@@ -531,6 +531,75 @@ def test_captured_discovery_cannot_assign_server_prompt_limit(repo, tmp_path, mo
         assert not state["claims"]
 
 
+@pytest.mark.parametrize("field", ["kind", "scope", "verdict"])
+@pytest.mark.parametrize("repair", [False, True])
+def test_wrong_claim_field_types_use_captured_discovery_correction(repo, tmp_path, monkeypatch, field, repair):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    initial = dict(claims[0], **{field: []})
+    terminal = dict(claims[0], **{field: {"unexpected": "value"}})
+    if repair:
+        capture_fixture(monkeypatch, texts)
+    else:
+        monkeypatch.setattr(es, "capture_all", lambda *a, **k: pytest.fail("invalid discovery was captured"))
+    shared = dict(plan=plan, claims=claims, discovery_claims={1: [initial], 2: claims if repair else [terminal]})
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    initial_attempt, correction = audit["attempt_ledger"][:2]
+    assert initial_attempt["outcome"] == "validation-invalid"
+    assert field in initial_attempt["validation_issue"]
+    assert shared["resumed"][0] == ("evidence-discovery", "fixture-session")
+    if repair:
+        assert correction["outcome"] == "completed"
+        assert next(iter(state["claims"].values()))["verdict"] == "supported"
+    else:
+        assert correction["outcome"] == "validation-invalid"
+        assert field in correction["validation_issue"]
+        assert [role for role, _, _ in shared["calls"]] == ["evidence-discovery", "evidence-discovery"]
+        debt = state["debt"]
+        assert debt == audit["claim_audit_debt"]
+        assert debt["failure_phase"] == "discovery" and debt["failure_kind"] == "validation"
+        assert debt["attempts"] == [initial_attempt, correction]
+        assert debt["reason"] in report and not state["claims"]
+
+
+@pytest.mark.parametrize("returned", [None, "another-session", "session"])
+def test_ordinary_claim_retry_requires_requested_session(repo, tmp_path, returned):
+    from tests.test_plan_claims import ScriptedEngine, STRUCTURAL_CLEAR
+
+    engine = ScriptedEngine(
+        "invalid initial audit",
+        Review(_audit(_claim()), returned, "correction stdout",
+               failure_detail="actual detail", stderr="actual stderr"),
+        STRUCTURAL_CLEAR,
+    )
+    lineage = "issue150-ordinary-retry"
+    report = h.critique_plan(
+        {"repo_path": str(repo), "plan_text": PLAN, "lineage": lineage, "round": 1,
+         "stakes": "trusted local tool; evidence binding has high impact", "propose_patch": False},
+        engine=engine, log_dir=tmp_path / "logs",
+    )
+    (path,) = (tmp_path / "logs").glob("*-critique_plan-*.json")
+    audit = json.loads(path.read_bytes())
+    state = cc.load_lineage(cc.default_state_root(), lineage, stamp="T", mode=cc.PLAN_MODE).claim_state
+    initial, retry = audit["attempt_ledger"]
+    assert initial["outcome"] == "validation-invalid"
+    assert retry["role"] == "claim-audit-retry" and retry["session_ref"] == returned
+    assert len(engine.prompts) == 3 and "Return the COMPLETE corrected audit" in engine.prompts[1]
+    if returned == "session":
+        assert retry["outcome"] == "completed" and not state["debt"]
+        assert "CLAIM-CLOSURE: 1 supported" in report
+    else:
+        assert retry["outcome"] == "validation-invalid" and retry["validation_pointer"] == "/session_ref"
+        debt = state["debt"]
+        assert debt == audit["claim_audit_debt"]
+        assert debt["failure_kind"] == "validation" and debt["returncode"] == 0
+        assert debt["attempts"] == [initial, retry]
+        assert debt["rejected_excerpt"] == "correction stdout"
+        assert debt["failure_detail"] == "actual detail" and debt["stderr"] == "actual stderr"
+        message = "resumable session" if returned is None else "different session"
+        assert message in report
+        assert not state["claims"] and "CONVERGENCE: BLOCKED" in report
+
+
 @pytest.mark.parametrize("role,attempt,repair", [
     ("claim-discovery-validation-retry", 2, True),
     ("claim-binding", 2, False),
@@ -1005,6 +1074,14 @@ def test_complete_native_receipt_accepts_repaired_empty_reply(native_replay_rece
     assert rejected["sha256"] == native.sha(b"")
     assert rejected["excerpt"] == ""
     validate_native_receipt(record, tmp_path)
+
+
+def test_complete_native_receipt_requires_consistent_dispatch_duration(native_replay_receipt, tmp_path):
+    record = native_replay_receipt
+    validate_native_receipt(record, tmp_path)
+    record["elapsed_seconds"] = 0.000001
+    with pytest.raises(ValueError, match="measured native dispatch"):
+        validate_native_receipt(record, tmp_path)
 
 
 @pytest.mark.parametrize("native_replay_receipt", ["wrong-session"], indirect=True)

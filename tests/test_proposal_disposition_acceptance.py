@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # exclusively to plan claim verification and its verified-plan timing envelope.
 _PLAN_CLAIM_NODES = {
     "critique_plan", "_verify_plan_claims", "_CapturedClaimEngine", "_EvidencePhaseReview",
+    "_claim_session_issue", "_mark_claim_validation_invalid",
     "_ValidationReview",
     "_plan_evidence_batch_limit", "_plan_capture_reserve",
     "PLAN_SOURCES_PER_CAPTURE_RESERVE", "MIN_PLAN_EVIDENCE_BATCHES",

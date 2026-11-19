@@ -21,7 +21,8 @@ Do not reinterpret old failed audits as success. PLAN rounds remain historical;
 deterministic acceptance, native claim qualification and broad CODE convergence
 own delivery of this fix. Native qualification replays the observed evidence calls
 through production verification, then compares canonical claim state, attempts and
-the report with the retained receipt.
+the report with the retained receipt. Serial claim attempts and the claim phase
+must fit within the measured live dispatch, with millisecond rounding accounted for.
 
 The default Codex model and fixed arbitration attester use `gpt-6.2-astra`.
 Keep tiered correction on `gpt-6.2-sol` and the general evidence-profile CLI

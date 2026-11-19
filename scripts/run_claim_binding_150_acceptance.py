@@ -303,6 +303,21 @@ def audit_projection(audit):
     return {key: value for key, value in audit.items() if key not in {"timestamp", "run_id", "claim_duration_ms"}}
 
 
+def validate_timing(record):
+    elapsed = record["elapsed_seconds"]
+    audit = record["audit"]
+    claim_ms = audit["claim_duration_ms"]
+    durations = [row["duration_ms"] for row in audit["attempt_ledger"] if row["role"].startswith("claim-")]
+    serial_ms = sum(durations)
+    # Each serial attempt and the encompassing phase are recorded in whole milliseconds.
+    if (type(elapsed) not in (int, float) or not 0 < elapsed < float("inf")
+            or type(claim_ms) is not int or claim_ms < 0
+            or serial_ms > claim_ms + len(durations)
+            or serial_ms > elapsed * 1000
+            or claim_ms > elapsed * 1000 + 1):
+        raise ValueError("measured native dispatch, claim phase and serial attempts disagree")
+
+
 def replay_review(record, handlers, pc):
     """Reconstruct tracked critique_plan from observed responses in a private state root."""
     from paranoia_local.engines import CodexEngine
@@ -429,6 +444,7 @@ def validate(record, handlers, pc, *, identity, root):
             or claim["verdict"] != "supported" or not pc._captured_support(claim)):
         raise ValueError("expected release claim or captured cold support missing")
     validate_attempts(record, handlers)
+    validate_timing(record)
     replay_review(record, handlers, pc)
     qualifying = False
     for index, (item, capture) in enumerate(zip(claim["evidence"], record["captures"], strict=True)):
@@ -451,9 +467,6 @@ def validate(record, handlers, pc, *, identity, root):
         qualifying = True
     if not qualifying:
         raise ValueError("official captured date passage and matching cold decision missing")
-    elapsed = record["elapsed_seconds"]
-    if type(elapsed) not in (int, float) or not 0 < elapsed < float("inf"):
-        raise ValueError("missing measured wall time")
 
 
 def main():

@@ -4519,6 +4519,33 @@ def critique_plan(
     return body_text
 
 
+def _claim_session_issue(
+    review: Review, phase: str, *, resumed_session: str | None = None,
+) -> str | None:
+    if review.error:
+        return None
+    if not review.session_ref:
+        return f"claim {phase} returned no resumable session"
+    if resumed_session is not None and review.session_ref != resumed_session:
+        return f"claim {phase} returned a different session from the requested continuation"
+    return None
+
+
+def _mark_claim_validation_invalid(
+    row: dict[str, Any], issue: str, review: Review, pointer: str,
+) -> None:
+    row["outcome"] = "validation-invalid"
+    row["validation_issue"] = rc.bounded_diagnostic(issue, sp.MAX_ISSUE_CHARS)
+    row["validation_pointer"] = pointer
+    row.update(_review_failure_projection(review))
+    row["rejected_reply_sha256"] = hashlib.sha256(
+        review.text.encode("utf-8", "surrogatepass")
+    ).hexdigest()
+    row["rejected_reply_excerpt"] = rc.bounded_diagnostic(
+        review.text, rc.MAX_REJECTED_PAYLOAD_CHARS,
+    )
+
+
 def _verify_plan_claims(
     plan_text: str,
     prior_state: dict[str, Any],
@@ -4649,6 +4676,8 @@ def _verify_plan_claims(
                 prior_state, failure, round_no=round_no, plan_text=plan_text,
                 frozen_ids=frozen,
             ), "binding-failed"
+        if attempt_ledger:
+            _mark_claim_validation_invalid(attempt_ledger[-1], first.reason, review, "/claims")
         if not review.session_ref or not hasattr(engine, "resume"):
             return (
                 pc.with_debt(
@@ -4663,10 +4692,23 @@ def _verify_plan_claims(
             ), repo,
             model, effort, True, timeout=3600, **_progress_kwargs(on_progress),
         )
-        if captured_engine is None and attempt_ledger is not None:
-            attempt_ledger.append(_attempt(
-                "claim-audit-retry", engine, retry, requested_timeout_sec=3600,
-            ).json())
+        retry_attempt = _attempt(
+            "claim-audit-retry", engine, retry, requested_timeout_sec=3600,
+        ).json()
+        if attempt_ledger is not None:
+            attempt_ledger.append(retry_attempt)
+        session_issue = _claim_session_issue(retry, "audit correction", resumed_session=review.session_ref)
+        if session_issue:
+            _mark_claim_validation_invalid(retry_attempt, session_issue, retry, "/session_ref")
+            failure = pc.AuditError(
+                pc.bounded_diagnostic(f"initial audit invalid ({first.reason}); {session_issue}"),
+                retry.raw, failure_detail=retry.failure_detail or "", stderr=retry.stderr or "",
+                returncode=retry.returncode, failure_phase="discovery", failure_kind="validation",
+                attempts=attempt_ledger[-2:] if attempt_ledger is not None else (retry_attempt,),
+            )
+            return pc.with_debt(
+                prior_state, failure, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
+            ), "retry-malformed"
         if retry.error:
             second = pc.AuditError(
                 f"initial audit invalid ({first.reason}); correction call failed "
@@ -4982,19 +5024,7 @@ class _CapturedClaimEngine:
         self, issue: str, review: Review, pointer: str,
     ) -> None:
         if self.attempt_ledger:
-            row = self.attempt_ledger[-1]
-            row["outcome"] = "validation-invalid"
-            row["validation_issue"] = rc.bounded_diagnostic(
-                issue, sp.MAX_ISSUE_CHARS,
-            )
-            row["validation_pointer"] = pointer
-            row.update(_review_failure_projection(review))
-            row["rejected_reply_sha256"] = hashlib.sha256(
-                review.text.encode("utf-8", "surrogatepass")
-            ).hexdigest()
-            row["rejected_reply_excerpt"] = rc.bounded_diagnostic(
-                review.text, rc.MAX_REJECTED_PAYLOAD_CHARS,
-            )
+            _mark_claim_validation_invalid(self.attempt_ledger[-1], issue, review, pointer)
 
     def _deadline_failure(
         self, error: pc.AuditError, session_ref: str | None = None,
@@ -5015,16 +5045,10 @@ class _CapturedClaimEngine:
         self, review: Review, phase: str, *, resumed_session: str | None = None,
     ) -> str | None:
         """Mark a successful provider reply with unusable continuation metadata."""
-        if review.error:
-            return None
-        if not review.session_ref:
-            reason = f"claim {phase} returned no resumable session"
-        elif resumed_session is not None and review.session_ref != resumed_session:
-            reason = f"claim {phase} returned a different session from the requested continuation"
-        else:
-            return None
-        self._mark_last_validation_invalid(reason, review, "/session_ref")
-        return reason
+        issue = _claim_session_issue(review, phase, resumed_session=resumed_session)
+        if issue is not None:
+            self._mark_last_validation_invalid(issue, review, "/session_ref")
+        return issue
 
     def _parse_discovery(self, text: str, *, allow_missing: bool = False) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""
