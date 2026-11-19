@@ -214,12 +214,15 @@ def server_parameters(manifest, directory):
 
 
 async def client(manifest, directory):
+    # Source admission must precede importing the delivered timeout policy.
+    load_source(manifest)
+    from paranoia_local.handlers import PLAN_REVIEW_CLIENT_TIMEOUT_SEC
     from mcp import ClientSession
     from mcp.client.stdio import stdio_client
     params = server_parameters(manifest, directory)
     with (directory / "server-stderr.txt").open("w") as stderr:
         async with stdio_client(params, errlog=stderr) as (reader, writer):
-            async with ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=8700)) as session:
+            async with ClientSession(reader, writer, read_timeout_seconds=timedelta(seconds=PLAN_REVIEW_CLIENT_TIMEOUT_SEC)) as session:
                 await session.initialize()
                 result = await session.call_tool(manifest["tool"], manifest["request"])
     response = "\n".join(block.text for block in result.content if block.type == "text")

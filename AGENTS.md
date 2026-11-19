@@ -1,5 +1,21 @@
 # Repository agent instructions
 
+Issue #150 follows docs/claim-binding-150-plan.md. The executable evidence budget
+authority is handlers.py: its claim-count batch allowance, source-count capture
+reserve, correction count, role windows and derived complete-graph/whole-call/client
+timeouts. Other current guidance is explanatory. Preserve global role rejection
+before dispatch, exact complete-source bounds, cold attestation and frozen-packet
+qualification. Captured roles own their single corrections; final local captured
+audit rejection is terminal, never another outer binding/attestation graph.
+Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
+versus provider code provenance. Shared capture/packing expiry is retrieval failure.
+Recovery uses higher-round critique_plan on the same lineage after addressing the
+reason; a fixed limit needs bounded input change. Supported unchanged packets may
+freeze, including failed siblings that are not retried unless verification reopens.
+Do not reinterpret old failed audits as success. PLAN rounds remain historical;
+deterministic acceptance, native claim qualification and broad CODE convergence
+own delivery of this fix.
+
 The default Codex model and fixed arbitration attester use `gpt-6.2-astra`.
 Keep tiered correction on `gpt-6.2-sol` and the general evidence-profile CLI
 minimum unchanged; CLI 0.169.0 qualifies both current 6.2 routes. Explicitly
@@ -436,12 +452,12 @@ of the resulting code and tests.
   complete capture into the cold attestation prompt and enforce the same exact prompt bound there.
   Before binding admission, reserve the maximum bounded validation diagnostic, location, passage,
   correction template, and attestation envelope so later output cannot overflow unrelated evidence.
-  Pack cold attestation by exact initial-and-correction prompt size into at most five batches and
+  Pack cold attestation by exact initial-and-correction prompt size within the derived inventory allowance and
   allow one same-session validation correction. Persist one closed server-owned capture-provenance
   row per source outcome with explicit nullable response metadata, both digests, fallback fact, and
   bounded error; retain it when an expanded packet cannot be bound or attested.
-  Bound the complete evidence phase to 22 model calls (the discovery + five binding + five
-  attestation topology and one reserved correction for every initial call) as a pathology guard,
+  Bound the complete evidence phase by the derived maximum graph (currently 42 model calls,
+  discovery + ten binding + ten attestation with one correction per initial call) as a pathology guard,
   not a quality target. Whole-plan discovery and its correction each receive 900 seconds; binding
   and cold-attestation calls retain 300 seconds. Admit an initial call only when both its call-count
   and full role-specific latency reserve fit the remaining monotonic deadline. Before the first
@@ -476,7 +492,7 @@ of the resulting code and tests.
   Validate retained inventory before capture; attest replacement wording as its own exact
   proposition; and enforce aggregate capture/binding budgets so multiplicative per-claim maxima
   become visible debt rather than an hours-long run.
-  Reject a sixth exact binding or cold-attestation batch globally before that role settles a
+  Reject a batch above the derived inventory allowance globally before that role settles a
   prefix; aggregate ceilings must never become cross-round pagination.
   Treat an omitted expected indexed binding row as unusable for that exact source and demote only
   the affected claim when it has no other qualifying evidence. Preserve omission as a distinct

@@ -288,10 +288,23 @@ their packets without new search. Edited, new, refuted, and unverified claims
 re-enter full verification. Claim identity includes the assertion-bearing block,
 heading ancestry, and list ancestry.
 
-The path is bounded to 200 candidate sources, five binding batches, five cold
-attestation batches, and 22 possible model calls including reserved corrections.
+The executable budget authority is the evidence policy in `handlers.py`, including
+`_plan_evidence_batch_limit` and `_plan_capture_reserve`. The current worked limits
+are 200 candidate sources, five batches per role through 25 claims, scaling to ten
+at 46 claims, and 42 possible model calls including reserved corrections.
 These are pathology circuit breakers. Oversized or unavailable sources fail for
 the affected claim rather than being silently truncated.
+
+Local evidence failures retain their server-owned phase, kind and exact bounded
+reason, separately from provider output and the actual attempt ledger. Rerun
+`critique_plan` on the same lineage at a higher round after addressing the cause.
+A `limit` failure shows the count and allowance: reduce redundant candidate sources
+or split independently reviewable plans with explicit cross-plan obligations;
+identical retries cannot repair that ceiling. Unresolved, refuted and changed
+packets re-enter discovery, capture, binding and attestation. Unchanged independently
+supported packets may freeze; their failed siblings are not retried unless the
+assertion re-enters verification. There is no standalone phase-retry API. Preserve
+assertions and authoritative-evidence requirements when recovering.
 
 See [`claim_verification.md`](claim_verification.md) for protocol-level detail.
 

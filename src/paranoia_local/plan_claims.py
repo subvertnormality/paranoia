@@ -67,6 +67,7 @@ class AuditError(ValueError):
     def __init__(
         self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
         returncode: int | None = None, failure_phase: str | None = None,
+        failure_kind: str | None = None,
         attempts: Iterable[dict[str, Any]] = (),
         completed_captures: Iterable[dict[str, Any]] = (),
     ) -> None:
@@ -77,9 +78,12 @@ class AuditError(ValueError):
         self.returncode = returncode
         self.failure_phase = (
             failure_phase
-            if failure_phase in {"capture", "binding", "attestation"}
+            if failure_phase in {"discovery", "capture", "binding", "attestation"}
             else None
         )
+        self.failure_kind = failure_kind if failure_kind in {
+            "limit", "deadline", "admission", "validation", "execution",
+        } else None
         self.attempts = deepcopy(list(attempts))
         self.completed_captures = deepcopy(list(completed_captures))
         self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
@@ -107,6 +111,10 @@ class AuditError(ValueError):
         }
         if self.attempts:
             debt["attempts"] = self.attempts
+        elif self.failure_kind is not None:
+            debt["attempts"] = []
+        if self.failure_kind is not None:
+            debt["failure_kind"] = self.failure_kind
         if self.completed_captures:
             debt["completed_captures"] = self.completed_captures
         return debt
@@ -115,6 +123,34 @@ class AuditError(ValueError):
 def bounded_diagnostic(text: str) -> str:
     """Bound one model-controlled diagnostic using the canonical head/tail excerpt."""
     return _excerpt(text)
+
+
+def evidence_recovery(kind: str | None, *, phase: str | None = None, frozen: bool = False) -> str:
+    """Public recovery contract; there is no standalone evidence-phase retry API."""
+    if frozen:
+        return (
+            "An unchanged independently supported packet may freeze on the next round; "
+            "its failed sibling is not retried unless the assertion re-enters verification."
+        )
+    if kind == "limit":
+        return (
+            "Inspect the reported count and allowance. Reduce redundant candidate sources "
+            "or split independently reviewable plans with explicit cross-plan obligations; "
+            "an identical request cannot repair a fixed limit. Then rerun critique_plan on "
+            "the same lineage at a higher round. Preserve assertions and authoritative evidence."
+        )
+    action = {
+        "discovery": "retry external claim discovery",
+        "capture": "retry capture or supply another authoritative public URL",
+        "binding": "retry captured-text binding",
+        "attestation": "retry cold authority-and-entailment attestation",
+    }.get(phase, "repeat evidence verification")
+    return (
+        "After addressing the reported problem, rerun critique_plan on the same lineage "
+        f"at a higher round to {action}. Unresolved, refuted or changed packets re-enter discovery, "
+        "capture, binding and attestation; unchanged supported packets may freeze. "
+        "Do not remove or weaken the assertion solely because evidence processing failed."
+    )
 
 
 @dataclass(frozen=True)
@@ -1318,24 +1354,19 @@ def render_trailer(state_raw: Any) -> str:
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
         failure_phase = debt.get("failure_phase")
-        if failure_phase == "capture":
-            lines.extend([
-                "EVIDENCE status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-                "EVIDENCE next action: retry capture or supply another authoritative public "
-                "URL; do not remove or weaken the assertion solely because retrieval failed",
-            ])
-        elif failure_phase == "binding":
-            lines.extend([
-                "EVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)",
-                "EVIDENCE next action: retry captured-text binding; do not remove or weaken "
-                "the assertion solely because binding failed",
-            ])
-        elif failure_phase == "attestation":
-            lines.extend([
-                "EVIDENCE status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
-                "EVIDENCE next action: retry cold authority-and-entailment attestation; do not "
-                "remove or weaken the assertion solely because attestation failed",
-            ])
+        status = {
+            "discovery": "DISCOVERY-FAILED (blocking; claim inventory not adjudicated)",
+            "capture": "RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+            "binding": "BINDING-FAILED (blocking; captured source not adjudicated)",
+            "attestation": "ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+        }.get(failure_phase)
+        if status:
+            lines.append(f"EVIDENCE status: {status}; reason: {debt.get('reason')}")
+        if debt.get("failure_kind"):
+            lines.append(f"EVIDENCE failure kind: {debt['failure_kind']}")
+        lines.append("EVIDENCE next action: " + evidence_recovery(
+            debt.get("failure_kind"), phase=failure_phase,
+        ))
 
     if audit_failed:
         return "\n".join(lines)
@@ -1362,72 +1393,23 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
     failure_phases = _source_failure_phases(
         claim.get("capture_provenance", []), claim.get("evidence", []),
     )
-    if failure_phases and claim.get("verdict") == "supported":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "retain the supported verdict from the independently adjudicated source",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry captured-text binding; retain the supported verdict "
-                    "from the independently adjudicated source",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry cold authority-and-entailment attestation; retain the "
-                    "supported verdict from the independently adjudicated source",
-                ])
-    elif failure_phases and claim.get("verdict") == "refuted":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "retain the refuted verdict from the independently adjudicated source",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry captured-text binding; retain the refuted verdict "
-                    "from the independently adjudicated source",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry cold authority-and-entailment attestation; retain the "
-                    "refuted verdict from the independently adjudicated source",
-                ])
-    elif failure_phases and claim.get("verdict") == "unverified":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "do not remove or weaken the assertion solely because retrieval failed",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
-                    "  Next action: retry captured-text binding; do not remove or weaken the "
-                    "assertion solely because binding failed",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
-                    "  Next action: retry cold authority-and-entailment attestation; do not remove "
-                    "or weaken the assertion solely because attestation failed",
-                ])
+    verdict = claim.get("verdict")
+    for phase in failure_phases:
+        name = "RETRIEVAL" if phase == "capture" else phase.upper()
+        if verdict in {"supported", "refuted"}:
+            detail = f"non-governing sibling; claim independently {verdict}"
+        else:
+            detail = {
+                "capture": "blocking; proposition not adjudicated",
+                "binding": "blocking; captured source not adjudicated",
+                "attestation": "blocking; bound passage not adjudicated",
+            }[phase]
+        lines.append(f"  Evidence status: {name}-FAILED ({detail})")
+        lines.append("  Next action: " + evidence_recovery(
+            None, phase=phase, frozen=verdict == "supported",
+        ))
+        if verdict in {"supported", "refuted"}:
+            lines.append(f"  retain the {verdict} verdict from the independently adjudicated source")
     if claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     elif not failure_phases or claim.get("verdict") == "refuted":

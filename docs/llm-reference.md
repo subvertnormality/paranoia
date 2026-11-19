@@ -71,7 +71,7 @@ Codex host configuration:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 8700
+tool_timeout_sec = 15000
 startup_timeout_sec = 60
 ```
 
@@ -365,7 +365,14 @@ unless the user explicitly abandons the lineage. Audit logs are not state backup
 
 Recovery:
 
-- Codex MCP timeout: set `tool_timeout_sec=8700`.
+- Codex MCP timeout: set `tool_timeout_sec=15000`; the executable timeout policy is
+  `handlers.PLAN_REVIEW_CLIENT_TIMEOUT_SEC`, including a positive client margin.
+  For evidence failure, inspect its server-owned kind and reason. Rerun
+  `critique_plan` on the same lineage at a higher round after addressing it; fixed
+  limits require fewer redundant candidates or independently reviewable plans,
+  rather than identical retries. Unresolved/refuted/changed packets re-enter
+  evidence work. Unchanged independently supported packets may freeze, so their
+  failed siblings are not retried unless the assertion re-enters verification.
 - Missing/old CLI: check version, update, and sign in.
 - Failed/rejected tracked call: address the diagnostic and retry the same round.
 - Settled blocked call with debt: edit, increment round, retry the same lineage.

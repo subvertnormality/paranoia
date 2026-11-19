@@ -3041,9 +3041,9 @@ def test_non_model_reserve_bounds_200_source_capture_before_binding(
         assert len(candidates) == count
         assert kwargs["deadline"] == (
             handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
-            + handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+            + handlers.PLAN_EVIDENCE_MAX_NON_MODEL_RESERVE_SEC
         )
-        now[0] += handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC + 1
+        now[0] += handlers.PLAN_EVIDENCE_MAX_NON_MODEL_RESERVE_SEC + 1
         return [
             external_sources.Capture(
                 candidate, candidate.url, 200, "text/html",
@@ -3061,7 +3061,7 @@ def test_non_model_reserve_bounds_200_source_capture_before_binding(
     try:
         result = adapter.run("audit", tmp_path, "m", "high", True)
         assert result.error
-        assert "exceeded its aggregate 300-second reserve" in result.text
+        assert "exceeded its aggregate 600-second reserve" in result.text
         assert [role for role, _ in engine.calls] == ["evidence-discovery"]
         assert adapter.model_calls == 1
     finally:
@@ -3099,11 +3099,11 @@ def test_plan_binding_aggregate_batch_ceiling_raises_before_model_calls(
         adapter.close()
 
 
-def test_sixth_attestation_batch_fails_globally_before_settling_a_prefix(
+def test_excess_attestation_batch_fails_globally_before_settling_a_prefix(
     tmp_path: Path, monkeypatch,
 ) -> None:
     count = handlers.MAX_PLAN_CAPTURE_SOURCES
-    passage = '"' * handlers.MAX_BINDING_PASSAGE_CHARS
+    passage = '\x01' * handlers.MAX_BINDING_PASSAGE_CHARS
     lines = [f"External behavior {index} is guaranteed." for index in range(count)]
     plan = "# Plan\n\n" + "\n".join(lines)
     source = _source(quote=passage)
@@ -3178,7 +3178,7 @@ def test_plan_evidence_budget_composes_at_maximum_batch_count() -> None:
             handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC
             - handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC
         )
-        + handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+        + handlers.PLAN_EVIDENCE_MAX_NON_MODEL_RESERVE_SEC
         + handlers.PLAN_EVIDENCE_SCHEDULING_SLACK_SEC
     )
     assert handlers.PLAN_REVIEW_TOTAL_TIMEOUT_SEC == (
@@ -3263,6 +3263,8 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
     claims: list[dict[str, object]] = []
     anchors: list[str] = []
     passages: list[str] = []
+    # Isolated historical packing fixture; the public maximum-policy fixture
+    # in test_issue150 exercises the earned inventory allowance with 200 sources.
     for index in range(handlers.MAX_PLAN_BINDING_BATCHES):
         anchor = f"Vendor {index} published release {index} on January {index + 1}, 2024."
         passage = f"Release {index} was published on January {index + 1}, 2024."
@@ -3275,6 +3277,10 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
                 url=f"https://official.example/source-{index}", quote=passage,
             )],
         ))
+    # The complete 200-source maximum with both real packers and every correction
+    # is covered by test_issue150.test_maximum_graph_has_200_sources_and_all_42_attempts.
+    # Keep this historical ten-source fixture at its actual five-batch contract.
+    monkeypatch.setattr(handlers, "_plan_evidence_batch_limit", lambda count: 10)
     plan = "# Maximum topology\n\n" + "\n".join(anchors) + "\n"
     discovery = _audit(*claims)
     binding_outputs: list[str | Review] = []
@@ -3319,7 +3325,7 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
     }, advance=advance)
 
     def capture_all(candidates, **kwargs):
-        now[0] += handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
+        now[0] += handlers._plan_capture_reserve(len(candidates))
         return [
             external_sources.Capture(
                 candidate, candidate.url, 200, "text/html",
@@ -3343,17 +3349,18 @@ def test_maximum_evidence_topology_executes_every_validation_retry(
         assert now[0] == (
             handlers.PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC
             - handlers.PLAN_EVIDENCE_SCHEDULING_SLACK_SEC
+            - (handlers.PLAN_EVIDENCE_MAX_NON_MODEL_RESERVE_SEC - handlers.PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC)
         )
         assert len(ledger) == handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS
         assert [row["outcome"] for row in ledger[::2]] == [
             "validation-invalid"
-        ] * 11
-        assert [row["outcome"] for row in ledger[1::2]] == ["completed"] * 11
+        ] * (handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS // 2)
+        assert [row["outcome"] for row in ledger[1::2]] == ["completed"] * (handlers.MAX_PLAN_EVIDENCE_MODEL_CALLS // 2)
         assert all(row.get("validation_pointer") for row in ledger[::2])
         audited = pc.parse_audit(
             result.text, plan, require_capture_provenance=True,
         )
-        assert len(audited.claims) == 5
+        assert len(audited.claims) == handlers.MAX_PLAN_BINDING_BATCHES
         assert all(claim["verdict"] == "supported" for claim in audited.claims)
     finally:
         adapter.close()

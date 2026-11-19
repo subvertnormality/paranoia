@@ -128,24 +128,29 @@ prompt-size measurements describe their recorded source, not this later wording.
    effects, and one mandatory broad cold final regression after that debt closes.
 8. The computed verdict combines external-claim closure and structural-class closure.
 
-The active inventory ceiling is 500 external claims and 20 evidence records per claim. The
-composed execution budget additionally allows at most 200 source captures and five binding
-batches of 400,000 characters in one audit. These are pathology/corruption guards, not
-evidence-quality targets. A single authoritative source may flex from an ordinary batch to one
-dedicated expanded packet. They cover ordinary large plans while preventing the multiplicative maxima
-from turning into hours of model/network work. Exceeding one creates visible audit debt and
-blocks; nothing beyond a ceiling is silently discarded or called verified.
+The active inventory ceiling is 500 external claims and 20 evidence records per claim.
+The executable budget authority is the evidence policy in `handlers.py`, especially
+`_plan_evidence_batch_limit` and `_plan_capture_reserve`; the numbers below are worked
+projections. At most 200 source candidates may enter capture. Binding and attestation
+each admit five batches through 25 discovered claims, then one per five claims rounded
+up, capped at ten. Thus 36 claims admit eight batches and 46 claims admit ten. Exact
+ordinary prompts remain bounded to 400,000 characters; eligible complete authoritative
+sources may use dedicated expanded packets. These are pathology guards, not evidence
+quality targets. Exceeding an aggregate allowance creates visible blocking audit debt;
+nothing beyond it is silently discarded, settled as a prefix or called verified.
 
 Whole-plan discovery and its same-session correction each have a 900-second cap. Captured-text
 binding and cold-attestation calls retain the 300-second cap; each locally invalid response allows
 at most one same-session correction. Cold attestation is
-packed by its exact rendered initial and correction prompts into at most five batches, rather than
-assuming every accepted passage fits one call. The complete evidence phase has an 8,160-second
-monotonic circuit breaker and at most 22 model calls: discovery + five binding + five attestation
+packed by its exact rendered initial and correction prompts within that same allowance, rather than
+assuming every accepted passage fits one call. The complete evidence phase has a derived
+14,460-second monotonic circuit breaker and at most 42 model calls: discovery + ten binding + ten attestation
 calls, with one correction reserved for every initial call. Before discovery spend, admission
-reserves that entire role-specific graph plus 300 seconds for capture/bounded pre-binding
-processing and 60 seconds of scheduling slack. The capture pool and exact local packing share an
-enforced monotonic 300-second deadline; exhausting it blocks before the first binding call. The
+reserves that entire role-specific graph plus the maximum 600 seconds of capture/local
+processing. That admission requires 14,400 seconds; the enclosing window includes another
+60 seconds of scheduling slack. Capture and packing share one monotonic interval starting
+after discovery: 300 seconds through 100 sources, scaling proportionally to 600 at 200.
+Expiry during either capture or packing is retrieval failure before the first binding call. The
 handler also checks both remaining calls and two full role-specific windows before each initial
 invocation. The retained
 acceptance record reports the measured live latency for each 627,000-character Codex and Claude
@@ -157,11 +162,14 @@ discovery session. Exact 5,000,000-byte and 1,000,000-character boundaries are a
 unit above either is rejected. Numbering, metadata, JSON escaping, and the full instruction
 envelope count against either the ordinary 400,000-character prompt or the dedicated
 685,000-character governing-source prompt. Arbitration degrades the largest distinct capture
-groups per-source when its aggregate would overflow; the plan path retains its five deterministic
-batches. An aggregate sixth plan batch, an expired capture, or a failed batch
+groups per-source when its aggregate would overflow; the plan path retains deterministic
+batches. A batch above the current inventory allowance, an expired capture, or a failed batch
 becomes visible blocking state rather than silently truncating the inventory.
 For binding and cold attestation, that aggregate rejection is global: no prefix is settled or
 made eligible for later freezing as a way to paginate the inventory across rounds.
+The captured roles own their single corrections. A final local parsing or retained-coverage
+rejection remains blocking validation debt; it cannot dispatch an unreserved outer binding
+correction and repeat attestation.
 If a row is ineligible for expansion or its complete expanded prompt cannot fit, only that capture
 becomes unusable with the bounded server-owned binding-budget reason; it cannot abort unrelated
 claim captures. Unavailable captures bypass model binding and retain their known server-owned
@@ -182,6 +190,9 @@ remaining complete-graph reservation blocks before a model call, retaining the l
 admission reason in both claim debt and its bounded, hashed failure-detail channel.
 An exit 124 with zero discovery attempts is local admission failure, not a provider
 timeout. Use the MCP client timeout documented in README.md, including its client margin.
+The derived whole-call window is currently 14,880 seconds and the client timeout is
+15,000 seconds, including a positive 120-second margin. These generous circuit breakers
+are not expected latency; they reserve complete work rather than shorten thorough reviews.
 Historical accepted plans record the timing in force for their original runs.
 After evidence state is persisted,
 the cold structural review starts only when its current 4,320-second census or 3,120-second
@@ -298,14 +309,22 @@ Retrieval (including response acquisition, text extraction, and the aggregate ca
 processing deadline), captured-text binding, and
 cold-attestation failures remain distinct server-owned
 phases through reconciliation and rendering, including when only some source rows fail or one
-claim contains failures from multiple phases. A failed sibling remains visible with its own retry
+claim contains failures from multiple phases. A failed sibling remains visible
 even when another independently adjudicated source keeps the claim supported or refuted; that
 diagnostic does not demote the independently adjudicated verdict or remove replacement guidance.
-Each affected phase names its own retry. None of
+The server-owned failure kind and exact bounded reason survive the trailer, audit and
+lineage. A `limit` failure names actual count and allowance. Reduce redundant candidate
+sources or split independently reviewable plans with explicit cross-plan obligations;
+an identical request cannot repair a fixed ceiling. After addressing the problem,
+rerun `critique_plan` on the same lineage at a higher round. Unresolved, refuted and
+changed packets re-enter discovery, capture, binding and attestation. Unchanged
+independently supported packets may freeze; their failed siblings are not retried
+unless the assertion re-enters verification. There is no standalone phase-retry API.
+Legacy failures use this same conservative public-entry-point guidance. None of
 these processing failures alone is evidence to remove, weaken, or otherwise edit the proposition;
 wording changes require authoritative evidence that refutes or fails to entail it. Ordinary
-terminal provider failures and role-admission failures retain the binding or attestation phase
-in durable claim debt and render that same phase's retry action; phase fidelity is not limited
+terminal provider failures and role-admission failures retain their discovery, binding or attestation phase
+in durable claim debt and render the public recovery action; phase fidelity is not limited
 to expanded source-local failures. A terminal validation retry retains both the initial and
 corrected attempts as separate bounded channel records in claim debt. An unexpected parallel
 capture-worker failure becomes retrieval debt and retains bounded metadata for siblings that
