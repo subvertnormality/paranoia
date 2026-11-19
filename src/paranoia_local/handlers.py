@@ -4927,10 +4927,9 @@ class _CapturedClaimEngine:
         if isinstance(attested, Review):
             return attested
         last_binding = binding_reviews[-1] if binding_reviews else first
-        self.last_session = last_binding.session_ref
         return Review(
             text=_render_audit(attested),
-            session_ref=last_binding.session_ref,
+            session_ref=session_ref,
             raw=self._completed_channel("raw"),
             failure_detail=self._completed_channel("failure_detail"),
             stderr=self._completed_channel("stderr"),

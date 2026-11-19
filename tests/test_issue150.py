@@ -568,6 +568,33 @@ def test_expanded_binding_session_mismatch_preserves_other_batch_custody(repo, t
     assert all(session == "fixture-session" for _, session in shared["resumed"])
 
 
+@pytest.mark.parametrize("repair,attempt", [(False, 3), (True, 6)])
+def test_final_expanded_binding_mismatch_keeps_discovery_session(repo, tmp_path, monkeypatch, repair, attempt):
+    plan, claims, texts = fixture(count=2, expanded=0)
+    last_url = claims[-1]["evidence"][0]["url"]
+    texts[last_url] = "x" * 450_000 + "\n" + texts[last_url]
+    capture_fixture(monkeypatch, texts)
+    original = h._CapturedClaimEngine.run
+    aggregate = []
+
+    def record(self, *a, **k):
+        review = original(self, *a, **k)
+        aggregate.append((review.session_ref, self.last_session, review.error))
+        return review
+
+    monkeypatch.setattr(h._CapturedClaimEngine, "run", record)
+    shared = dict(plan=plan, claims=claims, repair=repair, mismatched_session=attempt)
+    _, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    results = {claim["anchor"]: claim for claim in state["claims"].values()}
+    assert results[claims[0]["anchor"]]["verdict"] == "supported"
+    assert results[claims[1]["anchor"]]["verdict"] == "unverified"
+    assert aggregate == [("fixture-session", "fixture-session", False)]
+    role = "claim-binding-validation-retry" if repair else "claim-binding"
+    rejected = audit["attempt_ledger"][attempt - 1]
+    assert rejected["role"] == role and rejected["outcome"] == "validation-invalid"
+    assert rejected["session_ref"] == "different-provider-session"
+
+
 @pytest.mark.parametrize("phase", ["binding","attestation"])
 @pytest.mark.parametrize("correction", [False,True])
 def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, monkeypatch, phase, correction):
