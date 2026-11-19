@@ -43,6 +43,7 @@ MAX_EVIDENCE_PER_CLAIM = 20
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
 BINDING_FAILURE_PREFIX = "binding failure: "
+SOURCE_PROMPT_LIMIT = "limit: "
 ATTESTATION_FAILURE_PREFIX = "attestation failure: "
 
 VERDICTS = frozenset({"supported", "refuted", "unverified"})
@@ -134,8 +135,9 @@ def evidence_recovery(kind: str | None, *, phase: str | None = None, frozen: boo
         )
     if kind == "limit":
         return (
-            "Inspect the reported count and allowance. Reduce redundant candidate sources "
-            "or split independently reviewable plans with explicit cross-plan obligations; "
+            "Inspect the reported size or count and allowance. Supply a smaller complete "
+            "authoritative source, reduce redundant candidates, or split independently "
+            "reviewable plans with explicit cross-plan obligations; "
             "an identical request cannot repair a fixed limit. Then rerun critique_plan on "
             "the same lineage at a higher round. Preserve assertions and authoritative evidence."
         )
@@ -1408,9 +1410,16 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
                 "binding": "blocking; captured source not adjudicated",
                 "attestation": "blocking; bound passage not adjudicated",
             }[phase]
+        reason = next((
+            error for row in claim.get("capture_provenance", [])
+            if isinstance(error := row.get("error"), str)
+            and error.startswith(phase + " failure: " + SOURCE_PROMPT_LIMIT)
+        ), None)
         lines.append(f"  Evidence status: {name}-FAILED ({detail})")
+        if reason:
+            lines.append(f"  Evidence limit: {reason}")
         lines.append("  Next action: " + evidence_recovery(
-            None, phase=phase, frozen=verdict == "supported",
+            "limit" if reason else None, phase=phase, frozen=verdict == "supported",
         ))
         if verdict in {"supported", "refuted"}:
             lines.append(f"  retain the {verdict} verdict from the independently adjudicated source")

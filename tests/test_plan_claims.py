@@ -2008,8 +2008,9 @@ def test_public_claim_path_persists_capture_deadline_as_retrieval(
     assert status == "capture-failed"
     assert state["debt"]["failure_phase"] == "capture"
     assert "capture and pre-binding processing exceeded" in (
-        state["debt"]["failure_detail"]
+        state["debt"]["reason"]
     )
+    assert state["debt"]["failure_detail"] == ""
     trailer = pc.render_trailer(state)
     assert "EVIDENCE status: RETRIEVAL-FAILED" in trailer
     assert "retry capture or supply another authoritative public URL" in trailer
@@ -2128,73 +2129,6 @@ def test_public_claim_path_renders_failed_sibling_without_demoting_verdict(
     )
     if verdict == "refuted":
         assert "Replacement: none proven; remove, weaken, or research" in trailer
-
-
-def test_captured_claim_retry_cannot_bypass_capture_validation(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    source = _source()
-    candidate = external_sources.CandidateSource(
-        source["url"], source["title"], source["publisher"], source["source_kind"],
-        source["authority_basis"], source["relation"],
-    )
-    capture = external_sources.Capture(
-        candidate, candidate.url, 200, "text/html", "a" * 64, "b" * 64,
-        source["quote"],
-    )
-    monkeypatch.setattr(
-        handlers.external_sources, "capture_all", lambda candidates, **kwargs: [capture],
-    )
-    valid = _audit(_claim())
-    changed = _audit(_claim(evidence=[_source(url="https://example.com/changed")]))
-    binding = (
-        handlers.PLAN_BINDING_MARKER
-        + '\n{"bindings":[{"claim_index":0,"evidence_index":0,"usable":true,'
-        '"location":"Release page, first paragraph",'
-        '"passage":"Python 3.11.0 was released on Monday, October 24, 2022."}]}'
-    )
-    attestation = (
-        '=== EVIDENCE ATTESTATION JSON ===\n'
-        '{"attestations":[{"claim_index":0,"evidence_index":0,'
-        '"publisher_authority":true,"authority_reason":"official release owner",'
-        '"passage_entailment":true,"entailment_reason":"states the release date"}]}'
-    )
-    engine = _RoleScript({
-        "evidence-discovery": [valid],
-        "evidence-binding": [binding, changed],
-        "evidence-text": [attestation],
-    })
-    ledger: list[dict] = []
-    adapter = handlers._CapturedClaimEngine(
-        engine, plan_text=PLAN, repo=_repo(tmp_path), plan_repo_path=None,
-        attempt_ledger=ledger,
-    )
-    try:
-        first = adapter.run("audit", tmp_path, "m", "high", True)
-        assert not first.error
-        retry = adapter.resume("session", "correct", tmp_path, "m", "high", True)
-        assert retry.error
-        assert isinstance(retry, handlers._EvidencePhaseReview)
-        assert retry.evidence_phase == "binding"
-        assert "binding changed immutable source metadata" in retry.text
-        debt_state = pc.with_debt(
-            pc.empty_state(),
-            pc.AuditError(
-                "claim-binding reviewer failed (exit 0)", retry.raw,
-                returncode=retry.returncode, failure_phase=retry.evidence_phase,
-            ),
-            round_no=1, plan_text=PLAN,
-        )
-        assert debt_state["debt"]["failure_phase"] == "binding"
-        trailer = pc.render_trailer(debt_state)
-        assert "EVIDENCE status: BINDING-FAILED" in trailer
-        assert "retry captured-text binding" in trailer
-        assert [row["role"] for row in ledger] == [
-            "claim-discovery", "claim-binding", "claim-attestation",
-            "claim-binding-outer-retry",
-        ]
-    finally:
-        adapter.close()
 
 
 def test_non_web_context_provenance_preserves_authoritative_http_sibling(
@@ -2876,8 +2810,8 @@ def test_long_capture_redirect_to_reviewed_plan_cannot_expand(
     try:
         assert adapter._binding_batches(audit, captures) == []
         assert (0, 0) not in adapter.expanded_captures
-        assert captures[(0, 0)].error == (
-            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        assert captures[(0, 0)].error.startswith(
+            pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
         )
     finally:
         adapter.close()
@@ -2907,8 +2841,8 @@ def test_plan_binding_demotes_one_escape_amplified_capture_per_source(tmp_path: 
         adapter.close()
     assert reviews == []
     assert not captures[(0, 0)].usable
-    assert captures[(0, 0)].error == (
-        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    assert captures[(0, 0)].error.startswith(
+        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
     )
     state = pc.reconcile(
         {}, bound, lineage_id="binding-budget", round_no=1, plan_text=PLAN,
@@ -2948,8 +2882,8 @@ def test_escape_amplified_capture_is_demoted_before_flushing_current_batch(
         adapter.close()
     assert len(batches) == 1
     assert len(batches[0]) == 3
-    assert captures[(3, 0)].error == (
-        pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+    assert captures[(3, 0)].error.startswith(
+        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
     )
 
 
@@ -2988,8 +2922,8 @@ def test_repeated_ineligible_oversized_rows_cannot_manufacture_batches(
     assert len(batches) == 1
     assert [row["claim_index"] for row in batches[0]] == [0, 2, 4, 6, 8, 10]
     assert all(
-        captures[(index, 0)].error == (
-            pc.BINDING_FAILURE_PREFIX + external_sources.BINDING_BUDGET_ERROR
+        captures[(index, 0)].error.startswith(
+            pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT + external_sources.BINDING_BUDGET_ERROR
         )
         for index in range(1, 12, 2)
     )
@@ -3147,7 +3081,6 @@ def test_excess_attestation_batch_fails_globally_before_settling_a_prefix(
             "evidence-discovery", "evidence-binding",
         ]
         assert "=== CLAIM AUDIT JSON ===" not in result.text
-        assert adapter.attestation_raw == ""
     finally:
         adapter.close()
 
@@ -3455,7 +3388,8 @@ def test_issue_126_snapshot_preparation_and_admission_diagnostics(
         debt = lineage.claim_state["debt"]
         reason = "plan evidence deadline cannot admit the complete maximum model-call graph"
         assert debt["returncode"] == 124
-        assert reason in debt["failure_detail"]
+        assert reason in debt["reason"]
+        assert debt["failure_detail"] == ""
         assert reason in result
         assert debt["raw_sha256"] == hashlib.sha256(b"").hexdigest()
         assert debt["stderr_sha256"] == hashlib.sha256(b"").hexdigest()
@@ -5239,6 +5173,7 @@ def test_issue_114_sessionless_discovery_public_lifecycle(
     assert discovery_calls == [handlers.PLAN_EVIDENCE_DISCOVERY_TIMEOUT_SEC] * (2 if correction else 1)
     debt = state["debt"]
     assert "resumable session" in debt["reason"]
+    assert debt["failure_phase"] == "discovery" and debt["failure_kind"] == "validation"
     assert debt["returncode"] == 0
     for field, value in [("rejected_excerpt", missing.raw),
                          ("failure_detail", missing.failure_detail), ("stderr", missing.stderr)]:

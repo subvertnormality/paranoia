@@ -273,13 +273,14 @@ def test_native_expanded_sessionless_binding_cannot_credit_receipt(frozen, recei
     try:
         bound, reviews = adapter._bind_indexed("session", discovery, captures, "m", "high", {})
         assert reviews == [reply]
-        assert ledger[0]["outcome"] == "completed"
+        assert ledger[0]["outcome"] == "validation-invalid"
+        assert ledger[0]["validation_pointer"] == "/session_ref"
         assert ledger[0]["raw_sha256"] == acceptance.sha(reply.raw.encode())
         persisted = adapter._attest(bound, "m", "high")
         assert persisted.claims[0]["verdict"] == "unverified"
         assert "binding" in persisted.claims[0]["capture_provenance"][0]["error"]
         rewrite_audit(receipt, lambda audit: audit["attempt_ledger"].extend(ledger))
-        with pytest.raises(ValueError, match="binding.*session"):
+        with pytest.raises(ValueError, match="validation failure was not successfully repaired"):
             acceptance.validate_receipt(frozen, receipt, "review result")
     finally:
         adapter.close()

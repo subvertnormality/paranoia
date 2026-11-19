@@ -82,8 +82,12 @@ class Provider:
         if s.get("wrong") and self.role == "evidence-binding":
             text = text.replace('"claim_index": 0', '"claim_index": 999') if s["wrong"] == "index" else text.replace(
                 s["claims"][keys[0][0]]["evidence"][0]["quote"], "invented passage")
-        return Review(text=text, raw=text, session_ref="fixture-session", returncode=0,
-                      failure_detail="", stderr="", duration_ms=0)
+        attempt = len(s["calls"])
+        session = "fixture-session"
+        if self.role == "evidence-binding" and s.get("binding_sessionless") == attempt:
+            session = None
+        return Review(text=text, raw=text, session_ref=session, returncode=0,
+                      failure_detail=f"detail {attempt}", stderr=f"stderr {attempt}", duration_ms=0)
 
     def run(self, prompt, *args, **kwargs):
         return self.answer(prompt, **kwargs)
@@ -182,7 +186,7 @@ async def test_acceptance_client_uses_actual_derived_timeout(tmp_path, monkeypat
 
 @pytest.mark.parametrize("wrong", [None,"passage","index"])
 def test_public_growth_recovers_old_failed_lineage(repo, tmp_path, monkeypatch, wrong):
-    plan, claims, texts = fixture()
+    plan, claims, texts = fixture(expanded=7)
     prior = pc.reconcile({}, pc.parse_audit(_audit(*claims), plan),
                          lineage_id="issue150", round_no=16, plan_text=plan)
     original_ids = list(prior["claims"])
@@ -211,7 +215,7 @@ def test_public_growth_recovers_old_failed_lineage(repo, tmp_path, monkeypatch, 
     assert not pc.is_blocked(state)
     assert "CLAIM-CLOSURE: 36 supported, 0 refuted, 0 unverified" in report
     for role in ["evidence-binding", "evidence-text"]:
-        assert sum(r == role for r, _, _ in shared["calls"]) == 7
+        assert sum(r == role for r, _, _ in shared["calls"]) == 8
     for index, row in enumerate(state["claims"].values()):
         assert row["anchor"] == claims[index]["anchor"]
         assert row["evidence"][0]["quote"] == claims[index]["evidence"][0]["quote"]
@@ -245,27 +249,26 @@ def test_maximum_graph_has_200_sources_and_all_42_attempts(repo, monkeypatch):
 
 
 @pytest.mark.parametrize("phase", ["binding", "attestation"])
-def test_one_over_allowance_rejects_before_role_dispatch(repo, monkeypatch, phase):
-    plan, claims, texts = fixture(count=36, expanded=9)
+def test_one_over_allowance_rejects_before_role_dispatch(repo, tmp_path, monkeypatch, phase):
+    plan, claims, texts = fixture(count=36, expanded=8)
     capture_fixture(monkeypatch, texts)
     shared = dict(plan=plan, claims=claims)
-    adapter = h._CapturedClaimEngine(Provider(shared), plan_text=plan, repo=repo, plan_repo_path=None)
     if phase == "attestation":
-        # Supply completed bindings to exercise real attestation packing independently.
-        audit = pc.parse_audit(_audit(*claims), plan)
-        adapter.captures = adapter._capture(audit)
-        adapter.expanded_captures = {(i,0) for i in range(9)}
-        result = adapter._attest(audit, "test", "high")
-    else:
-        result = adapter.run("audit", repo, "test", "high", True)
-    try:
-        assert result.error and result.failure_kind == "limit"
-        assert "aggregate ceiling is 8" in result.evidence_reason
-        assert result.phase_attempts == ()
-        assert not any(r == ("evidence-binding" if phase == "binding" else "evidence-text")
-                       for r, _, _ in shared.get("calls", []))
-    finally:
-        adapter.close()
+        # Supply completed bindings so only attestation packing is under test.
+        def finished_binding(self, session, discovery, captures, *args):
+            self.expanded_captures = {(i, 0) for i in range(8)}
+            return discovery, []
+        monkeypatch.setattr(h._CapturedClaimEngine, "_bind_indexed", finished_binding)
+    report, state, log = public(monkeypatch, repo, tmp_path, shared)
+    debt = state["debt"]
+    assert debt["failure_phase"] == phase and debt["failure_kind"] == "limit"
+    assert "requires 9" in debt["reason"] in report
+    assert "aggregate ceiling is 8" in report
+    assert debt["attempts"] == [] and debt["returncode"] is None
+    assert log["claim_audit_debt"] == debt
+    assert_empty_provider_channels(debt)
+    assert not any(r == ("evidence-binding" if phase == "binding" else "evidence-text")
+                   for r, _, _ in shared.get("calls", []))
 
 
 @pytest.mark.parametrize("packing", [False,True])
@@ -326,6 +329,70 @@ def test_issue150_public_final_validation_is_terminal(repo, tmp_path, monkeypatc
         "evidence-text", "evidence-text"]
     assert len(audit["attempt_ledger"]) == 6
     assert audit["claim_audit_debt"] == debt
+    for channel in ("failure_detail", "stderr"):
+        base = "detail" if channel == "failure_detail" else channel
+        parts = [f"{base} {i}" for i in range(1, 7)]
+        value = "\n--- phase ---\n".join(parts)
+        assert debt[channel] == value
+        assert debt[channel + "_sha256"] == hashlib.sha256(value.encode()).hexdigest()
+        assert [r[channel + "_excerpt"] for r in audit["attempt_ledger"]] == parts
+
+
+def assert_empty_provider_channels(debt):
+    assert [debt[key] for key in ("rejected_excerpt", "failure_detail", "stderr")] == [""] * 3
+    empty = hashlib.sha256(b"").hexdigest()
+    assert [debt[key] for key in ("raw_sha256", "failure_detail_sha256", "stderr_sha256")] == [empty] * 3
+
+
+def test_combined_binding_rejection_does_not_own_completed_batch(repo, tmp_path, monkeypatch):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    capture_fixture(monkeypatch, texts)
+    original = pc.parse_audit
+    def reject_combined(*args, **kwargs):
+        if kwargs.get("require_capture_provenance"):
+            raise pc.AuditError("combined packet rejected", "rendered non-provider input")
+        return original(*args, **kwargs)
+    monkeypatch.setattr(pc, "parse_audit", reject_combined)
+    shared = dict(plan=plan, claims=claims)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    debt = state["debt"]
+    assert debt["failure_phase"] == "binding" and debt["failure_kind"] == "validation"
+    assert debt["reason"] in report and "combined packet rejected" in debt["reason"]
+    assert debt["returncode"] is None and debt["attempts"] == []
+    assert debt["failure_detail"] == "detail 1\n--- phase ---\ndetail 2"
+    assert "rendered non-provider input" not in debt["rejected_excerpt"]
+    assert [(r["role"], r["outcome"]) for r in audit["attempt_ledger"]] == [
+        ("claim-discovery", "completed"), ("claim-binding", "completed"),
+    ]
+    assert audit["claim_audit_debt"] == debt
+
+
+@pytest.mark.parametrize("corrected", [False, True])
+def test_missing_binding_session_is_owned_validation(repo, tmp_path, monkeypatch, corrected):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    capture_fixture(monkeypatch, texts)
+    attempt = 4 if corrected else 2
+    shared = dict(plan=plan, claims=claims, binding_sessionless=attempt, repair=corrected)
+    report, state, audit = public(monkeypatch, repo, tmp_path, shared)
+    debt = state["debt"]
+    assert debt["failure_phase"] == "binding" and debt["failure_kind"] == "validation"
+    assert debt["returncode"] == 0 and "no resumable session" in debt["reason"] in report
+    assert debt["failure_detail"] == f"detail {attempt}" and debt["stderr"] == f"stderr {attempt}"
+    assert len(debt["attempts"]) == (2 if corrected else 1)
+    assert debt["attempts"][-1]["validation_pointer"] == "/session_ref"
+    assert audit["claim_audit_debt"] == debt
+
+
+def test_oversized_source_recovery_names_complete_bound(repo, tmp_path, monkeypatch):
+    plan, claims, texts = fixture(count=1, expanded=0)
+    url = claims[0]["evidence"][0]["url"]
+    texts[url] = "x" * 690_000 + "\n" + claims[0]["anchor"]
+    capture_fixture(monkeypatch, texts)
+    report, state, _ = public(monkeypatch, repo, tmp_path, dict(plan=plan, claims=claims))
+    error = next(iter(state["claims"].values()))["capture_provenance"][0]["error"]
+    assert error.startswith(pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT)
+    assert "requires 69" in error and "400000-character allowance" in error
+    assert "Evidence limit:" in report and "smaller complete authoritative source" in report
 
 
 def test_issue150_recovery_guidance():
@@ -382,6 +449,8 @@ def test_issue150_discovery_correction_failure(repo, tmp_path, monkeypatch, fail
             assert isinstance(row[key + "_sha256"], str)
             assert isinstance(row[key + "_excerpt"], str)
     assert audit["attempt_ledger"] == debt["attempts"]
+    if failure == "admission":
+        assert_empty_provider_channels(debt)
 
 
 @pytest.mark.parametrize("phase", ["binding","attestation"])
@@ -411,10 +480,72 @@ def test_later_batch_admission_never_borrows_previous_response(repo, tmp_path, m
     debt = state["debt"]
     assert debt["failure_phase"] == phase and debt["failure_kind"] == "admission"
     assert len(debt["attempts"]) == (1 if correction else 0)
-    assert debt["rejected_excerpt"] == ""  # no response to the refused call
+    assert_empty_provider_channels(debt)
     assert "no provider response for this failure" in report
     assert debt["returncode"] == 124
     assert "later role admission refused" in report
     if correction:
         assert debt["attempts"][0]["outcome"] == "validation-invalid"
     assert len(audit["attempt_ledger"]) > len(debt["attempts"])
+
+
+def test_native_trial_resumes_durable_label_and_preserves_failed_receipt(tmp_path):
+    from scripts import run_claim_binding_150_acceptance as native
+
+    first, initial = native.prepare_trial(tmp_path)
+    failed = first / "receipt.json"
+    original = b'{"outcome":"failed"}\n'
+    failed.write_bytes(original)
+    directory = tmp_path / "state/lineages"
+    directory.mkdir(parents=True)
+    predecessor = '{"rounds":2,"review_state":{"last_round":6},"claim_state":{"debt":{"reason":"binding failed"}}}'
+    (directory / (native.LINEAGE + ".json")).write_text(predecessor)
+    second, resumed = native.prepare_trial(tmp_path)
+    assert failed.read_bytes() == original
+    assert first != second and initial["request"]["round"] == 1
+    assert resumed["request"]["round"] == 7
+    assert resumed["request"]["repo_path"] == initial["request"]["repo_path"]
+    assert resumed["request"]["lineage"] == initial["request"]["lineage"]
+    assert resumed["fixture_revision"] == initial["fixture_revision"]
+    assert resumed["predecessor_text"] == predecessor
+    assert resumed["predecessor_sha256"] == native.sha(predecessor.encode())
+    assert resumed["prior_receipts"] == {f"{first.name}/receipt.json": native.sha(original)}
+
+
+@pytest.mark.parametrize("mutation", [None, "timeout", "orphan", "native-error", "review-error"])
+def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_roles(mutation):
+    from dataclasses import asdict
+    from paranoia_local.engines import CodexEngine
+    from scripts import run_claim_binding_150_acceptance as native
+
+    record = {"audit": {"attempt_ledger": []}, "reviews": []}
+    profiles = [
+        ("claim-discovery", "evidence-discovery", 900, None, "discovery"),
+        ("claim-binding", "evidence-binding", 300, "discovery", "discovery"),
+        ("claim-attestation", "evidence-text", 300, None, "attestation"),
+    ]
+    for index, (phase, role, timeout, resumed, session) in enumerate(profiles):
+        if mutation == "orphan" and index == 1:
+            phase += "-validation-retry"
+        events = [
+            {"type": "thread.started", "thread_id": session},
+            {"type": "item.completed", "item": {"type": "agent_message", "text": "output"}},
+            {"type": "turn.completed"},
+        ]
+        if mutation == "native-error" and index == 1:
+            events.append({"type": "turn.failed", "error": {"message": "provider error"}})
+        raw = "\n".join(map(json.dumps, events))
+        review = Review("output", session, raw, duration_ms=1,
+                        error=mutation == "review-error" and index == 1)
+        row = h._attempt(phase, CodexEngine(), review, requested_timeout_sec=timeout).json()
+        row["outcome"] = "completed"
+        record["audit"]["attempt_ledger"].append(row)
+        record["reviews"].append({
+            "role": role, "timeout": 299 if mutation == "timeout" and index == 1 else timeout,
+            "resumed_session": resumed, "review": asdict(review), "prompt": "request",
+        })
+    if mutation is None:
+        assert list(native.validate_attempts(record, h)) == [p[0] for p in profiles]
+    else:
+        with pytest.raises(ValueError):
+            native.validate_attempts(record, h)

@@ -156,7 +156,7 @@ invocation. The retained
 acceptance record reports the measured live latency for each 627,000-character Codex and Claude
 packet. These remain generous circuit breakers, not review-quality budgets; an admitted call may
 use its full time and context to establish authoritative evidence.
-Captured sources are downloaded with up to 16 workers under the same monotonic deadline and
+Captured sources are downloaded with up to four workers under the same monotonic deadline and
 per-source wall-clock bounds, then bound in deterministic indexed batches in the same corrected
 discovery session. Exact 5,000,000-byte and 1,000,000-character boundaries are admitted; the first
 unit above either is rejected. Numbering, metadata, JSON escaping, and the full instruction

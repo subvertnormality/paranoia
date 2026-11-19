@@ -462,7 +462,8 @@ of the resulting code and tests.
   and cold-attestation calls retain 300 seconds. Admit an initial call only when both its call-count
   and full role-specific latency reserve fit the remaining monotonic deadline. Before the first
   model call, reserve the complete maximum model/retry graph plus explicit non-model
-  capture/processing time and scheduling slack.
+  capture/processing time using PLAN_EVIDENCE_REQUIRED_WORK_SEC. Scheduling slack
+  belongs only to the enclosing evidence window.
   Use the same pure prompt renderers for preflight and invocation and test the exact strings; do not
   maintain parallel size estimates.
   Packet and latency limits are circuit breakers, not

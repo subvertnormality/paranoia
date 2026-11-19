@@ -349,13 +349,6 @@ def _reserve_branch_contract(
 
 
 @dataclass(frozen=True)
-class _ValidationReview(Review):
-    """A successful provider response rejected by local claim validation."""
-
-    validation_detail: str = ""
-
-
-@dataclass(frozen=True)
 class _EvidencePhaseReview(Review):
     """A terminal evidence-provider failure with a server-owned processing phase."""
 
@@ -364,7 +357,7 @@ class _EvidencePhaseReview(Review):
     admission_reason: str = ""
     evidence_reason: str = ""
     failure_kind: str = "execution"
-    phase_attempts: tuple[dict[str, Any], ...] | None = None
+    phase_attempts: tuple[dict[str, Any], ...] = ()
 
 
 def _evidence_phase_review(review: Review, phase: str) -> _EvidencePhaseReview:
@@ -4599,54 +4592,30 @@ def _verify_plan_claims(
             "claim-audit", engine, review, requested_timeout_sec=3600,
         ).json())
     if review.error:
-        validation_invalid = isinstance(review, _ValidationReview)
-        evidence_phase = (
-            review.evidence_phase if isinstance(review, _EvidencePhaseReview) else None
-        )
-        phase_attempts: list[dict[str, Any]] = []
-        if validation_invalid and captured_engine is not None and attempt_ledger:
-            phase_attempts = [
-                row for row in attempt_ledger
-                if str(row.get("role", "")).startswith("claim-discovery")
-            ]
-        if evidence_phase in {"binding", "attestation"} and attempt_ledger:
-            prefix = f"claim-{'attestation' if evidence_phase == 'attestation' else 'binding'}"
-            candidates = [
-                row for row in attempt_ledger
-                if str(row.get("role", "")).startswith(prefix)
-            ]
-            phase_attempts = candidates[-2:] if (
-                candidates
-                and str(candidates[-1].get("role", "")).endswith("validation-retry")
-            ) else candidates[-1:]
-        if isinstance(review, _EvidencePhaseReview) and review.phase_attempts is not None:
-            phase_attempts = list(review.phase_attempts)
+        phase_review = review if isinstance(review, _EvidencePhaseReview) else None
+        evidence_phase = phase_review.evidence_phase if phase_review else None
+        quota = claude_provider_guidance(review, engine.name)
+        if phase_review and phase_review.admission_reason:
+            reason = f"evidence budget exhausted: {phase_review.admission_reason}"
+        elif phase_review and phase_review.evidence_reason:
+            reason = phase_review.evidence_reason
+        else:
+            reason = f"claim-{evidence_phase or 'audit'} reviewer failed (exit {review.returncode})"
+        if quota:
+            reason += "; " + quota
         error = pc.AuditError(
-            review.validation_detail if validation_invalid else
-            f"evidence budget exhausted: {review.admission_reason}"
-            if isinstance(review, _EvidencePhaseReview) and review.admission_reason else
-            review.evidence_reason
-            if isinstance(review, _EvidencePhaseReview) and review.evidence_reason else (
-                f"claim-{evidence_phase or 'audit'} reviewer failed "
-                f"(exit {review.returncode})"
-                + ("; " + quota if (quota := claude_provider_guidance(review, engine.name)) else "")
-            ),
-            review.raw,
+            reason, review.raw,
             failure_detail=review.failure_detail or "", stderr=review.stderr or "",
             returncode=review.returncode, failure_phase=evidence_phase,
-            failure_kind=(review.failure_kind if isinstance(review, _EvidencePhaseReview) else None),
-            attempts=phase_attempts,
-            completed_captures=(
-                review.completed_captures
-                if isinstance(review, _EvidencePhaseReview) else ()
-            ),
+            failure_kind=phase_review.failure_kind if phase_review else None,
+            attempts=phase_review.phase_attempts if phase_review else (),
+            completed_captures=phase_review.completed_captures if phase_review else (),
         )
         return pc.with_debt(
             prior_state, error, round_no=round_no, plan_text=plan_text, frozen_ids=frozen,
         ), (
-            "validation-invalid" if validation_invalid or (
-                isinstance(review, _EvidencePhaseReview)
-                and review.evidence_phase == "discovery" and review.failure_kind == "validation"
+            "validation-invalid" if (
+                phase_review and evidence_phase == "discovery" and phase_review.failure_kind == "validation"
             ) else
             f"{evidence_phase}-failed" if evidence_phase else "failed"
         )
@@ -4688,7 +4657,7 @@ def _verify_plan_claims(
                 ),
                 f"malformed: {first.reason}",
             )
-        retry = claim_engine.resume(
+        retry = engine.resume(
             review.session_ref, pc.retry_instructions(
                 first, plan_text, prior_state, frozen_ids=frozen,
             ), repo,
@@ -4780,10 +4749,9 @@ class _CapturedClaimEngine:
         self.binding_engine: Engine | None = None
         self.expanded_captures: set[tuple[int, int]] = set()
         self.last_session: str | None = None
-        self.discovery: pc.Audit | None = None
         self.allow_missing = False
         self.captures: dict[tuple[int, int], external_sources.Capture] = {}
-        self.attestation_raw = ""
+        self.completed_reviews: list[Review] = []
         self.non_model_deadline: float | None = None
         self.non_model_reserve = PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         self.phase_attempt_start = len(attempt_ledger or [])
@@ -4794,20 +4762,21 @@ class _CapturedClaimEngine:
     def _phase_attempts(self) -> tuple[dict[str, Any], ...]:
         return tuple((self.attempt_ledger or [])[self.phase_attempt_start:])
 
+    def _completed_channel(self, name: str) -> str:
+        return "\n--- phase ---\n".join(
+            value for review in self.completed_reviews if (value := getattr(review, name))
+        )
+
     def _processing_failure(self, error: pc.AuditError, phase: str) -> _EvidencePhaseReview:
         kind = error.failure_kind or "validation"
         attempts = self._phase_attempts()
         code = error.returncode
         if code is None and kind == "admission":
             code = 124  # server admission code, not an unstarted provider's exit
-        if code is None and attempts and kind not in {"limit", "deadline", "admission"}:
-            code = attempts[-1].get("returncode")
         return _EvidencePhaseReview(
             text=f"[paranoia-local error] {phase} failed: {error}",
             session_ref=self.last_session, raw=error.raw, error=True,
-            failure_detail=(error.failure_detail_raw or error.reason
-                            if kind in {"limit", "deadline", "admission"}
-                            else error.failure_detail_raw),
+            failure_detail=error.failure_detail_raw,
             stderr=error.stderr_raw, returncode=code,
             evidence_phase=error.failure_phase or phase,
             evidence_reason=pc.bounded_diagnostic(error.reason)[:pc.DIAGNOSTIC_CHARS], failure_kind=kind,
@@ -4842,12 +4811,14 @@ class _CapturedClaimEngine:
             "claim-discovery", discoverer, first,
             requested_timeout_sec=discovery_kwargs["timeout"],
         )
-        first = self._require_discovery_session(first)
-        if first.error:
-            if isinstance(first, _ValidationReview):
-                return first
-            return replace(_evidence_phase_review(first, "discovery"),
-                           phase_attempts=self._phase_attempts())
+        session_issue = self._required_session_issue(first, "discovery")
+        if first.error or session_issue:
+            return replace(
+                _evidence_phase_review(first, "discovery"),
+                evidence_reason=session_issue or "",
+                failure_kind="validation" if session_issue else "execution",
+                phase_attempts=self._phase_attempts(),
+            )
         raw_parts = [first.raw]
         try:
             discovery = self._parse_discovery(first.text)
@@ -4877,16 +4848,15 @@ class _CapturedClaimEngine:
                 requested_timeout_sec=discovery_kwargs["timeout"],
             )
             raw_parts.append(corrected.raw)
-            corrected = self._require_discovery_session(corrected)
-            if corrected.error:
+            session_issue = self._required_session_issue(corrected, "discovery")
+            if corrected.error or session_issue:
                 return replace(
                     _evidence_phase_review(corrected, "discovery"),
                     evidence_reason=pc.bounded_diagnostic(
                         f"initial discovery invalid ({error.reason}); correction failed: "
-                        + (corrected.validation_detail if isinstance(corrected, _ValidationReview)
-                           else f"provider exit {corrected.returncode}")
+                        + (session_issue or f"provider exit {corrected.returncode}")
                     ),
-                    failure_kind="validation" if isinstance(corrected, _ValidationReview) else "execution",
+                    failure_kind="validation" if session_issue else "execution",
                     phase_attempts=self._phase_attempts(),
                 )
             try:
@@ -4941,7 +4911,6 @@ class _CapturedClaimEngine:
         except pc.AuditError as error:
             return self._processing_failure(error, "capture")
         try:
-            self.discovery = discovery
             self.captures = captures
             self.binding_engine = self.engine.for_role(eng.ROLE_BINDING)
             binding_kwargs = dict(kwargs)
@@ -4951,18 +4920,17 @@ class _CapturedClaimEngine:
             )
         except pc.AuditError as error:
             return self._processing_failure(error, "binding")
-        raw_parts.extend(item.raw for item in binding_reviews)
-
         attested = self._attest(audit, model, effort)
         if isinstance(attested, Review):
             return attested
-        raw_parts.append(self.attestation_raw)
         last_binding = binding_reviews[-1] if binding_reviews else first
         self.last_session = last_binding.session_ref
         return Review(
             text=_render_audit(attested),
             session_ref=last_binding.session_ref,
-            raw="\n--- phase ---\n".join(raw_parts),
+            raw=self._completed_channel("raw"),
+            failure_detail=self._completed_channel("failure_detail"),
+            stderr=self._completed_channel("stderr"),
             usage=last_binding.usage,
             duration_ms=last_binding.duration_ms,
         )
@@ -5001,6 +4969,7 @@ class _CapturedClaimEngine:
         self, role: str, engine: Engine, review: Review, *,
         requested_timeout_sec: int,
     ) -> None:
+        self.completed_reviews.append(review)
         if self.attempt_ledger is not None:
             self.attempt_ledger.append(_attempt(
                 role, engine, review,
@@ -5033,30 +5002,20 @@ class _CapturedClaimEngine:
             text=f"[paranoia-local error] evidence budget exhausted: {error}",
             # Refused calls have no response; started attempts retain their own channels.
             session_ref=session_ref, raw="",
-            returncode=124, error=True, failure_detail=str(error),
+            returncode=124, error=True,
         )
         return replace(
             _evidence_phase_review(review, phase or ""), admission_reason=str(error),
             failure_kind="admission", phase_attempts=self._phase_attempts(),
         )
 
-    def _require_discovery_session(self, review: Review) -> Review:
-        """Reject unusable discovery metadata before any audit can leave the adapter."""
+    def _required_session_issue(self, review: Review, phase: str) -> str | None:
+        """Mark a successful provider reply with unusable continuation metadata."""
         if review.error or review.session_ref:
-            return review
-        detail = (
-            "claim discovery returned no resumable session; server capture, binding "
-            "and cold attestation cannot proceed. Retry the review; provider-authored "
-            "evidence has not been accepted."
-        )
-        self._mark_last_validation_invalid(detail, review, "/session_ref")
-        return _ValidationReview(
-            text=review.text, session_ref=review.session_ref, raw=review.raw,
-            returncode=review.returncode, error=True, usage=review.usage,
-            duration_ms=review.duration_ms, failure_detail=review.failure_detail,
-            stderr=review.stderr, provider_duration_ms=review.provider_duration_ms,
-            validation_detail=detail,
-        )
+            return None
+        reason = f"claim {phase} returned no resumable session"
+        self._mark_last_validation_invalid(reason, review, "/session_ref")
+        return reason
 
     def _parse_discovery(self, text: str) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""
@@ -5070,49 +5029,6 @@ class _CapturedClaimEngine:
             plan_repo_path=self.plan_repo_path,
         )
         return audit
-
-    def resume(
-        self, session_ref: str, prompt: str, cwd: Path, model: str, effort: str,
-        web_search: bool, **kwargs: Any,
-    ) -> Review:
-        role = self.binding_engine or self.engine.for_role(eng.ROLE_BINDING)
-        binding_kwargs = dict(kwargs)
-        try:
-            binding_kwargs["timeout"] = self._next_model_timeout()
-        except pc.AuditError as error:
-            return self._deadline_failure(error, session_ref, phase="binding")
-        corrected = role.resume(
-            session_ref, prompt, self.launch, model, effort, False, **binding_kwargs,
-        )
-        self._record(
-            "claim-binding-outer-retry", role, corrected,
-            requested_timeout_sec=binding_kwargs["timeout"],
-        )
-        if corrected.error:
-            return _evidence_phase_review(corrected, "binding")
-        if self.discovery is None:
-            return _EvidencePhaseReview(
-                text="[paranoia-local error] corrected binding has no discovery state",
-                session_ref=corrected.session_ref, raw=corrected.raw, error=True,
-                evidence_phase="binding",
-            )
-        try:
-            audit = self._parse_bound(corrected.text, self.discovery, self.captures)
-        except pc.AuditError as error:
-            return _EvidencePhaseReview(
-                text=f"[paranoia-local error] corrected binding audit invalid: {error}",
-                session_ref=corrected.session_ref, raw=corrected.raw, error=True,
-                evidence_phase="binding",
-            )
-        attested = self._attest(audit, model, effort)
-        if isinstance(attested, Review):
-            return attested
-        return Review(
-            text=_render_audit(attested), session_ref=corrected.session_ref,
-            raw=corrected.raw + "\n--- cold attestation ---\n" + self.attestation_raw,
-            usage=corrected.usage,
-            duration_ms=corrected.duration_ms,
-        )
 
     def _capture(
         self, audit: pc.Audit,
@@ -5134,7 +5050,7 @@ class _CapturedClaimEngine:
             )
         try:
             captured = external_sources.capture_all(
-                candidates, workers=16, deadline=self.non_model_deadline,
+                candidates, deadline=self.non_model_deadline,
                 clock=self.clock,
             )
         except external_sources.CaptureGroupError as exc:
@@ -5211,12 +5127,16 @@ class _CapturedClaimEngine:
 
     @classmethod
     def _binding_prompts_fit(cls, rows: list[dict[str, Any]], limit: int) -> bool:
+        return cls._binding_prompt_size(rows) <= limit
+
+    @classmethod
+    def _binding_prompt_size(cls, rows: list[dict[str, Any]]) -> int:
         rendered = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
         issue = "x" * MAX_BINDING_DIAGNOSTIC_CHARS
         return max(
             len(cls._binding_prompt(rendered)),
             len(cls._binding_prompt(rendered, issue)),
-        ) <= limit
+        )
 
     @staticmethod
     def _binding_target(claim: dict[str, Any], item: dict[str, Any]) -> str:
@@ -5246,13 +5166,17 @@ class _CapturedClaimEngine:
     def _attestation_prompts_fit(
         cls, items: list[dict[str, Any]], limit: int,
     ) -> bool:
+        return cls._attestation_prompt_size(items) <= limit
+
+    @classmethod
+    def _attestation_prompt_size(cls, items: list[dict[str, Any]]) -> int:
         rendered = json.dumps(items, ensure_ascii=False, separators=(",", ":"))
         return max(
             len(cls._attestation_prompt(items)),
             len(cls._attestation_correction_prompt(
                 rendered, "x" * MAX_BINDING_DIAGNOSTIC_CHARS,
             )),
-        ) <= limit
+        )
 
     def _expanded_source_fits(
         self, row: dict[str, Any], claim: dict[str, Any], item: dict[str, Any],
@@ -5359,6 +5283,19 @@ class _CapturedClaimEngine:
 
             capture_ref = seen_captures.get(identity) if referenceable else None
             row = make_row(capture_ref)
+
+            def reject_oversized(standalone: dict[str, Any]) -> None:
+                captures[(claim_index, evidence_index)] = replace(
+                    capture, text=None,
+                    error=(
+                        pc.BINDING_FAILURE_PREFIX + pc.SOURCE_PROMPT_LIMIT
+                        + f"{external_sources.BINDING_BUDGET_ERROR} "
+                        f"Complete binding prompt requires {self._binding_prompt_size([standalone])} "
+                        f"characters against the ordinary {MAX_PLAN_BINDING_BATCH_CHARS}-character "
+                        "allowance. No admissible complete expanded packet."
+                    ),
+                )
+
             if current and not self._binding_prompts_fit(
                 current + [row], MAX_PLAN_BINDING_BATCH_CHARS,
             ):
@@ -5371,13 +5308,7 @@ class _CapturedClaimEngine:
                         standalone, claim, item, capture,
                     )
                 ):
-                    captures[(claim_index, evidence_index)] = replace(
-                        capture, text=None,
-                        error=(
-                            pc.BINDING_FAILURE_PREFIX
-                            + external_sources.BINDING_BUDGET_ERROR
-                        ),
-                    )
+                    reject_oversized(standalone)
                     continue
                 batches.append(current)
                 current = []
@@ -5391,14 +5322,7 @@ class _CapturedClaimEngine:
                     current = []
                     seen_captures = {}
                     continue
-                capture = replace(
-                    capture, text=None,
-                    error=(
-                        pc.BINDING_FAILURE_PREFIX
-                        + external_sources.BINDING_BUDGET_ERROR
-                    ),
-                )
-                captures[(claim_index, evidence_index)] = capture
+                reject_oversized(row)
                 continue
             current.append(row)
             if referenceable and capture_ref is None:
@@ -5459,18 +5383,19 @@ class _CapturedClaimEngine:
                 requested_timeout_sec=call_kwargs["timeout"],
             )
             reviews.append(review)
-            if review.error or not review.session_ref:
+            session_issue = self._required_session_issue(review, "binding")
+            if review.error or session_issue:
                 if expanded:
                     source_local_failure(
-                        claude_provider_guidance(review, self.binding_engine.name) or review.failure_detail or review.stderr or
+                        session_issue or claude_provider_guidance(review, self.binding_engine.name) or review.failure_detail or review.stderr or
                         "dedicated expanded binding call failed"
                     )
                     continue
                 raise pc.AuditError(
-                    "captured-text binding call failed", review.raw,
+                    session_issue or "captured-text binding call failed", review.raw,
                     failure_detail=review.failure_detail or "", stderr=review.stderr or "",
                     returncode=review.returncode,
-                    failure_kind="execution",
+                    failure_kind="validation" if session_issue else "execution",
                 )
             try:
                 parsed = self._parse_indexed_binding(review.text, batch, captures)
@@ -5488,19 +5413,22 @@ class _CapturedClaimEngine:
                     requested_timeout_sec=call_kwargs["timeout"],
                 )
                 reviews.append(correction)
-                if correction.error or not correction.session_ref:
+                session_issue = self._required_session_issue(correction, "binding")
+                if correction.error or session_issue:
                     if expanded:
                         source_local_failure(
-                            claude_provider_guidance(correction, self.binding_engine.name) or correction.failure_detail or correction.stderr or
+                            session_issue or claude_provider_guidance(correction, self.binding_engine.name) or correction.failure_detail or correction.stderr or
                             "dedicated expanded binding correction failed"
                         )
                         continue
                     raise pc.AuditError(
-                        "captured-text binding correction failed", correction.raw,
+                        f"initial binding invalid ({first.reason}); "
+                        + (session_issue or "captured-text binding correction failed"),
+                        correction.raw,
                         failure_detail=correction.failure_detail or "",
                         stderr=correction.stderr or "",
                         returncode=correction.returncode,
-                        failure_kind="execution",
+                        failure_kind="validation" if session_issue else "execution",
                     )
                 try:
                     parsed = self._parse_indexed_binding(
@@ -5523,6 +5451,7 @@ class _CapturedClaimEngine:
             decisions.update(parsed)
             current_session = review.session_ref
 
+        self._begin_phase_batch()
         claims = [deepcopy(claim) for claim in discovery.claims]
         for claim_index, claim in enumerate(claims):
             claim["capture_attestations"] = []
@@ -5571,10 +5500,17 @@ class _CapturedClaimEngine:
             tuple(claims), discovery.coverage, discovery.dispositions,
             discovery.assessments,
         )
-        audit = pc.parse_audit(
-            _render_audit(combined), self.plan_text, repo=self.repo,
-            plan_repo_path=self.plan_repo_path, require_capture_provenance=True,
-        )
+        try:
+            audit = pc.parse_audit(
+                _render_audit(combined), self.plan_text, repo=self.repo,
+                plan_repo_path=self.plan_repo_path, require_capture_provenance=True,
+            )
+        except pc.AuditError as error:
+            raise pc.AuditError(
+                f"combined binding audit invalid: {error.reason}", self._completed_channel("raw"),
+                failure_detail=self._completed_channel("failure_detail"),
+                stderr=self._completed_channel("stderr"), failure_kind="validation",
+            ) from error
         return audit, reviews
 
     def _parse_indexed_binding(
@@ -5640,41 +5576,6 @@ class _CapturedClaimEngine:
             result[key] = _OMITTED_BINDING
         return result
 
-    def _parse_bound(
-        self, text: str, discovery: pc.Audit,
-        captures: dict[tuple[int, int], external_sources.Capture],
-    ) -> pc.Audit:
-        audit = pc.parse_audit(
-            text, self.plan_text, repo=self.repo, plan_repo_path=self.plan_repo_path,
-        )
-        if len(audit.claims) != len(discovery.claims) or audit.assessments:
-            raise pc.AuditError("binding changed or omitted the discovered claim inventory", text)
-        immutable_claim = ("kind", "scope", "anchor", "proposition", "prior_claim_id")
-        immutable_source = (
-            "title", "publisher", "source_kind", "authority_basis", "relation",
-        )
-        for claim_index, (claim, original) in enumerate(
-            zip(audit.claims, discovery.claims, strict=True)
-        ):
-            if any(claim.get(key) != original.get(key) for key in immutable_claim):
-                raise pc.AuditError("binding changed claim identity or metadata", text)
-            if len(claim["evidence"]) != len(original["evidence"]):
-                raise pc.AuditError("binding omitted a discovered source", text)
-            for evidence_index, (item, discovered) in enumerate(
-                zip(claim["evidence"], original["evidence"], strict=True)
-            ):
-                capture = captures.get((claim_index, evidence_index))
-                allowed_url = capture.final_url if capture and capture.final_url else discovered["url"]
-                if item["url"] != allowed_url or any(
-                    item[key] != discovered[key] for key in immutable_source
-                ):
-                    raise pc.AuditError("binding changed immutable source metadata", text)
-                if not capture or not capture.usable or not capture.text:
-                    raise pc.AuditError("binding cited an unavailable capture", text)
-                if not external_sources.passage_matches(item["quote"], capture.text):
-                    raise pc.AuditError("binding quote does not occur in captured text", text)
-        return audit
-
     def _attest(self, audit: pc.Audit, model: str, effort: str) -> pc.Audit | Review:
         self._begin_phase_batch()
         items: list[dict[str, Any]] = []
@@ -5716,6 +5617,13 @@ class _CapturedClaimEngine:
                     "capture": capture_data,
                 })
         attester = self.engine.for_role(eng.ROLE_TEXT)
+
+        def prompt_limit(rows: list[dict[str, Any]], limit: int) -> str:
+            return (
+                f"{pc.SOURCE_PROMPT_LIMIT}complete attestation prompt requires "
+                f"{self._attestation_prompt_size(rows)} characters against a "
+                f"{limit}-character allowance"
+            )
         ordinary_items = [
             row for row in items
             if (row["claim_index"], row["evidence_index"]) not in self.expanded_captures
@@ -5731,8 +5639,8 @@ class _CapturedClaimEngine:
             if not self._attestation_prompts_fit(
                 [row], MAX_PLAN_BINDING_BATCH_CHARS,
             ):
-                local_failures[(row["claim_index"], row["evidence_index"])] = (
-                    "one ordinary attestation item exceeds the exact prompt bound"
+                local_failures[(row["claim_index"], row["evidence_index"])] = prompt_limit(
+                    [row], MAX_PLAN_BINDING_BATCH_CHARS,
                 )
                 continue
             current.append(row)
@@ -5751,7 +5659,6 @@ class _CapturedClaimEngine:
                 failure_kind="limit",
             ), "attestation")
         decisions: dict[tuple[int, int], dict[str, Any]] = {}
-        attestation_raw: list[str] = []
 
         def parse_attestation(
             review: Review, attestation_batch: list[dict[str, Any]],
@@ -5828,9 +5735,8 @@ class _CapturedClaimEngine:
             )
             if not self._attestation_prompts_fit(attestation_batch, limit):
                 for row in attestation_batch:
-                    local_failures[(row["claim_index"], row["evidence_index"])] = (
-                        "evidence attestation prompt or correction exceeds its "
-                        f"{limit}-character bound"
+                    local_failures[(row["claim_index"], row["evidence_index"])] = prompt_limit(
+                        attestation_batch, limit,
                     )
                 continue
             try:
@@ -5848,7 +5754,6 @@ class _CapturedClaimEngine:
                 "claim-attestation", attester, review,
                 requested_timeout_sec=timeout,
             )
-            attestation_raw.append(review.raw)
             if review.error:
                 if len(attestation_batch) == 1 and (
                     attestation_batch[0]["claim_index"],
@@ -5909,7 +5814,6 @@ class _CapturedClaimEngine:
                     "claim-attestation-validation-retry", attester, correction,
                     requested_timeout_sec=timeout,
                 )
-                attestation_raw.append(correction.raw)
                 if correction.error:
                     if len(attestation_batch) == 1 and (
                         attestation_batch[0]["claim_index"],
@@ -5954,7 +5858,6 @@ class _CapturedClaimEngine:
                         failure_kind="validation", phase_attempts=self._phase_attempts(),
                     )
             decisions.update(parsed)
-        self.attestation_raw = "\n--- attestation ---\n".join(attestation_raw)
         try:
             if len(decisions) + len(local_failures) != len(items):
                 raise ValueError("attestation inventory differs from the requested inventory")
