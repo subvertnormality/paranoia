@@ -5885,6 +5885,7 @@ class _CapturedClaimEngine:
                         continue
                     return replace(
                         _evidence_phase_review(review, "attestation"),
+                        text=f"[paranoia-local error] attestation invalid without a provider session: {exc}",
                         evidence_reason=pc.bounded_diagnostic(
                             f"attestation invalid without a provider session: {exc}",
                         ),
@@ -5946,6 +5947,7 @@ class _CapturedClaimEngine:
                         continue
                     return replace(
                         _evidence_phase_review(correction, "attestation"),
+                        text=f"[paranoia-local error] evidence attestation invalid: {second}",
                         evidence_reason=pc.bounded_diagnostic(
                             f"initial attestation invalid ({exc}); correction invalid ({second})",
                         ),

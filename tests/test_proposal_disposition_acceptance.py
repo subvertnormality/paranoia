@@ -12,6 +12,37 @@ from paranoia_local import proposal_disposition as pd
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# The issue 139 receipt exercised branch proposals. These top-level nodes belong
+# exclusively to plan claim verification and its verified-plan timing envelope.
+_PLAN_CLAIM_NODES = {
+    "critique_plan", "_verify_plan_claims", "_CapturedClaimEngine", "_EvidencePhaseReview",
+    "_plan_evidence_batch_limit", "_plan_capture_reserve",
+    "PLAN_SOURCES_PER_CAPTURE_RESERVE", "MIN_PLAN_EVIDENCE_BATCHES",
+    "PLAN_CLAIMS_PER_EVIDENCE_BATCH", "PLAN_EVIDENCE_VALIDATION_CORRECTIONS",
+    "MAX_PLAN_CAPTURE_SOURCES", "MAX_PLAN_BINDING_BATCHES", "MAX_PLAN_ATTESTATION_BATCHES",
+    "MAX_PLAN_EVIDENCE_MODEL_CALLS", "PLAN_EVIDENCE_MAX_NON_MODEL_RESERVE_SEC",
+    "PLAN_EVIDENCE_REQUIRED_WORK_SEC", "PLAN_EVIDENCE_TOTAL_TIMEOUT_SEC",
+    "PLAN_REVIEW_CLIENT_MARGIN_SEC", "PLAN_REVIEW_CLIENT_TIMEOUT_SEC",
+}
+
+
+def _branch_proposal_handler_ast(raw):
+    tree = ast.parse(raw)
+    kept = []
+    for node in tree.body:
+        name = None
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+            name = node.name
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+            if isinstance(target, ast.Name):
+                name = target.id
+        if name not in _PLAN_CLAIM_NODES:
+            kept.append(node)
+    tree.body = kept
+    return ast.dump(tree, include_attributes=False)
+
+
 def _historical_codex_no_web_source(source):
     text = source.decode("utf-8")
     classes = [node for node in ast.parse(text).body
@@ -81,6 +112,9 @@ def test_native_proposal_disposition_acceptance(name, current):
                      "proposal_checkout.py"):
             relative = f"src/paranoia_local/{path}"
             source = (ROOT / relative).read_bytes()
+            if path == "handlers.py":
+                assert _branch_proposal_handler_ast(source) == _branch_proposal_handler_ast(blob(relative))
+                continue
             if path == "engines.py":
                 source = source.replace(
                     b'default_model = "claude-fable-5-2"',
