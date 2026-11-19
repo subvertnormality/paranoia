@@ -84,10 +84,16 @@ def request_for(root, predecessor, *, attempted_round=0):
 
 def fixture_revision(root):
     repo = root / "repository"
+    readme = repo / "README.md"
+
     def git(*args):
         return subprocess.check_output(["git", *args], cwd=repo)
+
     if (git("ls-tree", "-r", "--name-only", "HEAD") != b"README.md\n"
-            or git("show", "HEAD:README.md") != FIXTURE_README.encode()):
+            or git("show", "HEAD:README.md") != FIXTURE_README.encode()
+            or {path.name for path in repo.iterdir()} != {".git", "README.md"}
+            or not readme.is_file() or readme.is_symlink()
+            or readme.read_bytes() != FIXTURE_README.encode()):
         raise ValueError("qualification repository differs from frozen fixture")
     return git("rev-parse", "HEAD").decode().strip()
 
@@ -244,24 +250,78 @@ def packet_row(rows, index):
 
 def validate_report_claims(report, audit, claims, pc):
     trailer = audit.get("rendered_trailer")
-    expected = [line for line in pc.render_trailer(claims).splitlines() if line.startswith("CLAIM-")]
-    if (not isinstance(trailer, str) or not report.endswith("\n\n" + trailer)
-            or [line for line in trailer.splitlines() if line.startswith("CLAIM-")] != expected
+    claim_block = trailer.split("\n", 1)[1] if (
+        isinstance(trailer, str) and trailer.startswith("REVIEW-ROUTING:") and "\n" in trailer
+    ) else trailer
+    if (not isinstance(claim_block, str) or not report.endswith("\n\n" + trailer)
+            or not claim_block.startswith(pc.render_trailer(claims) + "\nLINEAGE:")
             or audit.get("claim_counts") != {"supported": 1, "refuted": 0, "unverified": 0}):
         raise ValueError("audited trailer and returned report disagree with durable claims")
 
 
+def validate_discovery_inputs(record, pc, repo):
+    plan = record["request"]["plan_text"]
+    stakes = record["request"]["stakes"]
+    predecessor = json.loads(record["predecessor_text"]) if record["predecessor_text"] else {}
+    prior = predecessor.get("claim_state", {})
+    targeted = pc.has_prior_snapshot(prior) and not predecessor.get("claim_reverify_required")
+    frozen = pc.frozen_supported_ids(prior, plan, repo=repo, require_capture_attestation=True) if targeted else ()
+    expected = (pc.targeted_audit_instructions(plan, prior, stakes, frozen) if targeted
+                else pc.audit_instructions(plan, prior, stakes))
+    calls = [row for row in record["reviews"] if row["role"] == "evidence-discovery"]
+    if calls[0]["prompt"] != expected:
+        raise ValueError("observed discovery input differs from qualification request")
+    if len(calls) == 2:
+        first = calls[0]["review"]["text"]
+        try:
+            audit = pc.parse_audit(first, plan, repo=repo, discovery_only=True)
+            pc.validate_prior_coverage(prior, audit, plan_text=plan, raw=first, frozen_ids=frozen, repo=repo)
+        except pc.AuditError as error:
+            if calls[1]["prompt"] == pc.retry_instructions(error, plan, prior, frozen_ids=frozen):
+                return
+        raise ValueError("observed discovery correction differs from qualification request")
+
+
+def validate_fixture_snapshot(root, revision, plan, state, handlers):
+    repo = root / "repository"
+    if revision != fixture_revision(root):
+        raise ValueError("qualification repository mismatch")
+    tree = handlers.orientation.snapshot_tree(repo, revision)
+    committed = subprocess.check_output(["git", "rev-parse", f"{revision}^{{tree}}"], cwd=repo).decode().strip()
+    snapshot = handlers.orientation.wrap_commit(repo, tree, revision)
+    if tree != committed or state["review_state"]["snapshot_digest"] != handlers.rc.digest(f"{plan}\0{snapshot}"):
+        raise ValueError("durable structural snapshot differs from reviewed fixture")
+
+
 def validate_binding_input(prompt, index, candidate, capture, pc):
     row = packet_row(json.loads(prompt.rsplit("\n\n", 1)[1]), index)
-    source = row["capture"]
-    if (row["proposition"] != PROPOSITION or row["binding_target"] != PROPOSITION
-            or row["candidate"] != capture["candidate"]
-            or any(candidate.get(key) != value for key, value in row["candidate"].items())
-            or source["usable"] is not True or source["capture_ref"] is not None
-            or source["line_numbered_text"] != pc.sources.numbered_text(capture["text"])
-            or any(source[key] != capture[key] for key in
-                   ("final_url", "status", "content_type", "content_sha256", "text_sha256"))):
+    metadata = {key: capture[key] for key in
+                ("final_url", "status", "content_type", "content_sha256", "text_sha256",
+                 "error", "fallback_attempted")}
+    expected = dict(
+        claim_index=0, evidence_index=index, proposition=PROPOSITION,
+        binding_target=PROPOSITION, candidate=capture["candidate"],
+        capture=dict(**metadata, usable=True, capture_ref=None,
+                     line_numbered_text=pc.sources.numbered_text(capture["text"])),
+    )
+    if row != expected or any(candidate.get(key) != value for key, value in row["candidate"].items()):
         raise ValueError("observed binding packet differs from indexed discovery and capture")
+    return row
+
+
+def validate_attestation_input(prompt, index, item, capture, *, expanded, pc):
+    row = packet_row(json.loads(prompt.rsplit("\n\n", 1)[1]), index)
+    source = {key: capture[key] for key in
+              ("final_url", "status", "content_type", "content_sha256", "text_sha256")}
+    if expanded:
+        source["complete_line_numbered_text"] = pc.sources.numbered_text(capture["text"])
+    expected = dict(
+        claim_index=0, evidence_index=index, proposition=PROPOSITION,
+        publisher=item["publisher"], authority_basis=item["authority_basis"],
+        relation=item["relation"], location=item["location"], passage=item["quote"], capture=source,
+    )
+    if row != expected:
+        raise ValueError("observed cold packet differs from indexed bound evidence and capture")
 
 
 def validate(record, handlers, pc, *, identity, root):
@@ -279,11 +339,12 @@ def validate(record, handlers, pc, *, identity, root):
     attempted_round = previous_round(root, record["prior_receipts"])
     if record["request"] != request_for(root, predecessor, attempted_round=attempted_round):
         raise ValueError("qualification input or provider mismatch")
-    if record["fixture_revision"] != fixture_revision(root):
-        raise ValueError("qualification repository mismatch")
     plan = record["request"]["plan_text"]
     audit, state, report = record["audit"], record["state"], record["report"]
+    validate_fixture_snapshot(root, record["fixture_revision"], plan, state, handlers)
     if (audit["error"] or audit["returncode"] != 0 or audit["claim_audit_failed"]
+            or audit["tool"] != "critique_plan" or audit["engine"] != record["request"]["engine"]
+            or audit["grounded"] is not True or audit["plan_digest"] != sha(plan.encode())[:16]
             or audit["lineage"] != record["request"]["lineage"]
             or audit["round"] != record["request"]["round"]
             or state["review_state"]["last_round"] != record["request"]["round"]
@@ -299,7 +360,9 @@ def validate(record, handlers, pc, *, identity, root):
         raise ValueError("expected release claim or captured cold support missing")
     validate_report_claims(report, audit, claims, pc)
     accepted = validate_attempts(record, handlers)
-    discovery = pc.parse_audit(accepted["claim-discovery"][0].text, plan)
+    repo = root / "repository"
+    validate_discovery_inputs(record, pc, repo)
+    discovery = pc.parse_audit(accepted["claim-discovery"][0].text, plan, repo=repo, discovery_only=True)
     if (len(discovery.claims) != 1 or discovery.claims[0]["anchor"] != PROPOSITION
             or discovery.claims[0]["proposition"] != PROPOSITION
             or discovery.claims[0]["verdict"] != "supported"):
@@ -307,9 +370,8 @@ def validate(record, handlers, pc, *, identity, root):
     candidates = discovery.claims[0]["evidence"]
     if len(candidates) != len(record["captures"]) or len(candidates) != len(claim["evidence"]):
         raise ValueError("discovery, captures and durable evidence have different inventories")
-    binding, binding_prompt = accepted["claim-binding"]
-    attestation, attestation_prompt = accepted["claim-attestation"]
-    cold_packet = json.loads(attestation_prompt.rsplit("\n\n", 1)[1])
+    binding = accepted["claim-binding"][0]
+    attestation = accepted["claim-attestation"][0]
     qualifying = False
     for index, item in enumerate(claim["evidence"]):
         candidate, capture = candidates[index], record["captures"][index]
@@ -326,22 +388,28 @@ def validate(record, handlers, pc, *, identity, root):
                 or capture["final_url"] != URL or capture["status"] != 200):
             continue
         if (not isinstance(capture["text"], str) or not re.fullmatch(r"[0-9a-f]{64}", capture["content_sha256"] or "")
+                or capture["error"] is not None
                 or any(capture[key] != provenance.get(key) or capture[key] != decision.get(key)
-                       for key in ("content_sha256", "text_sha256"))
+                       for key in ("content_sha256", "text_sha256", "status", "content_type", "fallback_attempted"))
                 or sha(capture["text"].encode()) != capture["text_sha256"]
                 or not RELEASE_PASSAGE.search(pc.sources.normalize_text(item["quote"]))
                 or not pc.sources.passage_matches(item["quote"], capture["text"])):
             continue
-        validate_binding_input(binding_prompt, index, candidate, capture, pc)
+        binding_rows = [
+            validate_binding_input(call["prompt"], index, candidate, capture, pc)
+            for call in record["reviews"] if call["role"] == "evidence-binding"
+        ]
+        expanded = (
+            handlers._CapturedClaimEngine._binding_prompt_size(binding_rows[:1])
+            > handlers.MAX_PLAN_BINDING_BATCH_CHARS
+        )
+        for call in record["reviews"]:
+            if call["role"] == "evidence-text":
+                validate_attestation_input(call["prompt"], index, item, capture, expanded=expanded, pc=pc)
         bound = indexed_row(binding.text, handlers.PLAN_BINDING_MARKER, "bindings", index)
         cold = indexed_row(attestation.text, "=== EVIDENCE ATTESTATION JSON ===", "attestations", index)
-        packets = [row for row in cold_packet if row["claim_index"] == 0 and row["evidence_index"] == index]
         if (bound["usable"] is True and bound["location"] == item["location"]
                 and pc.sources.normalize_text(bound["passage"]) == item["quote"]
-                and len(packets) == 1 and packets[0]["proposition"] == PROPOSITION
-                and packets[0]["relation"] == "supports_claim" and packets[0]["passage"] == item["quote"]
-                and all(packets[0]["capture"][key] == capture[key]
-                        for key in ("final_url", "content_sha256", "text_sha256"))
                 and cold["publisher_authority"] is True and cold["passage_entailment"] is True
                 and all(cold[key] == decision[key] for key in ("authority_reason", "entailment_reason"))):
             qualifying = True

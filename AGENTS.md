@@ -10,7 +10,8 @@ audit rejection is terminal, never another outer binding/attestation graph.
 Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
 versus provider code provenance. Shared capture/packing expiry is retrieval failure.
 Retain source-local prompt-limit provenance as a closed server-assigned record with
-the rejecting phase, measurement, and allowance. Provider prose cannot assign that kind.
+the rejecting phase, measurement, and allowance. Reject server-owned provenance and
+attestations on every discovery path, including the retained-omission fallback.
 Recovery uses higher-round critique_plan on the same lineage after addressing the
 reason; a fixed limit needs bounded input change. Supported unchanged packets may
 freeze, including failed siblings that are not retried unless verification reopens.

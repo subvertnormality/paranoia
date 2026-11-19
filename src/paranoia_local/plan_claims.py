@@ -387,6 +387,7 @@ def parse_audit(
     text: str, plan_text: str, *, allow_partial: bool = False,
     repo: Path | None = None, plan_repo_path: str | None = None,
     require_capture_provenance: bool = False,
+    discovery_only: bool = False,
 ) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
     if text.count(AUDIT_MARKER) != 1:
@@ -424,6 +425,14 @@ def parse_audit(
     issues: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
+        if discovery_only and isinstance(item, dict) and (
+            {"capture_attestations", "capture_provenance"} & item.keys()
+        ):
+            fatal.append(
+                f"claim {index}: omit server-owned capture_attestations and "
+                f"capture_provenance from discovery [/claims/{index}]"
+            )
+            continue
         try:
             claim = _validate_claim(
                 item, plan_text, repo=repo, plan_repo_path=plan_repo_path,

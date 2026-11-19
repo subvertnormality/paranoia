@@ -321,7 +321,9 @@ diagnostic does not demote the independently adjudicated verdict or remove repla
 The server-owned failure kind and exact bounded reason survive the trailer, audit and
 lineage. A `limit` failure names actual count and allowance. Reduce redundant candidate
 sources or split independently reviewable plans with explicit cross-plan obligations;
-an identical request cannot repair a fixed ceiling. After addressing the problem,
+an identical request cannot repair a fixed ceiling. Only server preflight can assign
+a prompt-limit diagnostic. Discovery and its correction supply source candidates,
+while capture provenance and cold attestations are assigned by the server. After addressing the problem,
 rerun `critique_plan` on the same lineage at a higher round. Unresolved, refuted and
 changed packets re-enter discovery, capture, binding and attestation. Unchanged
 independently supported packets may freeze; their failed siblings are not retried

@@ -4752,7 +4752,7 @@ class _CapturedClaimEngine:
         self.last_session: str | None = None
         self.allow_missing = False
         self.captures: dict[tuple[int, int], external_sources.Capture] = {}
-        self.completed_reviews: list[Review] = []
+        self.completed_reviews: list[tuple[str, Review]] = []
         self.non_model_deadline: float | None = None
         self.non_model_reserve = PLAN_EVIDENCE_NON_MODEL_RESERVE_SEC
         self.phase_attempt_start = len(attempt_ledger or [])
@@ -4765,7 +4765,15 @@ class _CapturedClaimEngine:
 
     def _completed_channel(self, name: str) -> str:
         return "\n--- phase ---\n".join(
-            value for review in self.completed_reviews if (value := getattr(review, name))
+            value for _, review in self.completed_reviews if (value := getattr(review, name))
+        )
+
+    @property
+    def attestation_raw(self) -> str:
+        """Historical runner's ordered stdout stream for cold attempts."""
+        return "\n--- attestation ---\n".join(
+            review.raw for role, review in self.completed_reviews
+            if role in {"claim-attestation", "claim-attestation-validation-retry"}
         )
 
     def _processing_failure(self, error: pc.AuditError, phase: str) -> _EvidencePhaseReview:
@@ -4871,15 +4879,7 @@ class _CapturedClaimEngine:
                 # preserve its useful packets and let reconciliation carry each omission
                 # forward as unverified. Other schema/transition errors remain wholesale.
                 try:
-                    discovery = pc.parse_audit(
-                        corrected.text, self.plan_text, repo=self.repo,
-                        plan_repo_path=self.plan_repo_path,
-                    )
-                    pc.validate_prior_coverage(
-                        self.prior_state, discovery, plan_text=self.plan_text,
-                        raw=corrected.text, frozen_ids=self.frozen_ids, repo=self.repo,
-                        plan_repo_path=self.plan_repo_path, allow_missing=True,
-                    )
+                    discovery = self._parse_discovery(corrected.text, allow_missing=True)
                 except pc.AuditError:
                     detail = pc.bounded_diagnostic(
                         f"initial: {error.reason}\ncorrection: {second.reason}"
@@ -4970,7 +4970,7 @@ class _CapturedClaimEngine:
         self, role: str, engine: Engine, review: Review, *,
         requested_timeout_sec: int,
     ) -> None:
-        self.completed_reviews.append(review)
+        self.completed_reviews.append((role, review))
         if self.attempt_ledger is not None:
             self.attempt_ledger.append(_attempt(
                 role, engine, review,
@@ -5018,16 +5018,16 @@ class _CapturedClaimEngine:
         self._mark_last_validation_invalid(reason, review, "/session_ref")
         return reason
 
-    def _parse_discovery(self, text: str) -> pc.Audit:
+    def _parse_discovery(self, text: str, *, allow_missing: bool = False) -> pc.Audit:
         """Validate governing inventory before any URL is captured."""
         audit = pc.parse_audit(
             text, self.plan_text, repo=self.repo,
-            plan_repo_path=self.plan_repo_path,
+            plan_repo_path=self.plan_repo_path, discovery_only=True,
         )
         pc.validate_prior_coverage(
             self.prior_state, audit, plan_text=self.plan_text, raw=text,
             frozen_ids=self.frozen_ids, repo=self.repo,
-            plan_repo_path=self.plan_repo_path,
+            plan_repo_path=self.plan_repo_path, allow_missing=allow_missing,
         )
         return audit
 
