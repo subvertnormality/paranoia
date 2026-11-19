@@ -155,8 +155,11 @@ class TestDispatch:
         assert "[paranoia-local error]" in out
 
     def test_rebut_dispatch_excludes_reused_proposal_author_until_independent_review(
-        self, repo: Path, tmp_path: Path, spy_get_engine,
+        self, repo: Path, tmp_path: Path, spy_get_engine, monkeypatch,
     ) -> None:
+        # The production dispatch also consults its default root. This fixture
+        # owns both roots so unrelated operator audits cannot exhaust the scan.
+        monkeypatch.setattr(server, "DEFAULT_LOG_DIR", tmp_path / "default")
         author = "proposal-author"
         (tmp_path / "proposal.json").write_text(json.dumps({
             "tool": "critique_branch_patch_proposal",

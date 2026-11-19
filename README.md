@@ -75,7 +75,7 @@ minutes. Add these values to `~/.codex/config.toml`:
 [mcp_servers.paranoia]
 command = "paranoia-local"
 args = ["--engine", "claude"]
-tool_timeout_sec = 8700
+tool_timeout_sec = 15000
 startup_timeout_sec = 60
 ```
 
@@ -533,7 +533,7 @@ Read the complete [safety, evidence, state, and rate-limit model](docs/how-it-wo
 
 ## Troubleshooting
 
-**The MCP call times out in Codex.** Set `tool_timeout_sec = 8700` in the MCP
+**The MCP call times out in Codex.** Set `tool_timeout_sec = 15000` in the MCP
 configuration shown in the quickstart.
 
 **The reviewer executable is unavailable or too old.** Run `codex --version` or

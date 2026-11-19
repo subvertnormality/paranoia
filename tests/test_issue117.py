@@ -179,14 +179,16 @@ def test_expanded_source_uses_exact_attestation_reserve(repo, monkeypatch):
     candidate = external_sources.CandidateSource(item["url"], item["title"], item["publisher"],
         item["source_kind"], item["authority_basis"], item["relation"])
     captured = []
-    original = handlers._CapturedClaimEngine._attestation_prompts_fit
-    def observe(cls, items, limit):
+    original = handlers._CapturedClaimEngine._attestation_prompt_size
+    def observe(cls, items):
         captured.append(copy.deepcopy(items))
-        return original(items, limit)
-    monkeypatch.setattr(handlers._CapturedClaimEngine, "_attestation_prompts_fit", classmethod(observe))
+        return original(items)
+    monkeypatch.setattr(handlers._CapturedClaimEngine, "_attestation_prompt_size", classmethod(observe))
     def fits(text):
         capture = external_sources.Capture(candidate, candidate.url, 200, "text/html", "a"*64, "b"*64, text)
-        return adapter._expanded_source_fits({"claim_index": 0, "evidence_index": 0}, _claim(), item, capture)
+        return adapter._expanded_prompt_limit(
+            {"claim_index": 0, "evidence_index": 0}, _claim(), item, capture,
+        ) is None
     assert fits("a")
     packet = captured[-1]
     assert packet[0]["capture"]["complete_line_numbered_text"] == external_sources.numbered_text("a")

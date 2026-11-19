@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from copy import deepcopy
 from dataclasses import dataclass
@@ -40,6 +41,7 @@ PRIOR_DISPOSITION_INSTRUCTIONS = (
 )
 MAX_ACTIVE_CLAIMS = 500
 MAX_EVIDENCE_PER_CLAIM = 20
+MAX_REPLY_JSON_DEPTH = 64
 DIAGNOSTIC_CHARS = 4000
 MAX_ATTESTATION_REASON_CHARS = 1_000
 BINDING_FAILURE_PREFIX = "binding failure: "
@@ -67,6 +69,7 @@ class AuditError(ValueError):
     def __init__(
         self, reason: str, raw: str = "", *, failure_detail: str = "", stderr: str = "",
         returncode: int | None = None, failure_phase: str | None = None,
+        failure_kind: str | None = None,
         attempts: Iterable[dict[str, Any]] = (),
         completed_captures: Iterable[dict[str, Any]] = (),
     ) -> None:
@@ -77,18 +80,22 @@ class AuditError(ValueError):
         self.returncode = returncode
         self.failure_phase = (
             failure_phase
-            if failure_phase in {"capture", "binding", "attestation"}
+            if failure_phase in {"discovery", "capture", "binding", "attestation"}
             else None
         )
+        self.failure_kind = failure_kind if failure_kind in {
+            "limit", "deadline", "admission", "validation", "execution",
+        } else None
         self.attempts = deepcopy(list(attempts))
         self.completed_captures = deepcopy(list(completed_captures))
-        self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()
+        # Match the attempt ledger's lossless encoding for every decoded Python string.
+        self.raw_sha256 = hashlib.sha256(raw.encode("utf-8", "surrogatepass")).hexdigest()
         self.excerpt = _excerpt(raw)
         self.failure_detail_sha256 = hashlib.sha256(
-            failure_detail.encode("utf-8", "replace")
+            failure_detail.encode("utf-8", "surrogatepass")
         ).hexdigest()
         self.failure_detail = _excerpt(failure_detail)
-        self.stderr_sha256 = hashlib.sha256(stderr.encode("utf-8", "replace")).hexdigest()
+        self.stderr_sha256 = hashlib.sha256(stderr.encode("utf-8", "surrogatepass")).hexdigest()
         self.stderr = _excerpt(stderr)
         super().__init__(reason)
 
@@ -107,14 +114,47 @@ class AuditError(ValueError):
         }
         if self.attempts:
             debt["attempts"] = self.attempts
+        elif self.failure_kind is not None:
+            debt["attempts"] = []
+        if self.failure_kind is not None:
+            debt["failure_kind"] = self.failure_kind
         if self.completed_captures:
             debt["completed_captures"] = self.completed_captures
         return debt
 
 
 def bounded_diagnostic(text: str) -> str:
-    """Bound one model-controlled diagnostic using the canonical head/tail excerpt."""
-    return _excerpt(text)
+    """Bound an encoding-safe diagnostic for prompts, packet metadata, or reports."""
+    return _excerpt(_utf8_projection(text))
+
+
+def evidence_recovery(kind: str | None, *, phase: str | None = None, frozen: bool = False) -> str:
+    """Public recovery contract; there is no standalone evidence-phase retry API."""
+    if frozen:
+        return (
+            "An unchanged independently supported packet may freeze on the next round; "
+            "its failed sibling is not retried unless the assertion re-enters verification."
+        )
+    if kind == "limit":
+        return (
+            "Inspect the reported size or count and allowance. Supply a smaller complete "
+            "authoritative source, reduce redundant candidates, or split independently "
+            "reviewable plans with explicit cross-plan obligations; "
+            "an identical request cannot repair a fixed limit. Then rerun critique_plan on "
+            "the same lineage at a higher round. Preserve assertions and authoritative evidence."
+        )
+    action = {
+        "discovery": "retry external claim discovery",
+        "capture": "retry capture or supply another authoritative public URL",
+        "binding": "retry captured-text binding",
+        "attestation": "retry cold authority-and-entailment attestation",
+    }.get(phase, "repeat evidence verification")
+    return (
+        "After addressing the reported problem, rerun critique_plan on the same lineage "
+        f"at a higher round to {action}. Unresolved, refuted or changed packets re-enter discovery, "
+        "capture, binding and attestation; unchanged supported packets may freeze. "
+        "Do not remove or weaken the assertion solely because evidence processing failed."
+    )
 
 
 @dataclass(frozen=True)
@@ -346,32 +386,69 @@ def changed_plan_text(state_raw: Any, plan_text: str) -> str:
     ))
 
 
+def _unique_reply_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, child in pairs:
+        if key in value:
+            raise ValueError(f"duplicate JSON object key {key[:80]!a}")
+        value[key] = child
+    return value
+
+
+def decode_reply_json(payload: str, reply: str, *, label: str) -> tuple[Any, int]:
+    """Decode one claim-role envelope without collapsing repeated keys."""
+    try:
+        value, end = json.JSONDecoder(object_pairs_hook=_unique_reply_object).raw_decode(payload)
+    except RecursionError as exc:
+        raise AuditError(f"{label} JSON nesting exceeds {MAX_REPLY_JSON_DEPTH}", reply) from exc
+    except ValueError as exc:
+        raise AuditError(f"{label} JSON did not parse: {exc}", reply) from exc
+
+    # Leave room for stronger downstream stack use when copying accepted coverage.
+    pending = [(value, 0)]
+    while pending:
+        node, depth = pending.pop()
+        if isinstance(node, (dict, list)):
+            if depth >= MAX_REPLY_JSON_DEPTH:
+                raise AuditError(f"{label} JSON nesting exceeds {MAX_REPLY_JSON_DEPTH}", reply)
+            children = node.values() if isinstance(node, dict) else node
+            pending.extend((child, depth + 1) for child in children)
+        elif isinstance(node, float) and not math.isfinite(node):
+            raise AuditError(f"{label} JSON contains a non-finite number", reply)
+    return value, end
+
+
 def parse_audit(
     text: str, plan_text: str, *, allow_partial: bool = False,
     repo: Path | None = None, plan_repo_path: str | None = None,
     require_capture_provenance: bool = False,
+    discovery_only: bool = False,
 ) -> Audit:
     """Parse and validate the single JSON object following ``AUDIT_MARKER``."""
-    if text.count(AUDIT_MARKER) != 1:
+    _, marker, tail = text.partition(AUDIT_MARKER)
+    if not marker:
         raise AuditError(
-            f"expected exactly one {AUDIT_MARKER!r} marker, found {text.count(AUDIT_MARKER)}",
+            f"expected exactly one {AUDIT_MARKER!r} marker, found 0",
             text,
         )
-    tail = text.split(AUDIT_MARKER, 1)[1].strip()
+    # The decoder owns the body. A marker inside a JSON string is data. Another
+    # envelope after the decoded object is rejected by the remainder check.
+    tail = tail.strip()
     if tail.startswith("```json"):
         tail = tail[7:].lstrip()
     elif tail.startswith("```"):
         tail = tail[3:].lstrip()
-    try:
-        value, end = json.JSONDecoder().raw_decode(tail)
-    except json.JSONDecodeError as exc:
-        raise AuditError(f"claim audit JSON did not parse: {exc}", text) from exc
+    value, end = decode_reply_json(tail, text, label="claim audit")
     remainder = tail[end:].strip()
     if remainder == "```":
         remainder = ""
     fatal = ["unexpected text after claim audit JSON"] if remainder else []
     if not isinstance(value, dict) or set(value) != {"claims", "coverage"}:
         raise AuditError("audit must be an object with exactly claims and coverage", text)
+    try:
+        _require_utf8(json.dumps(value, ensure_ascii=False), "claim audit JSON")
+    except ValueError as exc:
+        raise AuditError(str(exc), text) from exc
     claims, coverage = value["claims"], value["coverage"]
     if not isinstance(claims, list):
         raise AuditError("claims must be an array", text)
@@ -387,6 +464,14 @@ def parse_audit(
     issues: list[str] = []
     seen: set[tuple[str, str]] = set()
     for index, item in enumerate(claims):
+        if discovery_only and isinstance(item, dict) and (
+            {"capture_attestations", "capture_provenance"} & item.keys()
+        ):
+            fatal.append(
+                f"claim {index}: omit server-owned capture_attestations and "
+                f"capture_provenance from discovery [/claims/{index}]"
+            )
+            continue
         try:
             claim = _validate_claim(
                 item, plan_text, repo=repo, plan_repo_path=plan_repo_path,
@@ -503,11 +588,11 @@ def _validate_claim(
     # Concrete literals make eligibility mechanically enforceable.  An externally
     # published normative principle or promised behavior can be load-bearing even though
     # it is not naturally described as a historical "fact".
-    if item["kind"] not in CLAIM_KINDS:
-        raise ValueError(f"kind must be one of {sorted(CLAIM_KINDS)}")
     kind = item["kind"]
+    if not isinstance(kind, str) or kind not in CLAIM_KINDS:
+        raise ValueError(f"kind must be one of {sorted(CLAIM_KINDS)}")
     scope = item["scope"]
-    if scope not in SCOPES:
+    if not isinstance(scope, str) or scope not in SCOPES:
         raise ValueError(
             "scope must be the literal \"external\"; repository/internal assertions "
             "belong to structural review and tests"
@@ -528,7 +613,7 @@ def _validate_claim(
             f"plan wording: {', '.join(introduced)}"
         )
     verdict = item["verdict"]
-    if verdict not in VERDICTS:
+    if not isinstance(verdict, str) or verdict not in VERDICTS:
         raise ValueError(f"verdict must be one of {sorted(VERDICTS)}")
     evidence = item["evidence"]
     if not isinstance(evidence, list) or len(evidence) > MAX_EVIDENCE_PER_CLAIM:
@@ -637,7 +722,7 @@ def _validate_capture_provenance(
     rows: list[dict[str, Any]] = []
     seen: set[int] = set()
     for row in value:
-        if not isinstance(row, dict) or set(row) != fields:
+        if not isinstance(row, dict) or set(row) - {"prompt_limit"} != fields:
             raise ValueError("capture_provenance fields are invalid")
         index = row["evidence_index"]
         if type(index) is not int or not 0 <= index < len(evidence) or index in seen:
@@ -682,6 +767,19 @@ def _validate_capture_provenance(
         for field, digest in (("content_sha256", content_sha), ("text_sha256", text_sha)):
             if digest is not None and not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise ValueError(f"capture_provenance {field} must be null or lowercase SHA-256")
+        error = optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS)
+        prompt_limit = row.get("prompt_limit")
+        if "prompt_limit" in row and (
+            not isinstance(prompt_limit, dict)
+            or set(prompt_limit) != {"kind", "phase", "characters", "allowance"}
+            or prompt_limit["kind"] != "limit"
+            or prompt_limit["phase"] not in ("binding", "attestation")
+            or type(prompt_limit["characters"]) is not int
+            or type(prompt_limit["allowance"]) is not int
+            or not 0 < prompt_limit["allowance"] < prompt_limit["characters"]
+            or not error
+        ):
+            raise ValueError("capture_provenance prompt_limit is invalid")
         rows.append({
             "evidence_index": index,
             "requested_url": requested_url,
@@ -691,7 +789,8 @@ def _validate_capture_provenance(
             "fallback_attempted": row["fallback_attempted"],
             "content_sha256": content_sha,
             "text_sha256": text_sha,
-            "error": optional_line("error", sources.MAX_CAPTURE_ERROR_CHARS),
+            "error": error,
+            **({"prompt_limit": dict(prompt_limit)} if prompt_limit else {}),
         })
     return rows
 
@@ -708,7 +807,9 @@ def _source_failure_phases(
         if not raw_error:
             continue
         error = str(raw_error)
-        if error.startswith(BINDING_FAILURE_PREFIX):
+        if (limit := row.get("prompt_limit")):
+            phase = limit["phase"]
+        elif error.startswith(BINDING_FAILURE_PREFIX):
             phase = "binding"
         elif error.startswith(ATTESTATION_FAILURE_PREFIX):
             phase = "attestation"
@@ -1189,7 +1290,7 @@ def evidence_context(state_raw: Any, include_ids: Iterable[str] | None = None) -
             "proposition": claim.get("proposition"),
             "evidence": claim.get("evidence", []),
         })
-    return json.dumps(records, ensure_ascii=False, separators=(",", ":"))
+    return _utf8_projection(json.dumps(records, ensure_ascii=False, separators=(",", ":")))
 
 
 def review_context(state_raw: Any) -> str:
@@ -1261,7 +1362,7 @@ def review_context(state_raw: Any) -> str:
             )
     if state.get("debt"):
         lines.append(f"- AUDIT DEBT: {state['debt'].get('reason')}")
-    return "\n".join(lines)
+    return _utf8_projection("\n".join(lines))
 
 
 def render_trailer(state_raw: Any) -> str:
@@ -1311,34 +1412,36 @@ def render_trailer(state_raw: Any) -> str:
         )
     if state.get("debt"):
         debt = state["debt"]
+        failure_phase = debt.get("failure_phase")
+        if not debt.get("rejected_excerpt") and (
+            debt.get("failure_kind") in {"limit", "admission", "deadline"}
+            or (failure_phase == "capture" and debt.get("returncode") is None)
+        ):
+            reply = "no provider response for this failure"
+        else:
+            reply = f"rejected sha256 {debt.get('raw_sha256')}"
         lines.append(
             f"CLAIM-AUDIT-DEBT: round {debt.get('round')}: {debt.get('reason')} "
-            f"(rejected sha256 {debt.get('raw_sha256')})"
+            f"({reply})"
         )
         if debt.get("rejected_excerpt"):
             lines.append("REJECTED-AUDIT-EXCERPT:\n" + debt["rejected_excerpt"])
-        failure_phase = debt.get("failure_phase")
-        if failure_phase == "capture":
-            lines.extend([
-                "EVIDENCE status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-                "EVIDENCE next action: retry capture or supply another authoritative public "
-                "URL; do not remove or weaken the assertion solely because retrieval failed",
-            ])
-        elif failure_phase == "binding":
-            lines.extend([
-                "EVIDENCE status: BINDING-FAILED (blocking; captured source not adjudicated)",
-                "EVIDENCE next action: retry captured-text binding; do not remove or weaken "
-                "the assertion solely because binding failed",
-            ])
-        elif failure_phase == "attestation":
-            lines.extend([
-                "EVIDENCE status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
-                "EVIDENCE next action: retry cold authority-and-entailment attestation; do not "
-                "remove or weaken the assertion solely because attestation failed",
-            ])
+        status = {
+            "discovery": "DISCOVERY-FAILED (blocking; claim inventory not adjudicated)",
+            "capture": "RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
+            "binding": "BINDING-FAILED (blocking; captured source not adjudicated)",
+            "attestation": "ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
+        }.get(failure_phase)
+        if status:
+            lines.append(f"EVIDENCE status: {status}; reason: {debt.get('reason')}")
+        if debt.get("failure_kind"):
+            lines.append(f"EVIDENCE failure kind: {debt['failure_kind']}")
+        lines.append("EVIDENCE next action: " + evidence_recovery(
+            debt.get("failure_kind"), phase=failure_phase,
+        ))
 
     if audit_failed:
-        return "\n".join(lines)
+        return _utf8_projection("\n".join(lines))
 
     actionable = [
         claim for claim in claims
@@ -1350,7 +1453,14 @@ def render_trailer(state_raw: Any) -> str:
         lines.append("ACTIONABLE SOURCE PACKETS:")
     for claim in actionable:
         lines.extend(_packet_lines(claim))
-    return "\n".join(lines)
+    return _utf8_projection("\n".join(lines))
+
+
+def prompt_limit_detail(limit: dict[str, Any]) -> str:
+    return (
+        f"{limit['phase']} prompt needs {limit['characters']} characters "
+        f"against a {limit['allowance']}-character allowance"
+    )
 
 
 def _packet_lines(claim: dict[str, Any]) -> list[str]:
@@ -1362,78 +1472,40 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
     failure_phases = _source_failure_phases(
         claim.get("capture_provenance", []), claim.get("evidence", []),
     )
-    if failure_phases and claim.get("verdict") == "supported":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "retain the supported verdict from the independently adjudicated source",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry captured-text binding; retain the supported verdict "
-                    "from the independently adjudicated source",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
-                    "independently supported)",
-                    "  Next action: retry cold authority-and-entailment attestation; retain the "
-                    "supported verdict from the independently adjudicated source",
-                ])
-    elif failure_phases and claim.get("verdict") == "refuted":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "retain the refuted verdict from the independently adjudicated source",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry captured-text binding; retain the refuted verdict "
-                    "from the independently adjudicated source",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (non-governing sibling; claim "
-                    "independently refuted)",
-                    "  Next action: retry cold authority-and-entailment attestation; retain the "
-                    "refuted verdict from the independently adjudicated source",
-                ])
-    elif failure_phases and claim.get("verdict") == "unverified":
-        for failure_phase in failure_phases:
-            if failure_phase == "capture":
-                lines.extend([
-                    "  Evidence status: RETRIEVAL-FAILED (blocking; proposition not adjudicated)",
-                    "  Next action: retry capture or supply another authoritative public URL; "
-                    "do not remove or weaken the assertion solely because retrieval failed",
-                ])
-            elif failure_phase == "binding":
-                lines.extend([
-                    "  Evidence status: BINDING-FAILED (blocking; captured source not adjudicated)",
-                    "  Next action: retry captured-text binding; do not remove or weaken the "
-                    "assertion solely because binding failed",
-                ])
-            else:
-                lines.extend([
-                    "  Evidence status: ATTESTATION-FAILED (blocking; bound passage not adjudicated)",
-                    "  Next action: retry cold authority-and-entailment attestation; do not remove "
-                    "or weaken the assertion solely because attestation failed",
-                ])
+    verdict = claim.get("verdict")
+    for phase in failure_phases:
+        name = "RETRIEVAL" if phase == "capture" else phase.upper()
+        if verdict in {"supported", "refuted"}:
+            detail = f"non-governing sibling; claim independently {verdict}"
+        else:
+            detail = {
+                "capture": "blocking; proposition not adjudicated",
+                "binding": "blocking; captured source not adjudicated",
+                "attestation": "blocking; bound passage not adjudicated",
+            }[phase]
+        limits = [
+            row for row in claim.get("capture_provenance", [])
+            if (limit := row.get("prompt_limit")) and limit["phase"] == phase
+        ]
+        lines.append(f"  Evidence status: {name}-FAILED ({detail})")
+        for row in limits:
+            limit = row["prompt_limit"]
+            lines.append(f"  Evidence limit for source {row['evidence_index'] + 1}: {prompt_limit_detail(limit)}")
+        lines.append("  Next action: " + evidence_recovery(
+            "limit" if limits else None, phase=phase, frozen=verdict == "supported",
+        ))
+        if verdict in {"supported", "refuted"}:
+            lines.append(f"  retain the {verdict} verdict from the independently adjudicated source")
     if claim.get("replacement"):
         lines.append(f"  Evidence-entailed replacement: {claim['replacement']}")
     elif not failure_phases or claim.get("verdict") == "refuted":
         lines.append("  Replacement: none proven; remove, weaken, or research the assertion")
     if claim.get("rationale"):
         lines.append(f"  Assessment: {claim['rationale']}")
+    source_errors = {
+        row["evidence_index"]: row["error"] for row in claim.get("capture_provenance", [])
+        if type(row.get("evidence_index")) is int and row.get("error")
+    }
     for index, evidence in enumerate(claim.get("evidence", []), 1):
         lines.extend([
             f"  Source {index}: [{evidence.get('source_kind')}/{evidence.get('relation')}] "
@@ -1442,6 +1514,9 @@ def _packet_lines(claim: dict[str, Any]) -> list[str]:
             f"    Location: {evidence.get('url')} ({evidence.get('location')})",
             f"    Exact passage: {evidence.get('quote')}",
         ])
+        if error := source_errors.get(index - 1):
+            detail = sources._bounded_error(_utf8_projection(str(error)))
+            lines.append(f"    Source {index} failure: {detail}")
     return lines
 
 
@@ -1693,9 +1768,22 @@ PRIOR EVIDENCE PACKETS (JSON):
 {scope_text}"""
 
 
+def _utf8_projection(value: str) -> str:
+    """Escape legacy unpaired surrogates at text boundaries without editing stored rows."""
+    return value.encode("utf-8", errors="backslashreplace").decode("utf-8")
+
+
+def _require_utf8(value: str, name: str) -> None:
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise ValueError(f"{name} must encode as strict UTF-8") from exc
+
+
 def _one_line(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{name} must be a non-empty string")
+    _require_utf8(value, name)
     return " ".join(value.split())
 
 
@@ -1887,7 +1975,7 @@ def _removal_candidates(prior_state: Any, plan_text: str) -> str:
         and claim["anchor"].strip()
         and not _anchor_in_plan(claim["anchor"], plan_text)
     ]
-    return json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+    return _utf8_projection(json.dumps(candidates, ensure_ascii=False, separators=(",", ":")))
 
 
 def _full_packet_candidate_ids(
