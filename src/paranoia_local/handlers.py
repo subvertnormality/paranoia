@@ -5549,9 +5549,10 @@ class _CapturedClaimEngine:
         self, text: str, batch: list[dict[str, Any]],
         captures: dict[tuple[int, int], external_sources.Capture],
     ) -> dict[tuple[int, int], tuple[str, str] | None | _OmittedBinding]:
-        if text.count(PLAN_BINDING_MARKER) != 1:
+        _, marker, tail = text.partition(PLAN_BINDING_MARKER)
+        if not marker:
             raise pc.AuditError(f"expected exactly one {PLAN_BINDING_MARKER} marker", text)
-        tail = text.split(PLAN_BINDING_MARKER, 1)[1].strip()
+        tail = tail.strip()
         try:
             value, end = json.JSONDecoder().raw_decode(tail)
         except json.JSONDecodeError as exc:

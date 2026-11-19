@@ -75,6 +75,8 @@ class Provider:
                      "passage": s["claims"][i]["evidence"][j]["quote"]}
                     for i, j in keys
                 ]})
+                if s.get("repeat_binding_envelope"):
+                    text += "\n" + text
             else:
                 if s.get("attestation_execution_failure") == attempts:
                     return Review(
@@ -710,6 +712,32 @@ def test_claim_audit_marker_inside_quote_is_data_but_second_envelope_is_invalid(
     assert pc.parse_audit(response, PLAN).claims[0]["evidence"][0]["quote"] == quote
     with pytest.raises(pc.AuditError, match="unexpected text after claim audit JSON"):
         pc.parse_audit(response + "\n" + response, PLAN)
+
+
+@pytest.mark.parametrize("repeat_envelope", [False, True])
+def test_indexed_binding_accepts_marker_inside_complete_passage(repo, tmp_path, monkeypatch, repeat_envelope):
+    plan, claims, texts = fixture(count=2, expanded=0)
+    source = claims[0]["evidence"][0]
+    passage = f"{claims[0]['anchor']} The source also contains {h.PLAN_BINDING_MARKER} as literal text."
+    source["quote"] = passage
+    texts[source["url"]] = passage
+    capture_fixture(monkeypatch, texts)
+    report, state, audit = public(
+        monkeypatch, repo, tmp_path, dict(plan=plan, claims=claims, repeat_binding_envelope=repeat_envelope),
+    )
+    if repeat_envelope:
+        assert "BINDING-FAILED" in report and not state["claims"]
+        debt = state["debt"]
+        assert debt == audit["claim_audit_debt"]
+        assert debt["failure_phase"] == "binding" and debt["failure_kind"] == "validation"
+        assert [row["outcome"] for row in debt["attempts"]] == ["validation-invalid", "validation-invalid"]
+        assert not any(row["role"].startswith("claim-attestation") for row in audit["attempt_ledger"])
+    else:
+        settled = {claim["anchor"]: claim for claim in state["claims"].values()}
+        assert len(settled) == 2
+        assert all(claim["verdict"] == "supported" and pc._captured_support(claim) for claim in settled.values())
+        assert settled[claims[0]["anchor"]]["evidence"][0]["quote"] == passage
+        assert not state["debt"] and "CLAIM-CLOSURE: 2 supported" in report
 
 
 @pytest.mark.parametrize("returned", [None, "another-session", "session"])

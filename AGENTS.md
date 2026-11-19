@@ -15,7 +15,7 @@ Escape legacy unpaired surrogates in retained prompt and report projections whil
 preserving original lineage fields and historical audits.
 Escape provider diagnostics before copying them into source packets. Keep the
 attempt channels and their digests bound to the original data. Treat marker text
-inside decoded claim JSON as data and use a server reason for blank diagnostics.
+inside decoded claim and binding JSON as data. Use a server reason for blank diagnostics.
 Persist server-owned phase/kind/reason, actual attempt-scoped channels and local
 versus provider code provenance. Shared capture/packing expiry is retrieval failure.
 Retain source-local prompt-limit provenance as a closed server-assigned record with

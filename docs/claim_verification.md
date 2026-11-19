@@ -184,8 +184,8 @@ failure rather than becoming model-omission provenance. A failed dedicated expan
 source-local and retains its attempt diagnostics; unrelated batches continue.
 Source packets escape malformed Unicode in provider diagnostics before copying
 such text into evidence and use a server reason when the diagnostic is blank.
-The attempt ledger retains the original output channels. Marker text inside a
-quoted JSON value belongs to that value.
+The attempt ledger retains the original output channels. In claim and binding
+replies, marker text inside a quoted JSON value belongs to that value.
 Every source outcome carries a closed server-owned `capture_provenance` row with its requested
 location, nullable effective HTTP(S) final URL, explicit nullable status, content type, both capture
 digests, fallback fact, and bounded error. A null final URL preserves non-web context as an
