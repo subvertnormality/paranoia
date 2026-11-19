@@ -17,7 +17,9 @@ reason; a fixed limit needs bounded input change. Supported unchanged packets ma
 freeze, including failed siblings that are not retried unless verification reopens.
 Do not reinterpret old failed audits as success. PLAN rounds remain historical;
 deterministic acceptance, native claim qualification and broad CODE convergence
-own delivery of this fix.
+own delivery of this fix. Native qualification replays the observed evidence calls
+through production verification, then compares canonical claim state, attempts and
+the report with the retained receipt.
 
 The default Codex model and fixed arbitration attester use `gpt-6.2-astra`.
 Keep tiered correction on `gpt-6.2-sol` and the general evidence-profile CLI

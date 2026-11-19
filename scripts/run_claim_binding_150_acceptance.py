@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = "https://www.python.org/doc/versions/"
@@ -145,6 +146,13 @@ def previous_round(root, receipts):
     return latest
 
 
+def evidence_call(engine, args, kwargs, *, resume):
+    prompt, _, model, effort, web_search = args[1:] if resume else args
+    return dict(role=engine.role, prompt=prompt, model=model, effort=effort,
+                web_search=web_search, timeout=kwargs.get("timeout"),
+                resumed_session=args[0] if resume else None)
+
+
 def observe_evidence_calls(engine_type, record):
     """Record the arguments and reply at the actual engine call boundary."""
     roles = {"evidence-discovery", "evidence-binding", "evidence-text"}
@@ -153,11 +161,7 @@ def observe_evidence_calls(engine_type, record):
         def observed(engine, *args, **kwargs):
             if engine.role not in roles:
                 return method(engine, *args, **kwargs)
-            attempt = dict(
-                role=engine.role, timeout=kwargs.get("timeout"),
-                prompt=args[1] if resume else args[0],
-                resumed_session=args[0] if resume else None,
-            )
+            attempt = evidence_call(engine, args, kwargs, resume=resume)
             record["reviews"].append(attempt)
             review = method(engine, *args, **kwargs)
             attempt["review"] = asdict(review)
@@ -181,7 +185,7 @@ def validate_attempts(record, handlers):
         ("claim-attestation", "evidence-text", handlers.PLAN_EVIDENCE_PHASE_TIMEOUT_SEC),
     )
     index = 0
-    accepted = {}
+    discovery_session = None
     for phase, provider_role, timeout in expected_roles:
         if index >= len(rows) or rows[index]["role"] != phase:
             raise ValueError("missing initial native evidence role")
@@ -205,7 +209,7 @@ def validate_attempts(record, handlers):
             if extracted.text != review.text or extracted.session_ref != review.session_ref:
                 raise ValueError("returned review differs from native stdout extraction")
             prior_session = initial_session if retry else (
-                accepted["claim-discovery"][0].session_ref if phase == "claim-binding" else None
+                discovery_session if phase == "claim-binding" else None
             )
             if (actual["role"] != provider_role or actual["timeout"] != timeout
                     or actual["resumed_session"] != prior_session
@@ -224,28 +228,10 @@ def validate_attempts(record, handlers):
                     or type(row["duration_ms"]) is not int or row["duration_ms"] < 0):
                 raise ValueError("native execution, correction or duration failure")
             index += 1
-        accepted[phase] = (review, actual["prompt"])
+        if phase == "claim-discovery":
+            discovery_session = review.session_ref
     if index != len(rows):
         raise ValueError("unexpected native evidence role after complete graph")
-    return accepted
-
-
-def indexed_row(text, marker, key, index):
-    prefix, separator, body = text.partition(marker)
-    if prefix.strip() or not separator:
-        raise ValueError("missing native evidence envelope")
-    return packet_row(json.loads(body)[key], index)
-
-
-def packet_row(rows, index):
-    matches = [
-        row for row in rows
-        if type(row["claim_index"]) is int and row["claim_index"] == 0
-        and type(row["evidence_index"]) is int and row["evidence_index"] == index
-    ]
-    if len(matches) != 1:
-        raise ValueError("native evidence response omitted or repeated the governing index")
-    return matches[0]
 
 
 def validate_report_claims(report, audit, claims, pc):
@@ -259,27 +245,51 @@ def validate_report_claims(report, audit, claims, pc):
         raise ValueError("audited trailer and returned report disagree with durable claims")
 
 
-def validate_discovery_inputs(record, pc, repo):
-    plan = record["request"]["plan_text"]
-    stakes = record["request"]["stakes"]
+def replay_claims(record, handlers, pc, repo):
+    """Use production prompts, packing, validation and settlement without external I/O."""
+    from paranoia_local.engines import CodexEngine, Review, default_effort
+
+    request = record["request"]
     predecessor = json.loads(record["predecessor_text"]) if record["predecessor_text"] else {}
-    prior = predecessor.get("claim_state", {})
-    targeted = pc.has_prior_snapshot(prior) and not predecessor.get("claim_reverify_required")
-    frozen = pc.frozen_supported_ids(prior, plan, repo=repo, require_capture_attestation=True) if targeted else ()
-    expected = (pc.targeted_audit_instructions(plan, prior, stakes, frozen) if targeted
-                else pc.audit_instructions(plan, prior, stakes))
-    calls = [row for row in record["reviews"] if row["role"] == "evidence-discovery"]
-    if calls[0]["prompt"] != expected:
-        raise ValueError("observed discovery input differs from qualification request")
-    if len(calls) == 2:
-        first = calls[0]["review"]["text"]
-        try:
-            audit = pc.parse_audit(first, plan, repo=repo, discovery_only=True)
-            pc.validate_prior_coverage(prior, audit, plan_text=plan, raw=first, frozen_ids=frozen, repo=repo)
-        except pc.AuditError as error:
-            if calls[1]["prompt"] == pc.retry_instructions(error, plan, prior, frozen_ids=frozen):
-                return
-        raise ValueError("observed discovery correction differs from qualification request")
+    calls = iter(record["reviews"])
+    captures = [
+        pc.sources.Capture(**{**row, "candidate": pc.sources.CandidateSource(**row["candidate"])})
+        for row in record["captures"]
+    ]
+    pending_captures = [captures]
+
+    def respond(*, resume):
+        def respond_to_call(engine, *args, **kwargs):
+            expected = next(calls, None)
+            observed = evidence_call(engine, args, kwargs, resume=resume)
+            if expected is None or {k: v for k, v in expected.items() if k != "review"} != observed:
+                raise ValueError(f"observed native {engine.role} invocation differs from production replay")
+            return Review(**expected["review"])
+        return respond_to_call
+
+    def capture(candidates, **kwargs):
+        if not pending_captures or candidates != [row.candidate for row in captures]:
+            raise ValueError("native capture inventory differs from production replay")
+        return pending_captures.pop()
+
+    ledger = []
+    engine = CodexEngine()
+    model = engine.default_model
+    with (patch.object(CodexEngine, "run", respond(resume=False)),
+          patch.object(CodexEngine, "resume", respond(resume=True)),
+          patch.object(pc.sources, "capture_all", capture)):
+        claims, status = handlers._verify_plan_claims(
+            request["plan_text"], predecessor.get("claim_state", {}),
+            lineage_id=request["lineage"], round_no=request["round"], stakes=request["stakes"],
+            engine=engine, repo=repo, model=model, effort=default_effort(model, fallback="high"),
+            plan_repo_path=None, on_progress=None, attempt_ledger=ledger,
+            force_exhaustive=bool(predecessor.get("claim_reverify_required")),
+        )
+    recorded = [row for row in record["audit"]["attempt_ledger"] if row["role"].startswith("claim-")]
+    if (pending_captures or next(calls, None) is not None or ledger != recorded
+            or not status.startswith("parsed") or status != record["audit"]["claim_status"]
+            or claims != record["state"]["claim_state"]):
+        raise ValueError("native attempts or durable claims differ from production replay")
 
 
 def validate_fixture_snapshot(root, revision, plan, state, handlers):
@@ -291,37 +301,6 @@ def validate_fixture_snapshot(root, revision, plan, state, handlers):
     snapshot = handlers.orientation.wrap_commit(repo, tree, revision)
     if tree != committed or state["review_state"]["snapshot_digest"] != handlers.rc.digest(f"{plan}\0{snapshot}"):
         raise ValueError("durable structural snapshot differs from reviewed fixture")
-
-
-def validate_binding_input(prompt, index, candidate, capture, pc):
-    row = packet_row(json.loads(prompt.rsplit("\n\n", 1)[1]), index)
-    metadata = {key: capture[key] for key in
-                ("final_url", "status", "content_type", "content_sha256", "text_sha256",
-                 "error", "fallback_attempted")}
-    expected = dict(
-        claim_index=0, evidence_index=index, proposition=PROPOSITION,
-        binding_target=PROPOSITION, candidate=capture["candidate"],
-        capture=dict(**metadata, usable=True, capture_ref=None,
-                     line_numbered_text=pc.sources.numbered_text(capture["text"])),
-    )
-    if row != expected or any(candidate.get(key) != value for key, value in row["candidate"].items()):
-        raise ValueError("observed binding packet differs from indexed discovery and capture")
-    return row
-
-
-def validate_attestation_input(prompt, index, item, capture, *, expanded, pc):
-    row = packet_row(json.loads(prompt.rsplit("\n\n", 1)[1]), index)
-    source = {key: capture[key] for key in
-              ("final_url", "status", "content_type", "content_sha256", "text_sha256")}
-    if expanded:
-        source["complete_line_numbered_text"] = pc.sources.numbered_text(capture["text"])
-    expected = dict(
-        claim_index=0, evidence_index=index, proposition=PROPOSITION,
-        publisher=item["publisher"], authority_basis=item["authority_basis"],
-        relation=item["relation"], location=item["location"], passage=item["quote"], capture=source,
-    )
-    if row != expected:
-        raise ValueError("observed cold packet differs from indexed bound evidence and capture")
 
 
 def validate(record, handlers, pc, *, identity, root):
@@ -359,27 +338,11 @@ def validate(record, handlers, pc, *, identity, root):
             or claim["verdict"] != "supported" or not pc._captured_support(claim)):
         raise ValueError("expected release claim or captured cold support missing")
     validate_report_claims(report, audit, claims, pc)
-    accepted = validate_attempts(record, handlers)
-    repo = root / "repository"
-    validate_discovery_inputs(record, pc, repo)
-    discovery = pc.parse_audit(accepted["claim-discovery"][0].text, plan, repo=repo, discovery_only=True)
-    if (len(discovery.claims) != 1 or discovery.claims[0]["anchor"] != PROPOSITION
-            or discovery.claims[0]["proposition"] != PROPOSITION
-            or discovery.claims[0]["verdict"] != "supported"):
-        raise ValueError("discovery did not adjudicate the exact release claim")
-    candidates = discovery.claims[0]["evidence"]
-    if len(candidates) != len(record["captures"]) or len(candidates) != len(claim["evidence"]):
-        raise ValueError("discovery, captures and durable evidence have different inventories")
-    binding = accepted["claim-binding"][0]
-    attestation = accepted["claim-attestation"][0]
+    validate_attempts(record, handlers)
+    replay_claims(record, handlers, pc, root / "repository")
     qualifying = False
-    for index, item in enumerate(claim["evidence"]):
-        candidate, capture = candidates[index], record["captures"][index]
-        if any(row.get("url") != URL or row.get("relation") != "supports_claim"
-               for row in (candidate, capture["candidate"], item)):
-            continue
-        if any(candidate.get(key) != value or item.get(key) != value
-               for key, value in capture["candidate"].items()):
+    for index, (item, capture) in enumerate(zip(claim["evidence"], record["captures"], strict=True)):
+        if item["url"] != URL or item["relation"] != "supports_claim":
             continue
         provenance = next((r for r in claim["capture_provenance"] if r["evidence_index"] == index), {})
         decision = next((r for r in claim["capture_attestations"] if r["evidence_index"] == index), {})
@@ -395,24 +358,7 @@ def validate(record, handlers, pc, *, identity, root):
                 or not RELEASE_PASSAGE.search(pc.sources.normalize_text(item["quote"]))
                 or not pc.sources.passage_matches(item["quote"], capture["text"])):
             continue
-        binding_rows = [
-            validate_binding_input(call["prompt"], index, candidate, capture, pc)
-            for call in record["reviews"] if call["role"] == "evidence-binding"
-        ]
-        expanded = (
-            handlers._CapturedClaimEngine._binding_prompt_size(binding_rows[:1])
-            > handlers.MAX_PLAN_BINDING_BATCH_CHARS
-        )
-        for call in record["reviews"]:
-            if call["role"] == "evidence-text":
-                validate_attestation_input(call["prompt"], index, item, capture, expanded=expanded, pc=pc)
-        bound = indexed_row(binding.text, handlers.PLAN_BINDING_MARKER, "bindings", index)
-        cold = indexed_row(attestation.text, "=== EVIDENCE ATTESTATION JSON ===", "attestations", index)
-        if (bound["usable"] is True and bound["location"] == item["location"]
-                and pc.sources.normalize_text(bound["passage"]) == item["quote"]
-                and cold["publisher_authority"] is True and cold["passage_entailment"] is True
-                and all(cold[key] == decision[key] for key in ("authority_reason", "entailment_reason"))):
-            qualifying = True
+        qualifying = True
     if not qualifying:
         raise ValueError("official captured date passage and matching cold decision missing")
     if record["elapsed_seconds"] <= 0:

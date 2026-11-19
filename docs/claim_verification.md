@@ -323,8 +323,8 @@ lineage. A `limit` failure names actual count and allowance. Reduce redundant ca
 sources or split independently reviewable plans with explicit cross-plan obligations;
 an identical request cannot repair a fixed ceiling. Only server preflight can assign
 a prompt-limit diagnostic. Discovery and its correction supply source candidates,
-while capture provenance and cold attestations are assigned by the server. After addressing the problem,
-rerun `critique_plan` on the same lineage at a higher round. Unresolved, refuted and
+while capture provenance and cold attestations are assigned by the server. After
+addressing the problem, rerun `critique_plan` on the same lineage at a higher round. Unresolved, refuted and
 changed packets re-enter discovery, capture, binding and attestation. Unchanged
 independently supported packets may freeze; their failed siblings are not retried
 unless the assertion re-enters verification. There is no standalone phase-retry API.

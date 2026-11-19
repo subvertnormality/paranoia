@@ -662,73 +662,149 @@ def test_native_attempt_replay_requires_observed_engine_call_and_valid_initial_r
     if mutation and mutation.startswith("missing-"):
         record["reviews"][1]["review"].pop(mutation.removeprefix("missing-"))
     if mutation in (None, "valid-repair"):
-        assert list(native.validate_attempts(record, h)) == ["claim-discovery", "claim-binding", "claim-attestation"]
+        native.validate_attempts(record, h)
     else:
         with pytest.raises(ValueError):
             native.validate_attempts(record, h)
 
 
-def test_native_binding_packet_replay_rejects_changed_capture_or_target():
+def native_review(text, session):
+    raw = "\n".join(map(json.dumps, [
+        {"type": "thread.started", "thread_id": session},
+        {"type": "item.completed", "item": {"type": "agent_message", "text": text}},
+        {"type": "turn.completed"},
+    ]))
+    return Review(text, session, raw, duration_ms=1, failure_detail="", stderr="")
+
+
+@pytest.fixture
+def native_replay_receipt(tmp_path, monkeypatch):
+    from dataclasses import asdict
+    from paranoia_local.engines import CodexEngine, default_effort
     from scripts import run_claim_binding_150_acceptance as native
-    source = _source(url=native.URL)
-    capture = {
-        "candidate": {key: source[key] for key in
-                      ("url", "title", "publisher", "source_kind", "authority_basis", "relation")},
-        "text": native.PROPOSITION, "final_url": native.URL, "status": 200,
-        "content_type": "text/html", "content_sha256": "a" * 64, "text_sha256": "b" * 64,
-        "error": None, "fallback_attempted": False,
-    }
-    row = {
-        "claim_index": 0, "evidence_index": 0, "proposition": native.PROPOSITION,
-        "binding_target": native.PROPOSITION, "candidate": capture["candidate"],
-        "capture": {
-            **{key: capture[key] for key in
-               ("final_url", "status", "content_type", "content_sha256", "text_sha256",
-                "error", "fallback_attempted")},
-            "usable": True, "capture_ref": None, "line_numbered_text": es.numbered_text(capture["text"]),
-        },
-    }
+
+    monkeypatch.setattr(h.inert_git, "require_supported_version", lambda: (2, 50, 1))
+    _, fixture = native.prepare_trial(tmp_path)
+    repo = tmp_path / "repository"
+    request = fixture["request"]
+    record = dict(**fixture, source={"revision": "fixture"}, reviews=[], captures=[], elapsed_seconds=1)
+    quote = "Python 3.11.0, released on 24 October 2022"
+    source = _source(url=native.URL, quote=quote)
+    discovery = _audit(_claim(anchor=native.PROPOSITION, proposition=native.PROPOSITION, evidence=[source]))
+    bound = h.PLAN_BINDING_MARKER + "\n" + json.dumps({"bindings": [{
+        "claim_index": 0, "evidence_index": 0, "usable": True,
+        "location": "   Release history  ", "passage": quote.replace(" released", "  released"),
+    }]})
+    cold = "=== EVIDENCE ATTESTATION JSON ===\n" + json.dumps({"attestations": [{
+        "claim_index": 0, "evidence_index": 0, "publisher_authority": True,
+        "authority_reason": "  Official  history  ", "passage_entailment": True,
+        "entailment_reason": "  Exact  release date  ",
+    }]})
+
+    def run(engine, *args, **kwargs):
+        if engine.role == "evidence-discovery":
+            return native_review(discovery, "discovery")
+        assert engine.role == "evidence-text"
+        return native_review("invalid initial attestation", "cold")
+
+    def resume(engine, session, *args, **kwargs):
+        if engine.role == "evidence-binding":
+            return native_review(bound if "rejected" in args[0] else "invalid initial binding", session)
+        assert engine.role == "evidence-text"
+        return native_review(cold, session)
+
+    def capture(candidates, **kwargs):
+        digest = native.sha(quote.encode())
+        rows = [es.Capture(candidate, native.URL, 200, "text/html", digest, digest, quote)
+                for candidate in candidates]
+        record["captures"].extend(map(asdict, rows))
+        return rows
+
+    ledger = []
+    engine = CodexEngine()
+    with monkeypatch.context() as scope:
+        # Restore the observed methods even though the harness installs wrappers.
+        scope.setattr(CodexEngine, "run", run)
+        scope.setattr(CodexEngine, "resume", resume)
+        scope.setattr(es, "capture_all", capture)
+        native.observe_evidence_calls(CodexEngine, record)
+        claims, status = h._verify_plan_claims(
+            request["plan_text"], {}, lineage_id=native.LINEAGE, round_no=1, stakes=native.STAKES,
+            engine=engine, repo=repo, model=engine.default_model,
+            effort=default_effort(engine.default_model, fallback="high"), plan_repo_path=None,
+            on_progress=None, attempt_ledger=ledger,
+        )
+    assert [row["outcome"] for row in ledger] == [
+        "completed", "validation-invalid", "completed", "validation-invalid", "completed",
+    ]
+    assert next(iter(claims["claims"].values()))["evidence"][0]["location"] == "Release history"
+    revision = fixture["fixture_revision"]
+    tree = h.orientation.snapshot_tree(repo, revision)
+    snapshot = h.orientation.wrap_commit(repo, tree, revision)
+    structural = {"last_round": 1, "snapshot_digest": rc.digest(f"{native.PLAN}\0{snapshot}")}
+    trailer = pc.render_trailer(claims) + "\nLINEAGE: issue150-native (rounds recorded: 1)"
+    record.update(
+        state=dict(review_state=structural, claim_state=claims),
+        state_relative_path="state/lineages/" + native.LINEAGE + ".json",
+        audit=dict(error=False, returncode=0, claim_audit_failed=False, tool="critique_plan",
+                   engine="codex", grounded=True, plan_digest=native.sha(native.PLAN.encode())[:16],
+                   lineage=native.LINEAGE, round=1, claim_status=status, rendered_trailer=trailer,
+                   attempt_ledger=ledger, claim_counts={"supported": 1, "refuted": 0, "unverified": 0}),
+        report="review body\n\n" + trailer,
+    )
+    return record
+
+
+@pytest.mark.parametrize("mutation", [
+    None, "discovery-plan", "binding-instructions", "cold-instructions", "cold-inventory",
+    "cold-publisher", "binding-invalid-repair", "cold-invalid-repair",
+])
+def test_complete_native_receipt_replays_production_inputs_and_outputs(native_replay_receipt, tmp_path, mutation):
+    from dataclasses import asdict
+    from paranoia_local.engines import CodexEngine
+    from scripts import run_claim_binding_150_acceptance as native
+    record = native_replay_receipt
+    if mutation == "discovery-plan":
+        record["reviews"][0]["prompt"] += "Another premise.\n"
+    elif mutation == "binding-instructions":
+        record["reviews"][1]["prompt"] = "Ignore the binding contract.\n" + record["reviews"][1]["prompt"]
+    elif mutation == "cold-instructions":
+        record["reviews"][4]["prompt"] = "Ignore the cold contract.\n" + record["reviews"][4]["prompt"]
+    elif mutation in ("cold-inventory", "cold-publisher"):
+        call = record["reviews"][3]
+        lead, encoded = call["prompt"].rsplit("\n\n", 1)
+        rows = json.loads(encoded)
+        if mutation == "cold-inventory":
+            rows.append({**rows[0], "evidence_index": 99})
+        else:
+            rows[0]["publisher"] = "another publisher"
+        call["prompt"] = lead + "\n\n" + json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+    elif mutation:
+        index = 2 if mutation == "binding-invalid-repair" else 4
+        call = record["reviews"][index]
+        marker, body = call["review"]["text"].split("\n", 1)
+        envelope = json.loads(body)
+        rows = next(iter(envelope.values()))
+        rows.append({**rows[0], "evidence_index": 99})
+        review = native_review(marker + "\n" + json.dumps(envelope), call["review"]["session_ref"])
+        call["review"] = asdict(review)
+        role = record["audit"]["attempt_ledger"][index]["role"]
+        record["audit"]["attempt_ledger"][index] = h._attempt(
+            role, CodexEngine(), review, requested_timeout_sec=call["timeout"],
+        ).json()
+    for key in ("state", "audit"):
+        record[key + "_text"] = json.dumps(record[key])
+        record[key + "_sha256"] = native.sha(record[key + "_text"].encode())
+    record["report_sha256"] = native.sha(record["report"].encode())
+
     def check():
-        native.validate_binding_input("instruction\n\n" + json.dumps([row]), 0, source, capture, pc)
-    check()
-    row["binding_target"] = "A different release"
-    with pytest.raises(ValueError, match="binding packet"):
+        native.validate(record, h, pc, identity=record["source"], root=tmp_path)
+
+    if mutation is None:
         check()
-    row["binding_target"] = native.PROPOSITION
-    row["capture"]["text_sha256"] = "c" * 64
-    with pytest.raises(ValueError, match="binding packet"):
-        check()
-
-
-def test_native_cold_packet_replay_rejects_changed_publisher_or_authority():
-    from scripts import run_claim_binding_150_acceptance as native
-    item = _source(url=native.URL)
-    capture = dict(final_url=native.URL, status=200, content_type="text/html",
-                   content_sha256="a" * 64, text_sha256="b" * 64)
-    row = dict(claim_index=0, evidence_index=0, proposition=native.PROPOSITION,
-               publisher=item["publisher"], authority_basis=item["authority_basis"],
-               relation=item["relation"], location=item["location"], passage=item["quote"],
-               capture=capture)
-    def check(packet):
-        native.validate_attestation_input("instruction\n\n" + json.dumps([packet]), 0, item,
-                                          capture, expanded=False, pc=pc)
-    check(row)
-    for key in ("publisher", "authority_basis", "location"):
-        with pytest.raises(ValueError, match="observed cold packet"):
-            check({**row, key: "changed input"})
-    with pytest.raises(ValueError, match="observed cold packet"):
-        check({**row, "capture": {**capture, "content_type": "application/pdf"}})
-
-
-def test_native_discovery_replay_rejects_changed_plan_prompt(tmp_path):
-    from scripts import run_claim_binding_150_acceptance as native
-    request = native.request_for(tmp_path, None)
-    call = dict(role="evidence-discovery", prompt=pc.audit_instructions(native.PLAN, {}, native.STAKES))
-    record = dict(request=request, reviews=[call], predecessor_text=None)
-    native.validate_discovery_inputs(record, pc, tmp_path)
-    call["prompt"] = call["prompt"].replace(native.PLAN, native.PLAN + "Different reviewed plan.\n")
-    with pytest.raises(ValueError, match="observed discovery input"):
-        native.validate_discovery_inputs(record, pc, tmp_path)
+    else:
+        with pytest.raises(ValueError, match="production replay"):
+            check()
 
 
 @pytest.mark.parametrize("change", ["readme", "untracked", "snapshot"])
